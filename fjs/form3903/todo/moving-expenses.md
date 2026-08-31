@@ -196,10 +196,10 @@ caller threads the message out verbatim — it is never thrown.
 ## How the caller gates §217(g)
 
 `vnd.fjs.return_profile` carries **`movingExpensesArmedForcesPermanentChangeOfStation:
-option(true)`** — Form 3903's own pre-line checkbox, stored the way every other taxpayer
+or(option, true)`** — Form 3903's own pre-line checkbox, stored the way every other taxpayer
 certification on that dialect is stored (`itemizeEvenThoughLessThanStandardDeduction`,
-`hadForeignFinancialAccount`, `iraDeductionDeclared`). DOC-12's rule applies: `option(true)`,
-never `option(boolean)`, so ABSENT means *not certified* and a stored `false` is rejected
+`hadForeignFinancialAccount`, `iraDeductionDeclared`). DOC-12's rule applies: `or(option, true)`,
+never `or(option, boolean)`, so ABSENT means *not certified* and a stored `false` is rejected
 outright rather than read as a denial.
 
 `fjs/schedule/1` **refuses** — it does not zero — whenever a moving expense entry OR a Form W-2

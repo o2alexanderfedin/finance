@@ -893,6 +893,26 @@ const propertyDocument = overrides => documentHash => ({
     },
 })
 
+/**
+ * The same base as a ROYALTY column. i1040se p4 leaves printed lines 1a, 2 and
+ * 3 blank for code 6, and `vnd.fjs.rental_property`'s royalty partition reads
+ * that as ABSENT: since fjs 0.48.0 those fields are `or(option, T)`, so a
+ * present `undefined` is a different value the schema no longer admits.
+ * Dropping them here rather than at each call site makes the partition a
+ * property of the fixture — no override can put an address back on a royalty.
+ * @type {(overrides: Partial<RentalProperty>) => (documentHash: string) => Stored<RentalProperty>}
+ */
+const royaltyDocument = overrides => documentHash => {
+    const {
+        physicalAddress: _physicalAddress,
+        fairRentalDays: _fairRentalDays,
+        personalUseDays: _personalUseDays,
+        rentsReceived: _rentsReceived,
+        ...royalty
+    } = propertyDocument(overrides)(documentHash).value
+    return { documentHash, value: royalty }
+}
+
 /** @type {(category: string) => (amount: string) => RentalProperty['entries'][number]} */
 const entryOf = category => amount => ({
     category,
@@ -1157,13 +1177,9 @@ export const proof = {
      */
     aRoyaltyComputesOnItsOwnPrintedLineFour: () => {
         const result = ok(run({
-            rentalProperties: [propertyDocument({
+            rentalProperties: [royaltyDocument({
                 accountNumber: 'ROY-0001',
                 propertyType: 'royalties',
-                physicalAddress: undefined,
-                fairRentalDays: undefined,
-                personalUseDays: undefined,
-                rentsReceived: undefined,
                 royaltiesReceived: '3200.00',
                 entries: [entryOf('legalAndOtherProfessionalFees')('450.00')],
             })('sha256-royalty-a')],
@@ -1196,13 +1212,9 @@ export const proof = {
                         entryOf('taxes')('3180.00'),
                     ],
                 })('sha256-rental-a'),
-                propertyDocument({
+                royaltyDocument({
                     accountNumber: 'ROY-0001',
                     propertyType: 'royalties',
-                    physicalAddress: undefined,
-                    fairRentalDays: undefined,
-                    personalUseDays: undefined,
-                    rentsReceived: undefined,
                     royaltiesReceived: '3200.00',
                     entries: [entryOf('legalAndOtherProfessionalFees')('450.00')],
                 })('sha256-royalty-a'),
@@ -1252,13 +1264,9 @@ export const proof = {
          */
         aRoyaltyLossNamesFormSixtyOneNinetyEightAndNotFormEightFiveEightTwo: () => {
             const message = refusal(run({
-                rentalProperties: [propertyDocument({
+                rentalProperties: [royaltyDocument({
                     accountNumber: 'ROY-0001',
                     propertyType: 'royalties',
-                    physicalAddress: undefined,
-                    fairRentalDays: undefined,
-                    personalUseDays: undefined,
-                    rentsReceived: undefined,
                     royaltiesReceived: '3200.00',
                     entries: [entryOf('other')('3500.00')],
                 })('sha256-royalty-a')],
@@ -1376,13 +1384,9 @@ export const proof = {
             }
             // And the seventh, the royalty, which takes a different shape.
             const royalty = ok(run({
-                rentalProperties: [propertyDocument({
+                rentalProperties: [royaltyDocument({
                     accountNumber: 'ROY-0001',
                     propertyType: 'royalties',
-                    physicalAddress: undefined,
-                    fairRentalDays: undefined,
-                    personalUseDays: undefined,
-                    rentsReceived: undefined,
                     royaltiesReceived: '3200.00',
                 })('sha256-royalty-a')],
             }))

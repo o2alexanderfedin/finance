@@ -49,16 +49,16 @@
  *
  * @module
  */
-import { array, boolean, number, open, option, or, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, boolean, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, declaredMembers, mediaTypeOf } from '../document/base/module.f.js'
 import { casOpNames } from '../guest/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -114,12 +114,12 @@ export const runSchema = open({
     taxYear: number,
     paramSetHash: string,
     pinned: boolean,
-    subject: option(string),
-    parents: option(array(string)),
+    subject: or(option, string),
+    parents: or(option, array(string)),
     status: or('ok', 'error'),
     inputs: array(inputEntry),
-    resultHash: option(string),
-    error: option(string),
+    resultHash: or(option, string),
+    error: or(option, string),
 })
 
 /** @typedef {Ts<typeof runSchema>} Run */

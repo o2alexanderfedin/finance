@@ -1639,10 +1639,10 @@ export const proof = {
         },
         /** Printed line 6d unstated. */
         anUnstatedPriorYearDeferralRefuses: () => {
+            const { cropInsuranceProceedsDeferredFromPriorYear: _dropped, ...unstated }
+                = farmDocument({})('sha256-farm-a').value
             const message = refusal(run({
-                farmForms: [farmDocument({
-                    cropInsuranceProceedsDeferredFromPriorYear: undefined,
-                })('sha256-farm-a')],
+                farmForms: [{ documentHash: 'sha256-farm-a', value: unstated }],
             }))
             assert(message.includes('line 6d'), ['the printed line', message])
             assert(message.includes('cropInsuranceProceedsDeferredFromPriorYear'),

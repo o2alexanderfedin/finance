@@ -33,7 +33,7 @@
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { ConstObject, Rest, Type } from 'functionalscript/fjs/types/rtti/types.js' */
+/** @import { ConstObject, Rest, Type } from 'functionalscript/fjs/rtti/types.js' */
 
 /**
  * Returns `{ dialect }`, with `dialect`'s literal string type preserved in

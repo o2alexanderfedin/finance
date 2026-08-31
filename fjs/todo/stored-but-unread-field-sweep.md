@@ -174,7 +174,7 @@ invisible — the line was never zero, so nothing looked wrong.
   "under 13", "over 12 and not disabled" and "nobody asked" at once. `dependentCareCommonFacts`
   granted a qualifying person in all three. The fix is the shape this dialect already uses for
   `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` and `saversCreditEligibility`: a second
-  `option(true)`, `underAgeThirteenWhenTheCareWasProvided`, so each of §21(b)(1)'s two populations
+  `or(option, true)`, `underAgeThirteenWhenTheCareWasProvided`, so each of §21(b)(1)'s two populations
   is assertable, absence of both is *unstated*, and `fjs/form2441`'s R6 refuses by name. Both
   present is a contradiction and `fjs/document/credits`' `checkReferences` refuses it.
 - `vnd.fjs.1099g` `box3RefundTaxYear` — the year of the refund in box 2, which is already refused

@@ -82,8 +82,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
@@ -124,7 +124,7 @@ import { parse, stringify as jsonText } from '../../json/module.f.js'
  * by design, which is precisely the case upstream's own `open` docstring
  * names.
  */
-const documentIdentitySchema = open(/** @type {const} */ ({ dialect: option(string), taxYear: option(number) }))
+const documentIdentitySchema = open(/** @type {const} */ ({ dialect: or(option, string), taxYear: or(option, number) }))
 
 /**
  * The shape of one `finance_documents_list` response entry — see the module
@@ -217,7 +217,7 @@ export const financeDocumentsListTool = evo => cas => {
         'archived: true to list archived documents instead. One row per ' +
         '(subject, head) pair -- a subject with concurrent heads yields ' +
         'one row per head, all sharing the same subject.',
-        { archived: option(true) },
+        { archived: or(option, true) },
         ({ archived }) => catchStep(mapStep(
             step(
                 evo.list(archived),

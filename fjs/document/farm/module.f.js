@@ -89,7 +89,7 @@
  *
  * `accountingMethod` (printed line C), `materiallyParticipated` (printed line E)
  * and `investmentAtRisk` (printed line 36) are REQUIRED strings from frozen
- * two-value vocabularies, not `option(true)` checkboxes, for
+ * two-value vocabularies, not `or(option, true)` checkboxes, for
  * `vnd.fjs.business_expenses`' `specifiedServiceTradeOrBusiness` reason: each
  * printed line prints TWO boxes and a filer ticks one of them, so absence is
  * not an answer and a serializer's materialized `false` must not become one.
@@ -109,8 +109,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -118,8 +118,8 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -179,7 +179,7 @@ const expenseEntry = open({
  * structural validation reports it as the first failing field on a mismatched
  * blob (DOC-00's discriminant).
  *
- * Every printed Part I amount is `option(string)` rather than a required
+ * Every printed Part I amount is `or(option, string)` rather than a required
  * string: a farm with no cooperative distributions leaves printed line 3a
  * BLANK, and a materialized `'0.00'` there would be an assertion where the page
  * has none. The one exception is printed line 6d, whose absence is a refusal
@@ -190,29 +190,29 @@ export const farmSchema = open({
     proprietorSsn: string,
     accountNumber: string,
     taxYear: number,
-    corrected: option(true),
+    corrected: or(option, true),
     // Printed lines A, C, E and 36.
     principalCropOrActivity: string,
     accountingMethod: string,
     materiallyParticipated: string,
     investmentAtRisk: string,
     // Printed Part I, lines 1a through 8, in printed order.
-    salesOfPurchasedLivestockAndOtherResaleItems: option(string),
-    costOrOtherBasisOfPurchasedItems: option(string),
-    salesOfRaisedProductsAndLivestock: option(string),
-    cooperativeDistributions: option(string),
-    cooperativeDistributionsTaxableAmount: option(string),
-    agriculturalProgramPaymentsNotReportedOnForm1099G: option(string),
-    commodityCreditCorporationLoanProceedsReportedAsIncomeUnderElection: option(true),
-    commodityCreditCorporationLoansReportedUnderElection: option(string),
-    commodityCreditCorporationLoansForfeited: option(string),
-    commodityCreditCorporationLoansForfeitedTaxableAmount: option(string),
-    cropInsuranceProceedsReceived: option(string),
-    cropInsuranceProceedsTaxableAmount: option(string),
-    electionToDeferCropInsuranceProceeds: option(true),
-    cropInsuranceProceedsDeferredFromPriorYear: option(string),
-    customHireIncome: option(string),
-    otherIncome: option(string),
+    salesOfPurchasedLivestockAndOtherResaleItems: or(option, string),
+    costOrOtherBasisOfPurchasedItems: or(option, string),
+    salesOfRaisedProductsAndLivestock: or(option, string),
+    cooperativeDistributions: or(option, string),
+    cooperativeDistributionsTaxableAmount: or(option, string),
+    agriculturalProgramPaymentsNotReportedOnForm1099G: or(option, string),
+    commodityCreditCorporationLoanProceedsReportedAsIncomeUnderElection: or(option, true),
+    commodityCreditCorporationLoansReportedUnderElection: or(option, string),
+    commodityCreditCorporationLoansForfeited: or(option, string),
+    commodityCreditCorporationLoansForfeitedTaxableAmount: or(option, string),
+    cropInsuranceProceedsReceived: or(option, string),
+    cropInsuranceProceedsTaxableAmount: or(option, string),
+    electionToDeferCropInsuranceProceeds: or(option, true),
+    cropInsuranceProceedsDeferredFromPriorYear: or(option, string),
+    customHireIncome: or(option, string),
+    otherIncome: or(option, string),
     // §199A, the three facts `fjs/form8995a` reads. Copied from
     // `vnd.fjs.business_expenses` field for field, because a farming business is
     // a qualified trade or business like any other and Form 8995-A's
@@ -224,9 +224,9 @@ export const farmSchema = open({
     // financial services, brokerage services, and investing and trading.
     // Farming is on none of them, so `fjs/schedule/f` supplies the answer as a
     // constant and no taxpayer is asked a question with one possible answer.
-    priorYearQualifiedBusinessLossCarryforward: option(string),
-    w2Wages: option(string),
-    unadjustedBasisOfQualifiedProperty: option(string),
+    priorYearQualifiedBusinessLossCarryforward: or(option, string),
+    w2Wages: or(option, string),
+    unadjustedBasisOfQualifiedProperty: or(option, string),
     entries: array(expenseEntry),
 })
 

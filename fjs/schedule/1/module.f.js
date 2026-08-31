@@ -3245,7 +3245,7 @@ const iraEntry = tag => amount => ({
  * the box no computation in this repository read before line 20.
  *
  * `box13RetirementPlan` is ABSENT rather than `false` for the not-covered
- * case: `vnd.fjs.w2` types it `option(true)`, so absence is the only way the
+ * case: `vnd.fjs.w2` types it `or(option, true)`, so absence is the only way the
  * printed form says "not checked", and a fixture that wrote `false` would not
  * validate.
  * @type {(documentHash: string) => (box1: string) => (coveredByWorkplacePlan: boolean) => Stored<W2>}
@@ -4133,9 +4133,10 @@ export const proof = {
      * source. Absent is not zero-valued: it is not present at all.
      */
     formWithoutBox1ContributesNoSource: () => {
+        const { box1UnemploymentCompensation: _dropped, ...withoutBox1 } = unemploymentA.value
         const withholdingOnly = {
             documentHash: 'sha256-1099g-c',
-            value: { ...unemploymentA.value, box1UnemploymentCompensation: undefined },
+            value: withoutBox1,
         }
         const result = partIWithoutBusiness(profileNoDeclaredKinds)([withholdingOnly])
         assertEq(result.line7.value, 0n)

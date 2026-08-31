@@ -176,12 +176,12 @@ Both are taxpayer statements no information return carries, which is the same fo
 `movingExpensesArmedForcesPermanentChangeOfStation`:
 
 - `federalPovertyLineTable` — one of `contiguous48AndDistrictOfColumbia`, `alaska`,
-  `hawaii`. A three-way choice, so a vocabulary-checked string rather than `option(true)`,
+  `hawaii`. A three-way choice, so a vocabulary-checked string rather than `or(option, true)`,
   following the §32 fact fields' own precedent. i8962 line 4 also says that a filer who
   moved, or a joint filer whose spouses lived in different states, uses the table with the
   HIGHER amounts — which is why this is a declaration of which TABLE applies rather than of
   a state.
-- `noDependentIsRequiredToFileAnIncomeTaxReturn` — `option(true)`, DOC-12. Absent means not
+- `noDependentIsRequiredToFileAnIncomeTaxReturn` — `or(option, true)`, DOC-12. Absent means not
   certified, and a return with dependents then refuses rather than assuming line 2b is zero.
 
 ## What is deliberately NOT modeled

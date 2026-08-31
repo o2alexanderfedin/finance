@@ -71,7 +71,7 @@
  * cannot check that claim — but an unchecked claim a taxpayer made is a
  * different thing from an unstated assumption an engine made for them.
  *
- * It follows DOC-12's checkbox convention (`option(true)`), so a stored
+ * It follows DOC-12's checkbox convention (`or(option, true)`), so a stored
  * `false` is structurally rejected and absence is the only way to say "no" —
  * exactly as `vnd.fjs.adjustments`' `hadHighDeductibleCoverageAllYear` does,
  * and for the same reason: a serializer that helpfully materializes every key
@@ -102,7 +102,7 @@
  * `fjs/form8995` refuses the return by name when a §199A deduction would
  * otherwise be computed.
  *
- * **A `string` rather than `option(true)`**, unlike the field above it,
+ * **A `string` rather than `or(option, true)`**, unlike the field above it,
  * because this one carries an AMOUNT and not a checkbox: `'0.00'` is the
  * assertion "I had no prior-year qualified business loss", and it is a
  * different statement from the field being absent. It holds the SIZE of the
@@ -139,16 +139,16 @@
  * three-state, and `fjs/form8995a` refuses BY NAME when it is unstated and the
  * answer would depend on it.
  *
- * **A string, not `option(true)` and not `option(boolean)`**, which is a
+ * **A string, not `or(option, true)` and not `or(option, boolean)`**, which is a
  * departure from DOC-12's checkbox convention worth stating precisely:
  *
- * - `option(true)` cannot express this field. Absence is that convention's way
+ * - `or(option, true)` cannot express this field. Absence is that convention's way
  *   of saying "no", and here "no" is a substantive assertion that RAISES the
  *   deduction. The convention is right where absence is the safe reading —
  *   `grossReceiptsFullyReportedOnForms1099Nec` above is exactly that — and
  *   wrong here for the same reason `priorYearQualifiedBusinessLossCarryforward`
  *   is not a checkbox either.
- * - `option(boolean)` expresses three states but makes the dangerous one cheap.
+ * - `or(option, boolean)` expresses three states but makes the dangerous one cheap.
  *   The hazard this dialect already names — *"a serializer that helpfully
  *   materializes every key"* — would write `false`, indistinguishable from a
  *   taxpayer who answered no. As one of two exact strings, a materialized
@@ -188,8 +188,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -197,8 +197,8 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -268,7 +268,7 @@ const businessUseOfHomeExpenseEntry = open({
  * same provenance as the record it sat beside.
  *
  * `method` is the taxpayer's ELECTION and is a two-value frozen vocabulary
- * rather than an `option(true)`, for {@link specifiedServiceTradeOrBusinessValues}'
+ * rather than an `or(option, true)`, for {@link specifiedServiceTradeOrBusinessValues}'
  * own recorded reason. i8829's *Who cannot use Form 8829* makes the two
  * mutually exclusive — *"You have elected to use the simplified method for
  * your home for 2025"* is on the list of situations in which the form may not
@@ -292,7 +292,7 @@ const businessUseOfHomeExpenseEntry = open({
  * never touch Schedule A, an itemizer's go through Pub. 936 and the Line 11
  * Worksheet first and then split back.
  *
- * The four `option(true)` facts at the end are DISQUALIFIERS whose printed
+ * The four `or(option, true)` facts at the end are DISQUALIFIERS whose printed
  * question is answered "yes" by presence, the direction `vnd.fjs.credits`'
  * three Form 8863 boxes already use. Each names a computation i8829 sends to a
  * publication or an attached statement, and `fjs/form8829` refuses on each.
@@ -303,21 +303,21 @@ const businessUseOfHomeExpenseEntry = open({
  */
 const businessUseOfHomeRecord = open({
     method: string,
-    claimingTheStandardDeduction: option(true),
-    allGrossIncomeFromTheBusinessUseOfTheHome: option(true),
+    claimingTheStandardDeduction: or(option, true),
+    allGrossIncomeFromTheBusinessUseOfTheHome: or(option, true),
     areaUsedForBusiness: number,
     totalAreaOfHome: number,
     expenses: array(businessUseOfHomeExpenseEntry),
-    priorYearOperatingExpensesCarryover: option(string),
-    priorYearExcessCasualtyLossesAndDepreciationCarryover: option(string),
-    casualtyLosses: option(string),
-    homeAdjustedBasisOrFairMarketValue: option(string),
-    landIncludedInThatBasis: option(string),
-    firstUsedForBusiness: option(string),
-    daycareFacility: option(true),
-    additionsOrImprovementsPlacedInService: option(true),
-    stoppedUsingTheHomeForBusinessBeforeYearEnd: option(true),
-    aSecondHomeWasUsedForThisBusiness: option(true),
+    priorYearOperatingExpensesCarryover: or(option, string),
+    priorYearExcessCasualtyLossesAndDepreciationCarryover: or(option, string),
+    casualtyLosses: or(option, string),
+    homeAdjustedBasisOrFairMarketValue: or(option, string),
+    landIncludedInThatBasis: or(option, string),
+    firstUsedForBusiness: or(option, string),
+    daycareFacility: or(option, true),
+    additionsOrImprovementsPlacedInService: or(option, true),
+    stoppedUsingTheHomeForBusinessBeforeYearEnd: or(option, true),
+    aSecondHomeWasUsedForThisBusiness: or(option, true),
 })
 
 /**
@@ -336,16 +336,16 @@ export const businessExpensesSchema = open({
     recipientTin: string,
     accountNumber: string,
     taxYear: number,
-    corrected: option(true),
+    corrected: or(option, true),
     principalBusiness: string,
-    businessName: option(string),
-    grossReceiptsFullyReportedOnForms1099Nec: option(true),
-    priorYearQualifiedBusinessLossCarryforward: option(string),
-    specifiedServiceTradeOrBusiness: option(string),
-    w2Wages: option(string),
-    unadjustedBasisOfQualifiedProperty: option(string),
+    businessName: or(option, string),
+    grossReceiptsFullyReportedOnForms1099Nec: or(option, true),
+    priorYearQualifiedBusinessLossCarryforward: or(option, string),
+    specifiedServiceTradeOrBusiness: or(option, string),
+    w2Wages: or(option, string),
+    unadjustedBasisOfQualifiedProperty: or(option, string),
     entries: array(expenseEntry),
-    businessUseOfHome: option(businessUseOfHomeRecord),
+    businessUseOfHome: or(option, businessUseOfHomeRecord),
 })
 
 /**
@@ -381,7 +381,7 @@ export const specifiedServiceTradeOrBusinessValues = /** @type {const} */ ([
  * per square foot on the Simplified Method Worksheet in the Instructions for
  * Schedule C, which `fjs/form8829` refuses by name.
  *
- * A frozen two-element vocabulary rather than an `option(true)`, exactly as
+ * A frozen two-element vocabulary rather than an `or(option, true)`, exactly as
  * {@link specifiedServiceTradeOrBusinessValues} is and for the same reason:
  * the two produce different deductions of different sizes, so a serializer's
  * `''` must not be able to fall into either. i8829 makes them alternatives
@@ -734,7 +734,7 @@ export const proof = {
         },
     },
     grossReceiptsAssertion: {
-        // DOC-12: `option(true)`, so a stored `false` is structurally
+        // DOC-12: `or(option, true)`, so a stored `false` is structurally
         // rejected and absence is the only way to say "no". Asserted on the
         // one field whose absence is load-bearing — `fjs/schedule/c` REFUSES
         // rather than computes when it is absent.
@@ -1191,7 +1191,7 @@ export const proof = {
             })
             assert(t === 'ok', ['100% business use is a legitimate record', v])
         },
-        // DOC-12 in both directions for all six `option(true)` facts on this
+        // DOC-12 in both directions for all six `or(option, true)` facts on this
         // record: absence is absence, and a stored `false` is REFUSED
         // structurally rather than read back as "not asserted". Hand-typed as
         // six names for the same reason as the money loop above.

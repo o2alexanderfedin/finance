@@ -111,8 +111,8 @@
  *
  * @module
  */
-import { number, open, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -121,8 +121,8 @@ import { centsFromString } from '../../exact/module.f.js'
 import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**

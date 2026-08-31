@@ -66,8 +66,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -75,8 +75,8 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -126,7 +126,7 @@ const expenseEntry = open({
  * `base`) so structural validation reports it as the first failing field on a
  * mismatched blob (DOC-00's discriminant).
  *
- * `fairRentalDays` and `personalUseDays` are `option(number)` rather than
+ * `fairRentalDays` and `personalUseDays` are `or(option, number)` rather than
  * required numbers because printed line 2 is genuinely BLANK for a royalty,
  * and a materialized `0` there would assert "rented at fair rental value for
  * no days", which is a different claim about a different kind of property.
@@ -136,15 +136,15 @@ export const rentalPropertySchema = open({
     recipientTin: string,
     accountNumber: string,
     taxYear: number,
-    corrected: option(true),
+    corrected: or(option, true),
     propertyType: string,
-    otherTypeDescription: option(string),
-    physicalAddress: option(string),
-    fairRentalDays: option(number),
-    personalUseDays: option(number),
-    qualifiedJointVenture: option(true),
-    rentsReceived: option(string),
-    royaltiesReceived: option(string),
+    otherTypeDescription: or(option, string),
+    physicalAddress: or(option, string),
+    fairRentalDays: or(option, number),
+    personalUseDays: or(option, number),
+    qualifiedJointVenture: or(option, true),
+    rentsReceived: or(option, string),
+    royaltiesReceived: or(option, string),
     entries: array(expenseEntry),
 })
 
@@ -490,13 +490,22 @@ export const proof = {
                 assert(typeof v === 'string' && v.includes(field), ['expected the field named', field, v])
                 assert(typeof v === 'string' && v.includes('must be absent'), ['expected the direction stated', field, v])
             }
+            // A required field going missing is the key ABSENT. Spreading
+            // `field: undefined` leaves the key present, which since 0.48.0 rtti
+            // refuses structurally — the leaf would then read a `no match` array
+            // instead of the "is required" prose it exists to check.
+            const { physicalAddress: _noAddress, ...withoutAddress } = minimalRentalProperty
+            const { fairRentalDays: _noFairDays, ...withoutFairRentalDays } = minimalRentalProperty
+            const { personalUseDays: _noUseDays, ...withoutPersonalUseDays } = minimalRentalProperty
+            const { rentsReceived: _noRents, ...withoutRentsReceived } = minimalRentalProperty
+            const { royaltiesReceived: _noRoyalties, ...withoutRoyalties } = minimalRoyaltyProperty
             /** @type {readonly (readonly [Unknown, string])[]} */
             const missing = [
-                [{ ...minimalRentalProperty, physicalAddress: undefined }, 'physicalAddress'],
-                [{ ...minimalRentalProperty, fairRentalDays: undefined }, 'fairRentalDays'],
-                [{ ...minimalRentalProperty, personalUseDays: undefined }, 'personalUseDays'],
-                [{ ...minimalRentalProperty, rentsReceived: undefined }, 'rentsReceived'],
-                [{ ...minimalRoyaltyProperty, royaltiesReceived: undefined }, 'royaltiesReceived'],
+                [withoutAddress, 'physicalAddress'],
+                [withoutFairRentalDays, 'fairRentalDays'],
+                [withoutPersonalUseDays, 'personalUseDays'],
+                [withoutRentsReceived, 'rentsReceived'],
+                [withoutRoyalties, 'royaltiesReceived'],
             ]
             assertEq(missing.length, 5)
             for (const [value, field] of missing) {

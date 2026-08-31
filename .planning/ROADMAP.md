@@ -1387,7 +1387,7 @@ do not gate them; they run when the owner is in the room.
          forms. Upstream's `revisionSchema` is `open(...)` at its own definition under a docstring
          reading "Do not drop the wrapper."
 
-         What decides it: **`toJsonSchema` over all 31 dialect schemas is byte-identical to
+         What decides it: **`toJsonSchema` over all 30 dialect schemas is byte-identical to
          0.46.1's output.** The call-site form moves 47 containers, each gaining an
          `additionalProperties`; the definition form moves none. 31 top-level and 32 nested
          container schemas state `open`, and three const objects that resemble schemas —
@@ -1561,8 +1561,18 @@ proof is rewritten against whatever 0.48.0's `mcp` surface is, so it follows.
          `_`-prefixed internals — so this is a path rewrite and must be nothing else.
       2. **`option` stopped being a function.** 0.47.0: `option = t => or(t, undefined)`,
          called `option(string)`. 0.48.0: `option = type0('option')`, used
-         `or(option, string)`. **596 call sites across 59 files.** Upstream's own
+         `or(option, string)`. **459 call sites across 34 files.** Upstream's own
          `revisionSchema` now reads `archived: or(option, true)`.
+
+         **This section first said "596 across 59", and that figure counted prose.**
+         `grep` matches `option(` in a docstring and in a `todo/*.md` as readily as in
+         code. Measured on the pre-transform tree: **562** occurrences in `.js` — 459
+         calls, 102 docstring mentions, and one that is not rtti at all (`demo/steps/
+         02-line16.js` builds an HTML `<option>` from `demo/lib/dom.js`, and the first
+         sweep rewrote it before the import was checked) — plus **36** in markdown.
+         Code is rewritten; the 138 prose mentions are corrected as documentation,
+         because a docstring spelling the old form is wrong in a different way than a
+         call site is.
 
       **The acceptance criteria are v5 Phase 38's, because Phase 38 is where this repository
       learned that compiling is not evidence.** The call-site `open()` experiment typechecked,
@@ -1570,8 +1580,8 @@ proof is rewritten against whatever 0.48.0's `mcp` surface is, so it follows.
       diff as proof. So:
 
       1. `package.json` names 0.48.0 explicitly and `tsc` reports **0** errors.
-      2. **`toJsonSchema` over all 31 dialect schemas is byte-identical** to 0.47.0's output.
-         This is the criterion that decides the phase. A rewrite of 596 `option(…)` sites is
+      2. **`toJsonSchema` over all 30 dialect schemas is byte-identical** to 0.47.0's output.
+         This is the criterion that decides the phase. A rewrite of 459 `option(…)` sites is
          exactly the shape of change that can alter every served schema while looking
          mechanical — `option` is a *union member* now, not a wrapper, and getting the
          nesting wrong changes what the union admits.

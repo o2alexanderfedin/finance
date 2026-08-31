@@ -40,7 +40,7 @@ would notice as a smaller refund, but a tax the return failed to charge.
 
 **"this engine models no Form 1041 K-1 at all" has been false since Phase 30.**
 `vnd.fjs.k1_1041` shipped with that phase and carries
-`box12AlternativeMinimumTaxItems` as `option(array(codedEntry))` —
+`box12AlternativeMinimumTaxItems` as `or(option, array(codedEntry))` —
 `{ code, amount }` rows — at `fjs/document/k1_1041/module.f.js:179`, inside the
 dialect's own `codedBoxError` money-exactness loop (`:184` `codedBoxFields`), so every
 stored amount in that box is already validated to the cent.
@@ -123,7 +123,7 @@ refuses to accept as "safe".
 income, and §56 makes no per-spouse distinction.
 
 **A code A row whose `amount` is ABSENT refuses.** A coded row may print `STMT` instead
-of a figure, and `codedEntry.amount` is `option(string)` for that reason. Here the
+of a figure, and `codedEntry.amount` is `or(option, string)` for that reason. Here the
 absence is not a zero: it says a real adjustment exists on an attached statement that
 this engine has not been given. Skipping it would silently drop a preference item the
 fiduciary reported to the IRS — DOC-11's absent-is-absent rule at the point where it

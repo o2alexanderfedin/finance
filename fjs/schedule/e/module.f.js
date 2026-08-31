@@ -1779,8 +1779,10 @@ export const proof = {
         /** An ABSENT determination refuses by name, and names Part III's own
          * printed columns rather than Part II's four. */
         anUnstatedDeterminationRefusesNamingPartIIIsOwnColumns: () => {
+            const doc = estateTrustDoc({})
+            const { materialParticipation: _dropped, ...unstated } = doc.value
             const message = refusal(run({
-                estateTrustK1Forms: [estateTrustDoc({ materialParticipation: undefined })],
+                estateTrustK1Forms: [{ ...doc, value: unstated }],
             })).message
             assert(message.includes('Schedule E Part III line 33'), ['expected Part III named', message])
             assert(message.includes('estate or trust'), ['expected the entity kind named', message])
@@ -2138,13 +2140,15 @@ export const proof = {
          * This is the gate whose control is the leaf above.
          */
         aLimitedPartnersPassiveIncomeRefusesNamingFormEightNineSixty: () => {
+            const doc = partnershipDoc({ boxGLimitedPartnerOrOtherLlcMember: true })
+            const {
+                boxGGeneralPartnerOrLlcMemberManager: _droppedGeneral,
+                materialParticipation: _droppedDetermination,
+                box14SelfEmploymentEarnings: _droppedCodeA,
+                ...limited
+            } = doc.value
             const result = refusal(run({
-                partnershipK1Forms: [partnershipDoc({
-                    boxGGeneralPartnerOrLlcMemberManager: undefined,
-                    boxGLimitedPartnerOrOtherLlcMember: true,
-                    materialParticipation: undefined,
-                    box14SelfEmploymentEarnings: undefined,
-                })],
+                partnershipK1Forms: [{ ...doc, value: limited }],
             }))
             assert(result.message.includes('Form 8960 line 4a'), [result.message])
             assert(result.message.includes('§1411(c)(2)(A)'), [result.message])
@@ -2171,8 +2175,10 @@ export const proof = {
          * general partner who states neither answer refuses by name.
          */
         anUnstatedMaterialParticipationRefuses: () => {
+            const doc = partnershipDoc({})
+            const { materialParticipation: _dropped, ...unstated } = doc.value
             const result = refusal(run({
-                partnershipK1Forms: [partnershipDoc({ materialParticipation: undefined })],
+                partnershipK1Forms: [{ ...doc, value: unstated }],
             }))
             assert(result.message.includes('materialParticipation'), [result.message])
             assert(result.message.includes('§469(h)(1)'), [result.message])
@@ -2183,8 +2189,10 @@ export const proof = {
 
         /** The same for an S-corporation shareholder, whose message says "S corporation". */
         anUnstatedShareholderDeterminationRefusesNamingTheEntityKind: () => {
+            const doc = sCorporationDoc({})
+            const { materialParticipation: _dropped, ...unstated } = doc.value
             const result = refusal(run({
-                sCorporationK1Forms: [sCorporationDoc({ materialParticipation: undefined })],
+                sCorporationK1Forms: [{ ...doc, value: unstated }],
             }))
             assert(result.message.includes('S corporation'), [result.message])
             assert(!result.message.includes('this partnership'), [result.message])
@@ -2295,8 +2303,10 @@ export const proof = {
          * not a substitute.
          */
         aGeneralPartnerWithoutCodeARefuses: () => {
+            const doc = partnershipDoc({})
+            const { box14SelfEmploymentEarnings: _dropped, ...withoutCodeA } = doc.value
             const result = refusal(run({
-                partnershipK1Forms: [partnershipDoc({ box14SelfEmploymentEarnings: undefined })],
+                partnershipK1Forms: [{ ...doc, value: withoutCodeA }],
             }))
             assert(result.message.includes('box 14 code A'), [result.message])
             assert(result.message.includes('§1402(a)'), [result.message])
@@ -2309,11 +2319,14 @@ export const proof = {
          * refusal above could be a blanket ban on a missing box 14.
          */
         aGeneralPartnerWithNoIncomeAndNoCodeAComputes: () => {
+            const doc = partnershipDoc({})
+            const {
+                box1OrdinaryBusinessIncome: _droppedIncome,
+                box14SelfEmploymentEarnings: _droppedCodeA,
+                ...dormant
+            } = doc.value
             const result = ok(run({
-                partnershipK1Forms: [partnershipDoc({
-                    box1OrdinaryBusinessIncome: undefined,
-                    box14SelfEmploymentEarnings: undefined,
-                })],
+                partnershipK1Forms: [{ ...doc, value: dormant }],
             }))
             assertEq(result.parts.line41.value, 0n)
             assertEq(result.selfEmploymentEarningsCents, 0n)
@@ -2337,12 +2350,14 @@ export const proof = {
 
         /** A LIMITED partner with a code A refuses, naming §1402(a)(13). */
         aLimitedPartnerWithCodeARefuses: () => {
+            const doc = partnershipDoc({ boxGLimitedPartnerOrOtherLlcMember: true })
+            const {
+                boxGGeneralPartnerOrLlcMemberManager: _droppedGeneral,
+                materialParticipation: _droppedDetermination,
+                ...limited
+            } = doc.value
             const result = refusal(run({
-                partnershipK1Forms: [partnershipDoc({
-                    boxGGeneralPartnerOrLlcMemberManager: undefined,
-                    boxGLimitedPartnerOrOtherLlcMember: true,
-                    materialParticipation: undefined,
-                })],
+                partnershipK1Forms: [{ ...doc, value: limited }],
             }))
             assert(result.message.includes('§1402(a)(13)'), [result.message])
             assert(result.message.includes('box 4a'), [result.message])

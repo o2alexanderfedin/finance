@@ -121,13 +121,13 @@ import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
 import { unknown as jsonUnknown } from 'functionalscript/fjs/media/json/rtti/module.f.mjs'
 import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
@@ -167,7 +167,7 @@ import { stringify as jsonText } from '../../json/module.f.js'
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
 /** @import { ReportLine } from '../../report/line/module.f.js' */
 /** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
-/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/rtti/ts/types.js' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
 //
@@ -547,10 +547,10 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
  */
 export const fjsRunInputSchema = open({
     hash: string,
-    args: option(array(string)),
+    args: or(option, array(string)),
     taxYear: number,
-    subject: option(string),
-    parents: option(array(string)),
+    subject: or(option, string),
+    parents: or(option, array(string)),
 })
 
 /**

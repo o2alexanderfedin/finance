@@ -48,7 +48,7 @@ import { fieldsOf, askedFields } from '../form_model/module.f.js'
 
 /** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Type as RttiType } from 'functionalscript/fjs/types/rtti/types.js' */
+/** @import { Type as RttiType } from 'functionalscript/fjs/rtti/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 import { dialect as oneZeroNineFiveaDialect, oneZeroNineFiveASchema, validate as oneZeroNineFiveaValidate, subjectKey as oneZeroNineFiveaSubjectKey } from '../1095a/module.f.js'
 import { dialect as oneZeroNineEighteDialect, oneZeroNineEightESchema, validate as oneZeroNineEighteValidate, subjectKey as oneZeroNineEighteSubjectKey } from '../1098e/module.f.js'

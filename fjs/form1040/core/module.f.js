@@ -140,7 +140,6 @@ import {
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
-/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -658,7 +657,7 @@ const totalLine = rule => lines => ({
  * of every profile field's type, the same reason `fjs/return/profile`'s own
  * `moneyBoxFields` is written this way.
  *
- * DOC-12: a checkbox is `option(true)`, so CHECKED is the key's PRESENCE and
+ * DOC-12: a checkbox is `or(option, true)`, so CHECKED is the key's PRESENCE and
  * unchecked is its absence — there is no `false` to test against. The box
  * count `fjs/tax/deduction` receives is therefore how many of these four keys
  * are present, and nothing else. The per-status MAXIMUM is enforced there, and
@@ -1703,7 +1702,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const deductionChoiceResult = deductionChoice(taxParamSet)({
         status,
         agedOrBlindBoxes: checkedAgedOrBlindBoxes.length,
-        // Exceptions 1-3 (i1040gi p34). Each is `option(true)` on the
+        // Exceptions 1-3 (i1040gi p34). Each is `or(option, true)` on the
         // profile, so CHECKED is the key's presence — never a stored
         // `false` (DOC-12). Reading any of these as a hardcoded `false`
         // would leave every one of `fjs/tax/deduction`'s own proofs green,
@@ -2961,7 +2960,7 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // `classifyScope` call refuses the whole return before this function
     // ever runs.
     //
-    // `dependents` is read off the profile and normalized from `option(true)`
+    // `dependents` is read off the profile and normalized from `or(option, true)`
     // booleans to definite ones — the same `=== true` normalization
     // `fjs/schedule/b` performs on `hadForeignFinancialAccount`, and exactly
     // what `fjs/form8812`'s own docstring expects its caller to do before it
@@ -6097,7 +6096,7 @@ const iraCoveredWithSocialSecurityInputs = {
  * from {@link estateTrustPortfolioK1} for the reason the three portfolio
  * builders are separate: a fixture that could be pointed at any box by changing
  * one field lets a mis-numbered read pass by construction.
- * @type {(documentHash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ * @type {(documentHash: string) => (box12: NonNullable<K1EstateTrust['box12AlternativeMinimumTaxItems']>) => Stored<K1EstateTrust>}
  */
 const estateTrustAmtK1 = documentHash => box12 => ({
     documentHash,
@@ -8405,13 +8404,11 @@ export const proof = {
          */
         aBusinessWithNoFormEightNineNineFiveAAssertionsRefuses: () => {
             const record = businessExpensesDocument('sha256-business-01')('0.00')
+            const { specifiedServiceTradeOrBusiness: _dropped, ...withoutIt } = record.value
             /** @type {Stored<BusinessExpenses>} */
             const withoutAssertion = {
                 documentHash: record.documentHash,
-                value: {
-                    ...record.value,
-                    specifiedServiceTradeOrBusiness: undefined,
-                },
+                value: withoutIt,
             }
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
             const outcome = form1040IncomeLines(taxParams2025)(withBusiness(base)([
@@ -8453,13 +8450,12 @@ export const proof = {
          */
         aBusinessWithNoCarryforwardAssertionRefuses: () => {
             const record = businessExpensesDocument('sha256-business-01')('90.00')
+            const { priorYearQualifiedBusinessLossCarryforward: _dropped, ...withoutIt }
+                = record.value
             /** @type {Stored<BusinessExpenses>} */
             const withoutAssertion = {
                 documentHash: record.documentHash,
-                value: {
-                    ...record.value,
-                    priorYearQualifiedBusinessLossCarryforward: undefined,
-                },
+                value: withoutIt,
             }
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
             const outcome = form1040IncomeLines(taxParams2025)(withBusiness(base)([
@@ -9666,15 +9662,15 @@ export const proof = {
          * nothing else.
          */
         theSameAmountAsAStockGainDoesDisqualifyIt: () => {
-            const outcome = earnedIncomeCreditWithBusinessProperty(
-                { ...soldShop, disposal: undefined })([
-                    brokerageDocument('sha256-eic-4797-stock')({
-                        box1dProceeds: '19038.45',
-                        box1eCostOrOtherBasis: '0.00',
-                        box2LongTermGainOrLoss: true,
-                        box12BasisReportedToIrs: true,
-                    }),
-                ])
+            const { disposal: _dropped, ...stillHeldShop } = soldShop
+            const outcome = earnedIncomeCreditWithBusinessProperty(stillHeldShop)([
+                brokerageDocument('sha256-eic-4797-stock')({
+                    box1dProceeds: '19038.45',
+                    box1eCostOrOtherBasis: '0.00',
+                    box2LongTermGainOrLoss: true,
+                    box12BasisReportedToIrs: true,
+                }),
+            ])
             assert(outcome.kind === 'ok', ['expected a computed return', outcome])
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 7a').value, 1903845n, 'the SAME figure on the SAME printed line')
@@ -12034,9 +12030,10 @@ export const proof = {
          * so exactly one of the two states is legal at a time.
          */
         theSameRegisterWithNoDisposalComputesZeroAndAWholeYearOfDepreciation: () => {
+            const { disposal: _dropped, ...stillOwnedAppliances } = disposedAppliances
             const outcome = runFourSevenNineSeven(
                 ['wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses'])(
-                false)({ ...disposedAppliances, disposal: undefined })
+                false)(stillOwnedAppliances)
             const cents = reportedCents(outcome)
             assertEq(cents('1040 line 8'), 2284788n,
                 'no Form 4797, and a WHOLE year of depreciation on Schedule E line 18')
@@ -14123,12 +14120,11 @@ export const proof = {
         // MODELED as of this wiring, so `unmodeled` is empty and the message
         // names the profile field instead.
         withoutTheCertificationTheWholeReturnRefuses: () => {
+            const { movingExpensesArmedForcesPermanentChangeOfStation: _dropped, ...uncertified }
+                = formThreeNineZeroThreeProfile
             const outcome = form1040Report(taxParams2025)({
                 ...formThreeNineZeroThreeInputs('2000.00'),
-                profile: storedProfile({
-                    ...formThreeNineZeroThreeProfile,
-                    movingExpensesArmedForcesPermanentChangeOfStation: undefined,
-                }),
+                profile: storedProfile(uncertified),
             })
             assert(outcome.kind === 'error', ['an uncertified move must refuse', outcome])
             assert(

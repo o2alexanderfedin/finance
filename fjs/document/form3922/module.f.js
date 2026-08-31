@@ -39,7 +39,7 @@
  *   the "lookback" plan. Where box 8 is present it, not box 5, is the option
  *   price in the §423(c) qualifying-disposition rule, and an engine that read
  *   box 5 there would understate the ordinary-income element for every
- *   lookback plan. It is `option(string)` because the printed instruction says
+ *   lookback plan. It is `or(option, string)` because the printed instruction says
  *   *"If the exercise price per share was fixed or determinable on the date
  *   shown in box 1, then box 8 will be blank"*, and DOC-11's absent-is-absent
  *   rule is what keeps "blank" distinguishable from "the same as box 5".
@@ -111,8 +111,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.mjs'
@@ -122,8 +122,8 @@ import { moneyFieldError } from '../money_field/module.f.js'
 import { shareCountError } from '../share_count/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -147,18 +147,18 @@ export const formThirtyNineTwentyTwoSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
+    corrected: or(option, true),
     sourceArtifactHash: string,
-    box1DateOptionGranted: option(string),
-    box2DateOptionExercised: option(string),
-    box3FairMarketValuePerShareOnGrantDate: option(string),
-    box4FairMarketValuePerShareOnExerciseDate: option(string),
-    box5ExercisePricePaidPerShare: option(string),
-    box6NumberOfSharesTransferred: option(string),
-    box7DateLegalTitleTransferred: option(string),
-    box8ExercisePricePerShareAsIfExercisedOnGrantDate: option(string),
-    payerName: option(string),
-    recipientName: option(string),
+    box1DateOptionGranted: or(option, string),
+    box2DateOptionExercised: or(option, string),
+    box3FairMarketValuePerShareOnGrantDate: or(option, string),
+    box4FairMarketValuePerShareOnExerciseDate: or(option, string),
+    box5ExercisePricePaidPerShare: or(option, string),
+    box6NumberOfSharesTransferred: or(option, string),
+    box7DateLegalTitleTransferred: or(option, string),
+    box8ExercisePricePerShareAsIfExercisedOnGrantDate: or(option, string),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**

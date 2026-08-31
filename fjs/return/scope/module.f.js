@@ -1326,7 +1326,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // it — there is no information return for a payment made with Form 4868",
     // which named a missing DIALECT rather than a missing FORM: the first of
     // those this project can close by itself, and it did, with one
-    // `option(string)` field on `vnd.fjs.return_profile` beside the three
+    // `or(option, string)` field on `vnd.fjs.return_profile` beside the three
     // 1040 boxes already there for exactly the same reason. So the rule the
     // row above states has a second half — **a remedy naming a missing
     // dialect is a remedy this repo owns**, and the three rows that still

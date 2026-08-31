@@ -1486,7 +1486,8 @@ export const proof = {
      * profile-declared zero rather than a computed one.
      */
     aRegisterWithNoDisposalsFilesNothing: () => {
-        const f = expectOk(overOneRegister([{ ...lathe, disposal: undefined }]))
+        const { disposal: _dropped, ...unsold } = lathe
+        const f = expectOk(overOneRegister([unsold]))
         assertEq(f.filed, false)
         assertEq(f.sources.length, 0)
         assertEq(f.line7Cents, 0n)

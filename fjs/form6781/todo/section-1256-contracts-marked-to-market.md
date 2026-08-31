@@ -190,7 +190,7 @@ header, and it is the same shape as every other kind in the vocabulary.
 ## Q5. The elections — refusal, not certification, and the reason is the direction of the gap
 
 Boxes A, B and C are the mixed-straddle elections; box D is the net section 1256 contracts loss
-election. The choice the brief poses is profile certification (the `option(true)` DOC-12 pattern
+election. The choice the brief poses is profile certification (the `or(option, true)` DOC-12 pattern
 that Form 8962's `noDependentIsRequiredToFileAnIncomeTaxReturn`, Form 7206's
 `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth`, and the §217(g)
 `movingExpensesArmedForcesPermanentChangeOfStation` all use) versus a refused kind.

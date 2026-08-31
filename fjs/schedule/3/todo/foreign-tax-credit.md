@@ -49,7 +49,7 @@ whose eligibility nothing established.
 
 ### One flag, and it states both halves
 
-`section904jElectionAllForeignIncomeIsQualifiedPassiveIncome`, `option(true)` on
+`section904jElectionAllForeignIncomeIsQualifiedPassiveIncome`, `or(option, true)` on
 `vnd.fjs.return_profile`. It is the §904(j)(2)(C) election **and** the §904(j)(2)(A)
 assertion in one field, and the name says so.
 
@@ -57,7 +57,7 @@ Not two fields, and the reason is that only one combination is actionable. Facts
 without the election means Form 1116, which this engine refuses. Election without the
 facts is not a state a taxpayer can truthfully be in. Two fields would create two ways to
 express "refuse" and one way to express "compute", where one field expresses each once.
-The precedent is `spouseHadNoIncomeIsNotFilingAndIsNotADependent` — one `option(true)`
+The precedent is `spouseHadNoIncomeIsNotFilingAndIsNotADependent` — one `or(option, true)`
 carrying a three-part conjunctive assertion the engine cannot observe — rather than
 `hadForeignFinancialAccount`/`requiredToFileFinCen114`, which are two fields because the
 printed Schedule B asks two sub-questions.

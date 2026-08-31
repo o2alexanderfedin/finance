@@ -165,8 +165,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -175,8 +175,8 @@ import { centsFromString } from '../../exact/module.f.js'
 import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -197,7 +197,7 @@ const qualifiedCharitableDistributionEntry = open({
     accountNumber: string,
     charity: string,
     amount: string,
-    oneTimeSplitInterestElection: option(true),
+    oneTimeSplitInterestElection: or(option, true),
 })
 
 /**
@@ -215,20 +215,20 @@ export const iraSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,
-    corrected: option(true),
+    corrected: or(option, true),
     // ── TAX-28: §408(d)(8)'s election ───────────────────────────────────────
     // §408(d)(8)(B)(ii)'s age test, ASSERTED because it is not derivable —
     // see this module's own docstring for the two independent reasons.
-    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: option(true),
-    qualifiedCharitableDistributions: option(array(qualifiedCharitableDistributionEntry)),
+    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: or(option, true),
+    qualifiedCharitableDistributions: or(option, array(qualifiedCharitableDistributionEntry)),
     // ── TAX-29: Form 8606 Part I's asserted inputs ──────────────────────────
-    nondeductibleContributionsThisYear: option(string),          // printed line 1
-    contributionsMadeAfterYearEnd: option(string),               // printed line 4
-    yearEndValueOfAllTraditionalSepSimpleIras: option(string),   // printed line 6
+    nondeductibleContributionsThisYear: or(option, string),          // printed line 1
+    contributionsMadeAfterYearEnd: or(option, string),               // printed line 4
+    yearEndValueOfAllTraditionalSepSimpleIras: or(option, string),   // printed line 6
     // ── Three facts stored ONLY so `fjs/form8606` can refuse them by name ───
-    netAmountConvertedToRothIras: option(string),                // printed line 8, Part II
-    hadOutstandingRolloverOrRecharacterization: option(true),    // lines 6 and 7's exclusions
-    hadQualifiedDisasterDistributionOrPlanRepayment: option(true), // lines 15b and 15c
+    netAmountConvertedToRothIras: or(option, string),                // printed line 8, Part II
+    hadOutstandingRolloverOrRecharacterization: or(option, true),    // lines 6 and 7's exclusions
+    hadQualifiedDisasterDistributionOrPlanRepayment: or(option, true), // lines 15b and 15c
 })
 
 /**
@@ -516,10 +516,10 @@ export const proof = {
             assertEq(v.path[0], 'dialect')
         },
     },
-    // DOC-12: every yes/no fact is `option(true)`, so a stored `false` is
+    // DOC-12: every yes/no fact is `or(option, true)`, so a stored `false` is
     // structurally rejected and ABSENCE is the only way to say "no". Asserted
     // on all five individually rather than by sampling — 12-REVIEW.md WR-01
-    // records a case where widening ONE checkbox to `option(boolean)` passed
+    // records a case where widening ONE checkbox to `or(option, boolean)` passed
     // `tsc` and the whole suite because only its neighbours were asserted.
     // Every one of these five is load-bearing: `fjs/form8606` REFUSES on the
     // absence of the first and REFUSES on the presence of two of the others.

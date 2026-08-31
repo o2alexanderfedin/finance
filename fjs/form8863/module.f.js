@@ -198,7 +198,7 @@ export const educationCreditPhaseoutIncome = agiCents => form2555ExclusionCents 
 /**
  * One student, as this module sees them: the election, the three expense
  * figures, Form 8863 Part III's own four yes/no facts (lines 23 through 26,
- * already normalized from `option(true)` to definite booleans by the caller),
+ * already normalized from `or(option, true)` to definite booleans by the caller),
  * and the two 1098-T conditions this module refuses on.
  *
  * The three expense figures are separate on purpose:

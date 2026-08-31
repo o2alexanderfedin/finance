@@ -62,13 +62,13 @@ or was not the right container:
    method and convention would be that second copy, one layer up.
 
 The disposal block is `option`al **and nested**, rather than four sibling
-`option(string)` fields, so that "all four facts or none" is a STRUCTURAL
+`or(option, string)` fields, so that "all four facts or none" is a STRUCTURAL
 property of the schema instead of a cross-field check that can be forgotten.
 Contrast `section168kStatus`/`specialDepreciationAllowanceClaimed`, which
 genuinely are two independent fields whose agreement has to be asserted.
 
 ```js
-disposal: option({
+disposal: or(option, {
     dateAcquired: string,     // f4797 line 19 col (b) / line 2 col (b), mo. day yr.
     dateSold: string,         // f4797 line 19 col (c) / line 2 col (c), mo. day yr.
     grossSalesPrice: string,  // f4797 line 20 / line 2 col (d)
@@ -282,7 +282,7 @@ disagree — the drift the register's own docstring rejects. `return_profile` is
 this engine's one document per return.
 
 Field: `noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears`,
-`option(true)` under DOC-12, so a materialized `false` is structurally rejected
+`or(option, true)` under DOC-12, so a materialized `false` is structurally rejected
 and absence is the only way to say "no".
 
 **No amount is stored, and that is deliberate.** Line 8 is not a printed line

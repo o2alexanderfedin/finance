@@ -47,7 +47,7 @@
  *
  * @module
  */
-import { number } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number } from 'functionalscript/fjs/rtti/module.f.mjs'
 import { pureOk, runPure } from 'functionalscript/fjs/effects/module.f.mjs'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'

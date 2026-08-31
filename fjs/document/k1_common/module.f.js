@@ -25,7 +25,7 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
-import { open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /**
@@ -43,11 +43,11 @@ import { moneyFieldError } from '../money_field/module.f.js'
  */
 export const codedEntry = open({
     code: string,
-    amount: option(string),
+    amount: or(option, string),
 })
 
 /** One row of a coded box, as the two dialects' schemas produce it.
- * @typedef {{ readonly code: string, readonly amount?: string | undefined }} CodedEntry
+ * @typedef {{ readonly code: string, readonly amount?: string }} CodedEntry
  */
 
 /**

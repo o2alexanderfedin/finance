@@ -22,9 +22,9 @@ cannot use Form 8829*:
 
 So an engine that computed both would be computing a form the electing taxpayer may not file.
 The election is therefore a stored fact and not an inference, and it is a **two-value frozen
-vocabulary** rather than an `option(true)` — `businessUseOfHomeMethod`, either
+vocabulary** rather than an `or(option, true)` — `businessUseOfHomeMethod`, either
 `'actualExpenses'` or `'simplified'` — following
-`vnd.fjs.business_expenses`' own `specifiedServiceTradeOrBusinessValues`. Under `option(true)`
+`vnd.fjs.business_expenses`' own `specifiedServiceTradeOrBusinessValues`. Under `or(option, true)`
 absence and a denial would be the same stored state, and here the two states lead to two
 different deductions of different sizes, so absence must be *unstated* and must refuse.
 

@@ -178,7 +178,7 @@ so. So:
 
 1. The register must carry `everyDepreciableAssetIsListed`. Absent, Form 4562
    **refuses** as soon as any asset was placed in service in the computed year.
-   (An `option(true)` under DOC-12's checkbox convention, so a materialized
+   (An `or(option, true)` under DOC-12's checkbox convention, so a materialized
    `false` cannot pass as an assertion.)
 2. With it, the engine **computes** the test itself and compares the answer
    against each current-year asset's stored `convention`, refusing on

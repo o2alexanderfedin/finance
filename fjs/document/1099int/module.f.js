@@ -17,12 +17,12 @@
  *   revisions of the same printed form, so the revision (never derived from
  *   `taxYear`) travels with every stored instance. Non-empty is a semantic
  *   check (`checkReferences`), not expressible structurally.
- * - `corrected` is `option(true)` — DOC-12, mirrors `fjs/media/revision`'s
- *   `archived: option(true)` exactly: present-and-`true` means the printed
+ * - `corrected` is `or(option, true)` — DOC-12, mirrors `fjs/media/revision`'s
+ *   `archived: or(option, true)` exactly: present-and-`true` means the printed
  *   CORRECTED box was checked; the key absent means it was not. `false` is
  *   never a valid member of this schema — a `corrected: false` blob is
  *   rejected structurally, before `checkReferences` ever runs.
- * - Money boxes are each `option(string)` — DOC-11: blank is not zero, so a
+ * - Money boxes are each `or(option, string)` — DOC-11: blank is not zero, so a
  *   box the form left empty is modeled by the key's absence, never by a `"0"`
  *   or `0` value standing in for "not printed". Present values are the
  *   post-conversion canonical decimal strings this schema itself owns (never
@@ -67,8 +67,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -78,8 +78,8 @@ import { centsFromString } from '../../exact/module.f.js'
 import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../ocr/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -103,16 +103,16 @@ export const oneZeroNineNineIntSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1InterestIncome: option(string),
-    box2EarlyWithdrawalPenalty: option(string),
-    box3UsSavingsBondsAndTreasuryInterest: option(string),
-    box4FederalIncomeTaxWithheld: option(string),
-    box6ForeignTaxPaid: option(string),
-    box8TaxExemptInterest: option(string),
-    box9SpecifiedPrivateActivityBondInterest: option(string),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box1InterestIncome: or(option, string),
+    box2EarlyWithdrawalPenalty: or(option, string),
+    box3UsSavingsBondsAndTreasuryInterest: or(option, string),
+    box4FederalIncomeTaxWithheld: or(option, string),
+    box6ForeignTaxPaid: or(option, string),
+    box8TaxExemptInterest: or(option, string),
+    box9SpecifiedPrivateActivityBondInterest: or(option, string),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -134,7 +134,7 @@ const validateShape = rttiValidate(oneZeroNineNineIntSchema)
  * `centsFromString` re-parse (DRY) is written once, not seven times. Typed via
  * `@type {const}` (not a wider `keyof OneZeroNineNineInt` annotation) so
  * `r[field]` below resolves to exactly `string | undefined` — every listed
- * field is `option(string)` — rather than the union of every field's type.
+ * field is `or(option, string)` — rather than the union of every field's type.
  */
 export const moneyBoxFields = /** @type {const} */ ([
     'box1InterestIncome',
@@ -264,7 +264,7 @@ const minimal = {
 /**
  * T-09-08-02: a money box's name could be quietly dropped from
  * {@link moneyBoxFields} without anyone noticing — the field stays
- * `option(string)` structurally, so a comma-grouped or otherwise inexact
+ * `or(option, string)` structurally, so a comma-grouped or otherwise inexact
  * amount in a dropped box would then validate as ok. One generated leaf per
  * NAMED box supplies a comma-grouped value to that box alone and asserts
  * `validate` refuses, built by mapping {@link moneyBoxFields} itself into
@@ -353,7 +353,7 @@ export const proof = {
             // written in a form that refuses it.
             assertEq(v.box9SpecifiedPrivateActivityBondInterest, undefined)
         },
-        // DOC-12: `corrected: false` is not a valid member of `option(true)`
+        // DOC-12: `corrected: false` is not a valid member of `or(option, true)`
         // — rejected structurally, never accepted as "not corrected".
         correctedFalseRejected: () => {
             const [t] = validate({ ...minimal, corrected: false })

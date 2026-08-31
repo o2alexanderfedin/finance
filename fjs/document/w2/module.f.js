@@ -49,8 +49,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -58,8 +58,8 @@ import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -87,12 +87,12 @@ const box12Entry = open({
  */
 const stateLocalEntry = open({
     state: string,
-    employerStateIdNumber: option(string),
-    stateWagesTipsEtc: option(string),
-    stateIncomeTax: option(string),
-    localityName: option(string),
-    localWagesTipsEtc: option(string),
-    localIncomeTax: option(string),
+    employerStateIdNumber: or(option, string),
+    stateWagesTipsEtc: or(option, string),
+    stateIncomeTax: or(option, string),
+    localityName: or(option, string),
+    localWagesTipsEtc: or(option, string),
+    localIncomeTax: or(option, string),
 })
 
 /**
@@ -134,24 +134,24 @@ export const w2Schema = open({
     controlNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1WagesTipsOtherCompensation: option(string),
-    box2FederalIncomeTaxWithheld: option(string),
-    box3SocialSecurityWages: option(string),
-    box4SocialSecurityTaxWithheld: option(string),
-    box5MedicareWagesAndTips: option(string),
-    box6MedicareTaxWithheld: option(string),
-    box7SocialSecurityTips: option(string),
-    box8AllocatedTips: option(string),
-    box10DependentCareBenefits: option(string),
-    box11NonqualifiedPlans: option(string),
-    box12: option(array(box12Entry)),
-    box13StatutoryEmployee: option(true),
-    box13RetirementPlan: option(true),
-    box13ThirdPartySickPay: option(true),
-    box15Through20: option(array(stateLocalEntry)),
-    employerName: option(string),
-    employeeName: option(string),
+    corrected: or(option, true),
+    box1WagesTipsOtherCompensation: or(option, string),
+    box2FederalIncomeTaxWithheld: or(option, string),
+    box3SocialSecurityWages: or(option, string),
+    box4SocialSecurityTaxWithheld: or(option, string),
+    box5MedicareWagesAndTips: or(option, string),
+    box6MedicareTaxWithheld: or(option, string),
+    box7SocialSecurityTips: or(option, string),
+    box8AllocatedTips: or(option, string),
+    box10DependentCareBenefits: or(option, string),
+    box11NonqualifiedPlans: or(option, string),
+    box12: or(option, array(box12Entry)),
+    box13StatutoryEmployee: or(option, true),
+    box13RetirementPlan: or(option, true),
+    box13ThirdPartySickPay: or(option, true),
+    box15Through20: or(option, array(stateLocalEntry)),
+    employerName: or(option, string),
+    employeeName: or(option, string),
 })
 
 /**
@@ -290,7 +290,7 @@ const minimal = {
 /**
  * T-09-08-02: a money box's name could be quietly dropped from
  * {@link moneyBoxFields} without anyone noticing — the field stays
- * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * `or(option, string)` structurally, so a comma-grouped amount in a dropped box
  * would then validate as ok. One generated leaf per NAMED scalar box
  * supplies a comma-grouped value to that box alone and asserts `validate`
  * refuses, built by mapping `moneyBoxFields` itself into `[field,
@@ -429,7 +429,7 @@ export const proof = {
             assertEq(v.box15Through20, undefined)
         },
         // DOC-12, and the same rule for box 13's three flags: `false` is not
-        // a member of `option(true)`. Absence is the only way to say "not
+        // a member of `or(option, true)`. Absence is the only way to say "not
         // checked", so there is exactly one representation of it.
         falseFlagsRejected: () => {
             assertEq(validate({ ...minimal, corrected: false })[0], 'error')

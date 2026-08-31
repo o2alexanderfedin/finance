@@ -80,8 +80,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -92,8 +92,8 @@ import { codedEntry, codedBoxError, materialParticipationValues, materialPartici
 import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -141,37 +141,37 @@ export const k1SCorporationSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    payerName: or(option, string),
+    recipientName: or(option, string),
     // The one field that is not a printed box. There is no box G here: see
     // this module's own docstring, difference 1.
-    materialParticipation: option(string),
+    materialParticipation: or(option, string),
     // Part III, the fixed-caption money boxes.
-    box1OrdinaryBusinessIncome: option(string),
-    box2NetRentalRealEstateIncome: option(string),
-    box3OtherNetRentalIncome: option(string),
-    box4InterestIncome: option(string),
-    box5aOrdinaryDividends: option(string),
-    box5bQualifiedDividends: option(string),
-    box6Royalties: option(string),
-    box7NetShortTermCapitalGain: option(string),
-    box8aNetLongTermCapitalGain: option(string),
-    box8bCollectiblesTwentyEightPercentGain: option(string),
-    box8cUnrecapturedSection1250Gain: option(string),
-    box9NetSection1231Gain: option(string),
-    box11Section179Deduction: option(string),
+    box1OrdinaryBusinessIncome: or(option, string),
+    box2NetRentalRealEstateIncome: or(option, string),
+    box3OtherNetRentalIncome: or(option, string),
+    box4InterestIncome: or(option, string),
+    box5aOrdinaryDividends: or(option, string),
+    box5bQualifiedDividends: or(option, string),
+    box6Royalties: or(option, string),
+    box7NetShortTermCapitalGain: or(option, string),
+    box8aNetLongTermCapitalGain: or(option, string),
+    box8bCollectiblesTwentyEightPercentGain: or(option, string),
+    box8cUnrecapturedSection1250Gain: or(option, string),
+    box9NetSection1231Gain: or(option, string),
+    box11Section179Deduction: or(option, string),
     // Part III, the CODED boxes — a code letter and an amount, repeated.
-    box10OtherIncome: option(array(codedEntry)),
-    box12OtherDeductions: option(array(codedEntry)),
-    box13Credits: option(array(codedEntry)),
-    box15AlternativeMinimumTaxItems: option(array(codedEntry)),
-    box16ItemsAffectingShareholderBasis: option(array(codedEntry)),
-    box17OtherInformation: option(array(codedEntry)),
+    box10OtherIncome: or(option, array(codedEntry)),
+    box12OtherDeductions: or(option, array(codedEntry)),
+    box13Credits: or(option, array(codedEntry)),
+    box15AlternativeMinimumTaxItems: or(option, array(codedEntry)),
+    box16ItemsAffectingShareholderBasis: or(option, array(codedEntry)),
+    box17OtherInformation: or(option, array(codedEntry)),
     // Part III, the checkbox-only boxes.
-    box14ScheduleK3Attached: option(true),
-    box18MoreThanOneActivityForAtRiskPurposes: option(true),
-    box19MoreThanOneActivityForPassiveActivityPurposes: option(true),
+    box14ScheduleK3Attached: or(option, true),
+    box18MoreThanOneActivityForAtRiskPurposes: or(option, true),
+    box19MoreThanOneActivityForPassiveActivityPurposes: or(option, true),
 })
 
 /**

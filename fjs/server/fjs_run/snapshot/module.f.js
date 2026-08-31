@@ -41,7 +41,7 @@
  *
  * There is no separate "archive a document" tool. `finance_document_archive`
  * was considered and rejected (11-CONTEXT.md): the already-registered
- * `evo_add` tool already accepts `archived: option(true)` on its input shape,
+ * `evo_add` tool already accepts `archived: or(option, true)` on its input shape,
  * so retracting a wrongly-ingested document is exactly this call, made
  * through `evo_add` like any other revision:
  *

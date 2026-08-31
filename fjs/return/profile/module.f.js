@@ -33,13 +33,13 @@
  *
  * ## Three schema decisions worth stating
  *
- * - **Every checkbox is `option(true)`, never a two-valued primitive.** DOC-12's
- *   rule, exactly as `corrected: option(true)` on the 1099-INT and
- *   `archived: option(true)` on `vnd.fjs.revision`: an unchecked box is the
+ * - **Every checkbox is `or(option, true)`, never a two-valued primitive.** DOC-12's
+ *   rule, exactly as `corrected: or(option, true)` on the 1099-INT and
+ *   `archived: or(option, true)` on `vnd.fjs.revision`: an unchecked box is the
  *   key's ABSENCE. `spouseIsBlind: false` is rejected structurally rather than
  *   accepted as "not blind", so a serializer that helpfully materializes every
  *   key cannot smuggle a checkbox in as data.
- * - **Every money box is `option(string)`.** AGENTS.md: money in a stored JSON
+ * - **Every money box is `or(option, string)`.** AGENTS.md: money in a stored JSON
  *   document is a decimal string, never a JSON number — a JSON number is an
  *   IEEE 754 double by the time `media/json`'s `Unknown` sees it. Exactness is
  *   enforced in {@link checkReferences} via the shared
@@ -104,8 +104,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../../document/base/module.f.js'
@@ -118,8 +118,8 @@ import {
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -730,7 +730,7 @@ export const kindVocabulary = /** @type {const} */ ([
  * "required SSN" test), `ageAtYearEnd` (line4's "under 17" test), and
  * `livedWithTaxpayer` (a fact every dependency claim relies on, though no
  * single 8812 line names it directly). The three boolean-shaped facts are
- * `option(true)`, DOC-12's convention extended to a taxpayer-asserted fact
+ * `or(option, true)`, DOC-12's convention extended to a taxpayer-asserted fact
  * rather than a printed checkbox: ABSENT means "not asserted true", the
  * conservative default for a credit-eligibility fact — a serializer that
  * helpfully materializes every key as `false` cannot smuggle a false
@@ -738,13 +738,13 @@ export const kindVocabulary = /** @type {const} */ ([
  */
 const dependentEntrySchema = open({
     relationship: string,
-    ssnValidForEmployment: option(true),
+    ssnValidForEmployment: or(option, true),
     ageAtYearEnd: number,
-    livedWithTaxpayer: option(true),
+    livedWithTaxpayer: or(option, true),
     // ── TAX-27 (Phase 32): the five §32(c)(3) facts Schedule 8812's four
     // above cannot express. See {@link earnedIncomeCreditVocabularies} for
     // why every one of them is TWO OR MORE EXACT STRINGS rather than
-    // `option(true)`, and `fjs/todo/tax-27-earned-income-credit.md` for the
+    // `or(option, true)`, and `fjs/todo/tax-27-earned-income-credit.md` for the
     // fact-by-fact analysis that asked for them.
     //
     // `relationship` above is UNTOUCHED. It is Schedule 8812's, it is free
@@ -756,11 +756,11 @@ const dependentEntrySchema = open({
     // argues §32(c)(2) earned income must not share Schedule 8812's
     // `earnedIncome`. Two questions with the same name and different
     // definitions is the error, not the duplication.
-    earnedIncomeCreditRelationship: option(string),
-    earnedIncomeCreditFullTimeStudent: option(string),
-    earnedIncomeCreditPermanentAndTotalDisability: option(string),
-    earnedIncomeCreditUnitedStatesResidency: option(string),
-    earnedIncomeCreditJointReturn: option(string),
+    earnedIncomeCreditRelationship: or(option, string),
+    earnedIncomeCreditFullTimeStudent: or(option, string),
+    earnedIncomeCreditPermanentAndTotalDisability: or(option, string),
+    earnedIncomeCreditUnitedStatesResidency: or(option, string),
+    earnedIncomeCreditJointReturn: or(option, string),
 })
 
 /**
@@ -809,16 +809,16 @@ export const oldestPlausibleDependentAge = 150
  * on {@link dependentEntrySchema} and five about the filer on
  * {@link returnProfileSchema}.
  *
- * ## Why these are exact strings and NOT `option(true)`
+ * ## Why these are exact strings and NOT `or(option, true)`
  *
  * This dialect's own rule, stated in its header, is that a boolean-shaped
- * fact is `option(true)` and ABSENCE means "not asserted true". That rule is
+ * fact is `or(option, true)` and ABSENCE means "not asserted true". That rule is
  * right wherever absence is the SAFE reading, and it is wrong here, for
  * exactly the reason `fjs/document/business_expenses` gives for its
  * `specifiedServiceTradeOrBusiness` flag — the precedent this group follows
  * rather than re-argues:
  *
- * - Under `option(true)`, absence and a denial are the same stored state. For
+ * - Under `or(option, true)`, absence and a denial are the same stored state. For
  *   `earnedIncomeCreditPermanentAndTotalDisability` the two are opposite
  *   answers to a question worth thousands of dollars: a disabled dependent has
  *   NO age limit at all (§152(c)(3)(B)), so reading an absent field as "not
@@ -826,12 +826,12 @@ export const oldestPlausibleDependentAge = 150
  *   "disabled" silently keeps one who is not.
  * - **Here the wrong default GRANTS a credit.** That is the direction that
  *   decides the shape. `earnedIncomeCreditJointReturn` is the sharpest case:
- *   under `option(true)` the ABSENT state would have to mean "did not file a
+ *   under `or(option, true)` the ABSENT state would have to mean "did not file a
  *   joint return", which is the state that qualifies the child — so a
  *   serializer that dropped the key, or a preparer who never asked, produces
  *   a credit rather than a refusal. As one of two exact strings, absence is
  *   *unstated* and `fjs/schedule/eic` refuses by name.
- * - `option(boolean)` would express three states while making the dangerous
+ * - `or(option, boolean)` would express three states while making the dangerous
  *   one cheap, as that same docstring records: *"a serializer that helpfully
  *   materializes every key"* would write `false`, indistinguishable from a
  *   taxpayer who answered no. A materialized `false` or `''` fails the
@@ -974,28 +974,28 @@ export const returnProfileSchema = open({
     taxYear: number,
     filingStatus: string,
     // Line 12a — someone can claim you (or your spouse) as a dependent.
-    claimedAsDependent: option(true),
+    claimedAsDependent: or(option, true),
     // Line 12b — married filing separately and your spouse itemizes.
-    spouseItemizes: option(true),
+    spouseItemizes: or(option, true),
     // Line 12c — dual-status alien.
-    dualStatusAlien: option(true),
+    dualStatusAlien: or(option, true),
     // Line 12d — the four age/blindness boxes.
-    taxpayerBornBeforeJan2_1961: option(true),
-    taxpayerIsBlind: option(true),
-    spouseBornBeforeJan2_1961: option(true),
-    spouseIsBlind: option(true),
+    taxpayerBornBeforeJan2_1961: or(option, true),
+    taxpayerIsBlind: or(option, true),
+    spouseBornBeforeJan2_1961: or(option, true),
+    spouseIsBlind: or(option, true),
     // The i1040gi p33 footnote condition that alone permits a married-filing-
     // separately filer to check the two SPOUSE boxes above. See check 5b.
-    spouseHadNoIncomeIsNotFilingAndIsNotADependent: option(true),
+    spouseHadNoIncomeIsNotFilingAndIsNotADependent: or(option, true),
     dependentCount: number,
     declaredKinds: array(string),
     // Decision 5 — the IRS whole-dollar election, all-or-nothing per return.
-    wholeDollarElection: option(true),
+    wholeDollarElection: or(option, true),
     // Standard Deduction Worksheet for Dependents input.
-    earnedIncome: option(string),
-    line26EstimatedTaxPayments: option(string),
-    line35aRefundRequested: option(string),
-    line36AppliedToNextYear: option(string),
+    earnedIncome: or(option, string),
+    line26EstimatedTaxPayments: or(option, string),
+    line35aRefundRequested: or(option, string),
+    line36AppliedToNextYear: or(option, string),
     // Schedule 3 line 10 — the amount paid with a Form 4868 request for an
     // automatic extension of time to file. `line26EstimatedTaxPayments`'
     // exact shape, for its exact reason: no information return reports it,
@@ -1006,25 +1006,25 @@ export const returnProfileSchema = open({
     // fields above are named for 1040 lines, so `line10AmountPaid...` would
     // read as 1040 line 10 — the adjustments total, a different figure on a
     // different form. The name says which printed page a reader should open.
-    scheduleThreeLine10AmountPaidWithExtensionRequest: option(string),
+    scheduleThreeLine10AmountPaidWithExtensionRequest: or(option, string),
     // Schedule B Part III, line 7a (first sub-question) — TAX-07. Taxpayer-
     // declared; no IRS information return reports this fact.
-    hadForeignFinancialAccount: option(true),
+    hadForeignFinancialAccount: or(option, true),
     // Schedule B Part III, line 7a (second sub-question) — independent of
     // hadForeignFinancialAccount, since the printed form asks it as a
     // separate "if 'Yes'" sub-question rather than a derived consequence.
-    requiredToFileFinCen114: option(true),
+    requiredToFileFinCen114: or(option, true),
     // Schedule B Part III, line 7b — free-text country names, plural.
-    foreignAccountCountries: option(array(string)),
+    foreignAccountCountries: or(option, array(string)),
     // Schedule B Part III, line 8.
-    receivedForeignTrustDistributionOrWasGrantorOrTransferor: option(true),
+    receivedForeignTrustDistributionOrWasGrantorOrTransferor: or(option, true),
     // Phase 13 Slice 1 (TAX-10), 13-CONTEXT.md Decision 5.1: the IRA-
     // deduction circularity refusal fires on THIS FIELD, not on the coarse
     // `scheduleOneAdjustments` kind — that kind cannot distinguish an IRA
     // deduction (which creates the Pub. 590-A / taxable-Social-Security
     // cycle) from an HSA or educator-expense adjustment, which does not.
     // Read only by `fjs/form1040/core`; no cross-field check needed here.
-    iraDeductionDeclared: option(true),
+    iraDeductionDeclared: or(option, true),
     // Phase 13 Slice 1 (TAX-10): the Social Security Benefits Worksheet's
     // line 8 branches on this fact for a married-filing-separately filer —
     // no other 1040 line already carries it. Additive, taxpayer-declared,
@@ -1032,13 +1032,13 @@ export const returnProfileSchema = open({
     // `spouseHadNoIncomeIsNotFilingAndIsNotADependent`'s own precedent: no
     // cross-field check here, since `fjs/form1040/core` gates the value by
     // `filingStatus` itself before ever passing it to the worksheet.
-    mfsLivedWithSpouseAtAnyTimeInYear: option(true),
+    mfsLivedWithSpouseAtAnyTimeInYear: or(option, true),
     // Schedule A line 18 (TAX-13, 13-CONTEXT.md Decision 2.5) — "elect to
     // itemize deductions even though they are less than your standard
     // deduction". A taxpayer election no document reports, exactly like
     // hadForeignFinancialAccount. Read only by `fjs/tax/deduction`'s
     // `deductionChoice` (13-06); no cross-field check needed here.
-    itemizeEvenThoughLessThanStandardDeduction: option(true),
+    itemizeEvenThoughLessThanStandardDeduction: or(option, true),
     // Form 3903's own pre-line checkbox (§217(g), as left standing when TCJA
     // §11049 suspended §217): "Check here to certify that you meet these
     // requirements" — a Member of the Armed Forces on active duty moving,
@@ -1048,7 +1048,7 @@ export const returnProfileSchema = open({
     // `fjs/schedule/1`, which gates line 14 on it; no cross-field check here,
     // because certifying eligibility while claiming nothing is an ordinary
     // return and every other field on this dialect is silent about moving.
-    movingExpensesArmedForcesPermanentChangeOfStation: option(true),
+    movingExpensesArmedForcesPermanentChangeOfStation: or(option, true),
     // Form 4797 line 7's own printed instruction, which names this state in so
     // many words: "If line 7 is a gain and you didn't have any prior year
     // section 1231 losses, or they were recaptured in an earlier year, enter
@@ -1079,7 +1079,7 @@ export const returnProfileSchema = open({
     // — and only when line 7 is a GAIN, because the printed page skips lines 8
     // and 9 entirely for a loss. See
     // `fjs/form4797/todo/sales-of-business-property.md` §4.
-    noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: option(true),
+    noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: or(option, true),
     // §904(j)(2)(C)'s ELECTION and §904(j)(2)(A)'s ASSERTION, in one field,
     // and the name states both because the taxpayer is making both claims at
     // once: "every dollar of my foreign-source gross income is qualified
@@ -1113,14 +1113,14 @@ export const returnProfileSchema = open({
     // electing while holding no 1099 with a foreign tax box is an ordinary
     // return, and every other field on this dialect is silent about foreign
     // taxes.
-    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: option(true),
+    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: or(option, true),
     // TAX-12 (13-CONTEXT.md Decision 4.1) — per-dependent facts Schedule
     // 8812 needs to classify a qualifying child versus an other dependent.
     // Additive, ABSENT for a return declaring `dependentCount: 0` and
     // itemizing nothing about its dependents (check 8 below). See this
     // module's own docstring, "schema decisions worth stating", for why
     // citizenship is deliberately NOT a fifth field here.
-    dependents: option(array(dependentEntrySchema)),
+    dependents: or(option, array(dependentEntrySchema)),
     // TAX-27 (Phase 32) — §32(c)(1)'s and §32(m)'s facts about the FILER,
     // none of which any information return reports and none of which any
     // existing field on this dialect carries. See
@@ -1131,11 +1131,11 @@ export const returnProfileSchema = open({
     // deliberately gets NO field here: `claimedAsDependent` (1040 line 12a,
     // far above) already carries exactly that fact, and a second declaration
     // of one fact is how the two come to disagree.
-    filerSocialSecurityNumber: option(string),
-    spouseSocialSecurityNumber: option(string),
-    filerQualifyingChildOfAnotherTaxpayer: option(string),
-    filerAttainedAgeTwentyFiveButNotSixtyFive: option(string),
-    filerPrincipalPlaceOfAbode: option(string),
+    filerSocialSecurityNumber: or(option, string),
+    spouseSocialSecurityNumber: or(option, string),
+    filerQualifyingChildOfAnotherTaxpayer: or(option, string),
+    filerAttainedAgeTwentyFiveButNotSixtyFive: or(option, string),
+    filerPrincipalPlaceOfAbode: or(option, string),
     // TAX-37 (Form 8962) -- the two facts the Premium Tax Credit needs that
     // no information return reports. A Form 1095-A is a REAL issued statement
     // and carries neither: the Marketplace does not know which federal
@@ -1144,7 +1144,7 @@ export const returnProfileSchema = open({
     //
     // Form 8962 line 4's own printed checkbox: Alaska, Hawaii, or the other
     // 48 states and DC. A vocabulary-checked STRING rather than three
-    // `option(true)` flags, because the printed form admits exactly one of
+    // `or(option, true)` flags, because the printed form admits exactly one of
     // three and three independent booleans could say "Alaska and Hawaii" --
     // the same reason the §32 fact fields above are vocabulary strings.
     //
@@ -1158,11 +1158,11 @@ export const returnProfileSchema = open({
     // cross-field check is needed here (buying Marketplace coverage in no
     // year is an ordinary return, and every other field on this dialect is
     // silent about health coverage).
-    federalPovertyLineTable: option(string),
+    federalPovertyLineTable: or(option, string),
     // Form 8962 line 2b: household income includes "the combined modified AGI
     // for your dependents who are required to file an income tax return
     // because their income meets the income tax return filing threshold".
-    // `option(true)`, DOC-12 -- absent means NOT certified, and
+    // `or(option, true)`, DOC-12 -- absent means NOT certified, and
     // `fjs/form8962` then refuses a return with any dependent rather than
     // reading line 2b as zero, which would overstate the credit for every
     // family whose teenager has a job.
@@ -1171,7 +1171,7 @@ export const returnProfileSchema = open({
     // the taxpayer states that no dependent meets the §6012(a)(1) filing
     // threshold, which for the ordinary case (a six-year-old) is trivially
     // true and which the taxpayer, unlike this engine, actually knows.
-    noDependentIsRequiredToFileAnIncomeTaxReturn: option(true),
+    noDependentIsRequiredToFileAnIncomeTaxReturn: or(option, true),
     // TAX-39 (Form 7206) -- §162(l)(2)(B)'s "other coverage" disqualifier, the
     // one fact the self-employed health insurance deduction needs that appears
     // on NO information return and that no amount this engine holds implies.
@@ -1204,13 +1204,13 @@ export const returnProfileSchema = open({
     // and again refuses rather than deducting. Both narrowings are recorded in
     // `fjs/schedule/1/todo/self-employed-health-insurance.md`.
     //
-    // `option(true)`, DOC-12 -- absent means NOT certified. Read only by
+    // `or(option, true)`, DOC-12 -- absent means NOT certified. Read only by
     // `fjs/schedule/1`, which refuses when premiums are stored and it is
     // absent, so no cross-field check is needed here: certifying while
     // claiming no premium is an ordinary return, exactly as
     // `movingExpensesArmedForcesPermanentChangeOfStation`'s own note says of
     // certifying a permanent change of station while claiming no move.
-    notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: option(true),
+    notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: or(option, true),
     // ── TAX-42 (Form 2555, §911): four facts, none on any information return ─
     //
     // There is no information return for foreign earned income AT ALL. A
@@ -1263,10 +1263,10 @@ export const returnProfileSchema = open({
     // text discounts them cannot be turned into a checkbox, so
     // `foreignEarnedIncomeBonaFideResidenceTest` refuses by name instead.
     //
-    // `option(true)`, DOC-12 -- absent means NOT certified. Check 11 below is
+    // `or(option, true)`, DOC-12 -- absent means NOT certified. Check 11 below is
     // what makes absence bite, because unlike the certifications above this
     // one sits beside stored AMOUNTS on the same dialect.
-    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: option(true),
+    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: or(option, true),
     // Form 2555 line 31/38, and i2555's line 31 instruction defines it
     // exactly: "the number of days in your qualifying period that fall within
     // your 2025 tax year. Your qualifying period is the period during which
@@ -1278,7 +1278,7 @@ export const returnProfileSchema = open({
     // 16 window is a 12-month slice; i2555's own example -- a tax home
     // established August 14 and held past year end -- enters 140.
     //
-    // `option(number)` on `vnd.fjs.rental_property`'s precedent, where
+    // `or(option, number)` on `vnd.fjs.rental_property`'s precedent, where
     // `fairRentalDays` and `personalUseDays` are day counts and ABSENT is not
     // zero. Range-checked in check 11 against that dialect's own
     // {@link daysInTheLongestYear}, for its reason: this dialect does not know
@@ -1287,13 +1287,13 @@ export const returnProfileSchema = open({
     // year -- is `fjs/tax/params`' `foreignEarnedIncome.daysInTaxYear`, and
     // `fjs/schedule/1` refuses against THAT, because a parameter set is where
     // a year's own facts live.
-    foreignEarnedIncomeQualifyingDays: option(number),
+    foreignEarnedIncomeQualifyingDays: or(option, number),
     // Form 2555 line 26 -> line 27, the 2025 foreign earned income itself, a
     // money box. Already NET of line 25's §119 excludable meals and lodging,
     // exactly as `fjs/form7206`'s line 1 premiums arrive net of that line's
     // own printed exclusions: the split cannot be recovered downstream, so it
     // is enforced where the figure is named.
-    foreignEarnedIncome: option(string),
+    foreignEarnedIncome: or(option, string),
     // Form 2555 line 44 -- "Deductions allowed in figuring your adjusted gross
     // income (Form 1040 or 1040-SR, line 11) that are allocable to the
     // excluded income", which is §911(d)(6) in its deduction half. A money
@@ -1304,7 +1304,7 @@ export const returnProfileSchema = open({
     // omit -- which is why check 11 refuses a stored foreign earned income
     // that arrives without the certification, and why this field exists at all
     // rather than being assumed away.
-    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: option(string),
+    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: or(option, string),
     // The Foreign Earned Income Tax Worksheet's own line 2b, printed
     // identically in i1040gi p37 (the 1040 line 16 worksheet) and i6251 p10
     // (the Form 6251 line 7 one): "the total amount of any itemized deductions
@@ -1326,7 +1326,7 @@ export const returnProfileSchema = open({
     // rather than understating it: worksheet line 2c grows, and line 6 is
     // increasing in line 2c under a progressive schedule. That is the safe
     // direction and still not a reason to guess, which is why the field exists.
-    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: option(string),
+    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: or(option, string),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -1773,7 +1773,7 @@ const minimal = {
 /**
  * T-10-04-02, the shape T-09-08-02 already caught once on the 1099-INT: a
  * money box's name could be quietly dropped from {@link moneyBoxFields}
- * without anyone noticing — the field stays `option(string)` structurally, so
+ * without anyone noticing — the field stays `or(option, string)` structurally, so
  * a comma-grouped amount in a dropped box would then validate as ok. One
  * generated leaf per NAMED box supplies a comma-grouped value to that box
  * alone, asserts `validate` refuses, AND asserts the refusal names that box,
@@ -2577,7 +2577,7 @@ export const proof = {
             // code review (12-REVIEW.md WR-01). The omission was not a live
             // defect — the shipped schema already rejected `false` — but it
             // was an unguarded one: widening this single field from
-            // `option(true)` to `option(boolean)` passed `tsc --noEmit` AND
+            // `or(option, true)` to `or(option, boolean)` passed `tsc --noEmit` AND
             // the entire suite with zero failures. A green suite over a
             // silently shrunk guarantee is exactly the failure this file's
             // sibling count-constants exist to prevent, so every checkbox on
@@ -2970,8 +2970,8 @@ export const proof = {
                 'a denial must be distinguishable from an absence',
             )
         },
-        // `option(true)` would have accepted a bare `false` nowhere, but
-        // `option(string)` must reject one explicitly -- and a materialized
+        // `or(option, true)` would have accepted a bare `false` nowhere, but
+        // `or(option, string)` must reject one explicitly -- and a materialized
         // `false` is precisely the serializer hazard this dialect's header
         // names. `''` is the other cheap way to write "nothing", and it is
         // refused by the vocabulary rather than accepted as an absence.

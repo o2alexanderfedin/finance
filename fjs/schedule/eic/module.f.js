@@ -624,7 +624,7 @@ export const earnedIncomeCreditInvestmentIncome = input => {
  * order the printed Step 3 asks its questions.
  *
  * **§32(c)(3)(D) and §32(m) — the SSN test — is checked LAST and does not
- * refuse.** `ssnValidForEmployment` is `option(true)`, this dialect's original
+ * refuse.** `ssnValidForEmployment` is `or(option, true)`, this dialect's original
  * checkbox convention, so an absent field means "not asserted" and the child
  * is simply not taken into account under §32(b). That reading is safe here in
  * a way it is not for the ten fields Phase 32 added, and the reason is a
@@ -869,13 +869,20 @@ const oneChildProfile = {
 }
 
 /**
+ * `oneChildProfile` with `dependents` genuinely ABSENT. The schema states
+ * `or(option, array(dependentEntrySchema))`, so an absent array is the field
+ * not being there at all — a field present and holding `undefined` is a
+ * different value, and dropping it by destructuring is the only way to say so.
+ */
+const { dependents: _dropped, ...withoutDependents } = oneChildProfile
+
+/**
  * The same filer with no dependents at all — the childless credit's fixture.
  * @type {ReturnProfile}
  */
 const childlessProfile = {
-    ...oneChildProfile,
+    ...withoutDependents,
     dependentCount: 0,
-    dependents: undefined,
     filerPrincipalPlaceOfAbode: 'inTheUnitedStatesForMoreThanHalfTheYear',
     filerAttainedAgeTwentyFiveButNotSixtyFive: 'attainedAgeTwentyFiveButNotSixtyFive',
 }
@@ -1580,19 +1587,23 @@ export const proof = {
         // The three filer facts that refuse BY NAME when unstated, and the one
         // that is conditional on there being no qualifying child.
         eachUnstatedFactRefusesByName: () => {
+            // An UNSTATED fact is one the profile does not carry, so each
+            // fixture drops its field by destructuring rather than overriding
+            // it with `undefined` — see `withoutDependents` above.
+            const { filerSocialSecurityNumber: _noSsn, ...withoutFilerSsn } = oneChildProfile
+            const { filerQualifyingChildOfAnotherTaxpayer: _noOwnStatus, ...withoutOwnStatus } =
+                oneChildProfile
             /** @type {readonly (readonly [string, string, ReturnProfile])[]} */
             const cases = [
-                ['filerSocialSecurityNumber', '§32(m)',
-                    { ...oneChildProfile, filerSocialSecurityNumber: undefined }],
+                ['filerSocialSecurityNumber', '§32(m)', withoutFilerSsn],
                 ['spouseSocialSecurityNumber', '§32(c)(1)(E)(ii)',
                     { ...oneChildProfile, filingStatus: 'marriedFilingJointly' }],
-                ['filerQualifyingChildOfAnotherTaxpayer', '§32(c)(1)(B)',
-                    { ...oneChildProfile, filerQualifyingChildOfAnotherTaxpayer: undefined }],
+                ['filerQualifyingChildOfAnotherTaxpayer', '§32(c)(1)(B)', withoutOwnStatus],
                 ['filerPrincipalPlaceOfAbode', '§32(c)(1)(A)(ii)(I)',
-                    { ...oneChildProfile, dependentCount: 0, dependents: undefined }],
+                    { ...withoutDependents, dependentCount: 0 }],
                 ['filerAttainedAgeTwentyFiveButNotSixtyFive', '§32(c)(1)(A)(ii)(II)',
                     {
-                        ...oneChildProfile, dependentCount: 0, dependents: undefined,
+                        ...withoutDependents, dependentCount: 0,
                         filerPrincipalPlaceOfAbode: 'inTheUnitedStatesForMoreThanHalfTheYear',
                     }],
             ]

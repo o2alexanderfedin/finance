@@ -61,13 +61,13 @@
  * `box8TradeOrBusinessIncome` is a checkbox. Neither is a dollar amount, so
  * neither appears in {@link moneyBoxFields} and neither is re-parsed through
  * `centsFromString`. `box8TradeOrBusinessIncome` follows DOC-12's checkbox
- * convention — `option(true)`, so a `false` blob is rejected structurally and
+ * convention — `or(option, true)`, so a `false` blob is rejected structurally and
  * absence is the only way to say "not checked".
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -76,8 +76,8 @@ import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -104,8 +104,8 @@ export const mediaType = mediaTypeOf(dialect)
  */
 const stateEntry = open({
     state: string,
-    statePayerStateNumber: option(string),
-    stateIncomeTaxWithheld: option(string),
+    statePayerStateNumber: or(option, string),
+    stateIncomeTaxWithheld: or(option, string),
 })
 
 /**
@@ -120,19 +120,19 @@ export const oneZeroNineNineGSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1UnemploymentCompensation: option(string),
-    box2StateOrLocalIncomeTaxRefunds: option(string),
-    box3RefundTaxYear: option(number),
-    box4FederalIncomeTaxWithheld: option(string),
-    box5RtaaPayments: option(string),
-    box6TaxableGrants: option(string),
-    box7AgriculturePayments: option(string),
-    box8TradeOrBusinessIncome: option(true),
-    box9MarketGain: option(string),
-    box10Through11: option(array(stateEntry)),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box1UnemploymentCompensation: or(option, string),
+    box2StateOrLocalIncomeTaxRefunds: or(option, string),
+    box3RefundTaxYear: or(option, number),
+    box4FederalIncomeTaxWithheld: or(option, string),
+    box5RtaaPayments: or(option, string),
+    box6TaxableGrants: or(option, string),
+    box7AgriculturePayments: or(option, string),
+    box8TradeOrBusinessIncome: or(option, true),
+    box9MarketGain: or(option, string),
+    box10Through11: or(option, array(stateEntry)),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**

@@ -127,7 +127,7 @@ const drawField = field => path => {
 /**
  * A repeating group. Rows are added on demand; an untouched group contributes
  * nothing, which is what keeps an optional array absent rather than present
- * and empty — a distinction the dialects' `option(...)` boxes care about.
+ * and empty — a distinction the dialects' `or(option, ...)` boxes care about.
  * @type {(field: FieldModel) => (path: string) => HTMLElement}
  */
 const drawRows = field => path => {

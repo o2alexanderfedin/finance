@@ -210,13 +210,11 @@ export const estateTrustAmtAdjustment = forms => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
-
 /**
  * A stored beneficiary's Schedule K-1 carrying exactly the box 12 rows given.
  * Box 6 is absent: these leaves are about the AMT adjustment, not about
  * Schedule E.
- * @type {(documentHash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ * @type {(documentHash: string) => (box12: NonNullable<K1EstateTrust['box12AlternativeMinimumTaxItems']>) => Stored<K1EstateTrust>}
  */
 const k1 = documentHash => box12 => ({
     documentHash,
