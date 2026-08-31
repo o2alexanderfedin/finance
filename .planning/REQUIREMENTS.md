@@ -1816,7 +1816,7 @@ targets.
 requirement — that was already true in v4 and stays true; see this document's v2 Tier-B
 ruling for why a phase without an ID is preferable to an ID invented to give it one.
 
-- [ ] **MAINT-09** *(T3)*: **Take `functionalscript` 0.47.0.** The release carries 40
+- [x] **MAINT-09** *(T3)*: **Take `functionalscript` 0.47.0.** The release carries 40
       changelog entries, 15 of them marked BREAKING, across 143 changed files. Exactly two
       reach this repository: `#1732`, which makes a bare `Struct` or `Tuple` schema **closed**
       and requires `dialectEntry` to take a schema with a stated rest, and `#1654`, which
@@ -1917,7 +1917,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
-| MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | v5 | Pending |
+| MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | v5 | Complete |
 | MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v5 | Pending |
 | DOC-25 | T3 | 40. Validation on the Write Path | v5 | Pending |
 | MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
@@ -2204,3 +2204,87 @@ ROADMAP.md "Scope Honesty and the Cut Line".
 ---
 *Scoped 2026-08-03 from PROJECT.md, todo/plan.md, and the research corpus. Tier labels
 indicate sequencing pressure, not importance.*
+
+---
+
+## v6 Requirements — A Current Engine, Actually Current (MAINT, DOC)
+
+**One ID coined here on 2026-08-30**, plus five carried forward from v5 unexecuted. The
+0.48.0 delta was measured against `0fcb088` before this section was written — the figures
+below are observations, not targets, the same discipline the v5 section records.
+
+**Phases 39, 40 and 41 carry forward from v5 at their original numbers**, exactly as 34–36
+carried forward from v4. Renumbering them into a tidy v6 sequence would make the ledger look
+regular at the cost of every citation that already addresses them by number; this document
+has refused that trade twice and refuses it again.
+
+**Why a second bump so soon.** 0.47.0 was taken on 2026-08-27 and 0.48.0 published
+2026-08-30T19:06:59Z, three days later. Staying on 0.47.0 was considered and rejected: the
+two breaking changes below are mechanical and their cost only grows as this repository
+does, and MAINT-11's capability adoption would otherwise be written against a release that
+was already superseded before the phase started.
+
+- [ ] **MAINT-14** *(T3)*: **Take `functionalscript` 0.48.0.** 235 changed files upstream,
+      15 added, 7 removed. Of the 50 upstream modules this repository imports, 28 changed
+      and 5 moved. Exactly two changes reach this code, and both are wide but mechanical:
+
+      **`rtti` relocated** from `fjs/types/rtti/…` to `fjs/rtti/…` — **140 import sites**.
+      The public constructor surface is unchanged; the only additions are two
+      `_`-prefixed internals (`_primitive0List`, `_tag1List`), so this is a path rewrite
+      and nothing else.
+
+      **`option` is no longer a function.** 0.47.0 defines `option = t => or(t, undefined)`,
+      called as `option(string)`. 0.48.0 defines `option = type0('option')`, a tag used as
+      `or(option, string)` — upstream's own `revisionSchema` now reads
+      `archived: or(option, true)`. **596 call sites across 59 files** here.
+
+      **The guard is what the server serves, not that it compiles.** v5's Phase 38 proved
+      that a rewrite can typecheck, pass, and still change every schema the application
+      serves — the call-site `open()` experiment moved 47 containers while looking like the
+      smaller diff. So the same three checks decide this one: `toJsonSchema` over all 31
+      dialect schemas **byte-identical** across the bump; the proof-leaf set may only grow,
+      never shrink; and no touched module's assertion count falls.
+
+      `^0.47.0` does not admit 0.48.0 — a caret on a `0.x` pins the minor — so this is an
+      explicit bump.
+
+### Carried forward from v5, unexecuted
+
+These five keep their v5 text and their phase numbers. What changes is the release they are
+written against: 0.47.0 is superseded, so each phase reads 0.48.0's behaviour before acting.
+
+- **MAINT-10** (Phase 39) — the protocol-version gap. **0.47.0 already closed the upstream
+  half** and this repository never noticed: `_negotiateVersion(supported, requested)` exists
+  and `financeConfig` passes `protocolVersions: ['2025-11-25']`. All three deliverables here
+  are untouched — the docstring at lines 14–25 still calls it a live gap and instructs "Do
+  not wrap or replace `mcpStep` here to work around it"; lines 23, 310 and 502 still cite
+  `fjs/todo/upstream-mcp-protocol-version-negotiation.md`, deleted in `7244f81`; and
+  `initializeIgnoresRequestedProtocolVersion` still passes for the wrong reason.
+
+  **The sub-question v5 left open is now answered: no, `financeConfig` does not advertise a
+  second revision.** The software is unpublished, so there are no older clients to serve and
+  backward compatibility buys nothing. The proof therefore constructs its **own** two-entry
+  `McpConfig` — which is all that is needed to tell the two behaviours apart, since with one
+  entry the counter-proposal equals the old unconditional pin. The shipped server keeps its
+  single pinned revision, and the leaf's name goes with the behaviour it no longer describes.
+
+- **DOC-25** (Phase 40) — dialect validation on the write path.
+- **MAINT-11, MAINT-12, MAINT-13** (Phase 41) — new capabilities and the migration report,
+  now read against 0.48.0's surface rather than 0.47.0's.
+
+### v6 Traceability
+
+| REQ-ID | Tier | Phase | Milestone | Status |
+|--------|------|-------|-----------|--------|
+| MAINT-14 | T3 | 42. Take FunctionalScript 0.48.0 | v6 | Pending |
+| MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v6 | Pending |
+| DOC-25 | T3 | 40. Validation on the Write Path | v6 | Pending |
+| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
+| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
+| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
+
+**The five carried-forward IDs appear in both tables on purpose.** The v5 rows are the
+record of what that milestone scoped; these are what v6 owns. `parseRequirements` takes an
+ID's status from the last row it reads, and both say `Pending`, so the two agree — which is
+the only way a duplicate row is allowed to exist here.
+

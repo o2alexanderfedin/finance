@@ -1109,16 +1109,19 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: MAINT-06 (intent) · **Tier**: T3 · **Status**: complete 2026-08-19 · record: `.planning/reports/fjs-0.46.1-migration.md`
 
 ### Phase 38: Take FunctionalScript 0.47.0
-**Requirements**: MAINT-09 · **Tier**: T3 · **Status**: not started — milestone v5
+**Requirements**: MAINT-09 · **Tier**: T3 · **Status**: complete — milestone v5, shipped in PR #139 (merge `14e6868`, 2026-08-30)
 
 ### Phase 39: Retire the Protocol-Version Gap
-**Requirements**: MAINT-10 · **Tier**: T3 · **Status**: not started — milestone v5
+**Requirements**: MAINT-10 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
 
 ### Phase 40: Validation on the Write Path
-**Requirements**: DOC-25 · **Tier**: T3 · **Status**: not started — milestone v5, after Phase 38
+**Requirements**: DOC-25 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
 
 ### Phase 41: New Capabilities and the Migration Report
-**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: not started — milestone v5
+**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
+
+### Phase 42: Take FunctionalScript 0.48.0
+**Requirements**: MAINT-14 · **Tier**: T3 · **Status**: not started — milestone v6
 
 ---
 
@@ -1329,7 +1332,7 @@ negotiation it retires and the two-entry `protocolVersions` list its proof requi
 and none of them is blocked on engineering**, so they are not scheduled against the four above and
 do not gate them; they run when the owner is in the room.
 
-- [ ] **Phase 38: Take FunctionalScript 0.47.0** - MAINT-09. `^0.46.1` does not admit 0.47.0 — a
+- [x] **Phase 38: Take FunctionalScript 0.47.0** - MAINT-09. `^0.46.1` does not admit 0.47.0 — a
       caret on a `0.x` version pins the minor — so this is an explicit bump, not a refresh. The two
       breaking changes that reach here are `#1732`, which makes a bare `Struct` or `Tuple` schema
       **closed** and requires `dialectEntry` to take a schema with a stated rest, and `#1654`, which
@@ -1524,3 +1527,64 @@ for why a phase without an ID is preferable to an ID invented to give it one.
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
       answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
       unchanged and still wanted.
+
+
+---
+
+## Milestone v6: A Current Engine, Actually Current
+
+**Why a second bump three days after the first.** 0.47.0 was taken on 2026-08-27 and
+0.48.0 published 2026-08-30T19:06:59Z. Staying put was considered and rejected on two
+grounds: the two breaking changes below are mechanical, and their cost grows with this
+repository rather than shrinking; and Phase 41 adopts new capabilities, which written
+against 0.47.0 would be written against a release already superseded before the phase
+started. **Phases 39, 40 and 41 carry forward from v5 at their original numbers**, exactly
+as 34–36 carried forward from v4, and for the same reason: the citations that address them
+by number outnumber the tidiness gained by renumbering.
+
+**Execution order: `42 → 39 → 40 → 41`.** Not numeric, and deliberately so — this file has
+run a non-numeric order before (`19 → 18 → 17`) and records why each time. 42 comes first
+because 39, 40 and 41 all read the release's behaviour before acting, and reading 0.47.0's
+would mean reading it twice. 39 no longer needs anything from 42 on the negotiation itself —
+0.47.0 already shipped `_negotiateVersion` and this repository simply never noticed — but its
+proof is rewritten against whatever 0.48.0's `mcp` surface is, so it follows.
+
+- [ ] **Phase 42: Take FunctionalScript 0.48.0** - MAINT-14. `^0.47.0` does not admit 0.48.0
+      — a caret on a `0.x` pins the minor — so this is an explicit bump. **Measured against
+      `0fcb088` on 2026-08-30, before this phase was written**; the numbers are observations
+      mainline must reproduce, not targets. 235 changed files upstream, 15 added, 7 removed;
+      of the 50 upstream modules imported here, 28 changed and 5 moved. Two changes reach
+      this code:
+
+      1. **`rtti` relocated**, `fjs/types/rtti/…` → `fjs/rtti/…`, at **140 import sites**.
+         The public constructor surface is unchanged — the only additions are two
+         `_`-prefixed internals — so this is a path rewrite and must be nothing else.
+      2. **`option` stopped being a function.** 0.47.0: `option = t => or(t, undefined)`,
+         called `option(string)`. 0.48.0: `option = type0('option')`, used
+         `or(option, string)`. **596 call sites across 59 files.** Upstream's own
+         `revisionSchema` now reads `archived: or(option, true)`.
+
+      **The acceptance criteria are v5 Phase 38's, because Phase 38 is where this repository
+      learned that compiling is not evidence.** The call-site `open()` experiment typechecked,
+      passed the suite, and silently moved 47 served containers while presenting the smaller
+      diff as proof. So:
+
+      1. `package.json` names 0.48.0 explicitly and `tsc` reports **0** errors.
+      2. **`toJsonSchema` over all 31 dialect schemas is byte-identical** to 0.47.0's output.
+         This is the criterion that decides the phase. A rewrite of 596 `option(…)` sites is
+         exactly the shape of change that can alter every served schema while looking
+         mechanical — `option` is a *union member* now, not a wrapper, and getting the
+         nesting wrong changes what the union admits.
+      3. **The proof-leaf set may only grow.** Compare leaf-name SETS, not totals, with the
+         recipe AGENTS.md documents; `comm -23 baseline-leaves.txt result-leaves.txt` must be
+         empty. No touched module's assertion count may fall — `grep -cE '\bassert(Eq|NotNullish)?\(' <file>`
+         before and after.
+      4. The full battery holds at its current figures: `npm test` green, `test:integration`
+         **13/13**, `test:ui` **46/46**, and **no file falls below 95%** on any of the three
+         coverage metrics (the v5 close-out left 0 of 121 below).
+
+**What v6 does NOT do.** It does not renumber 39–41, it does not touch phases 34–36 (still
+T1, still blocked on the owner being in the room, still unscheduled against the engineering
+work), and it does not advertise a second MCP protocol revision — see MAINT-10, where that
+open sub-question is now answered: the software is unpublished, so there are no older
+clients and backward compatibility buys nothing.
