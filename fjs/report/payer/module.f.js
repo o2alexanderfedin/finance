@@ -367,9 +367,6 @@ export const proof = {
     payerReportAggregatesAcrossPayersAndDialects: () => {
         const [t, v] = interpret(hostMap)(payerReport(guestCtx)([]))
         assert(t === 'ok', ['expected the payer report to run to completion', t, v])
-        if (t !== 'ok') {
-            return
-        }
         const [value] = v
         const byPayer = /** @type {ByPayer} */ (value)
 
@@ -403,9 +400,6 @@ export const proof = {
     payerWithNoInScopeBoxIsAbsentNotZero: () => {
         const [t, v] = interpret(hostMap)(payerReport(guestCtx)([]))
         assert(t === 'ok', ['expected the payer report to run to completion', t, v])
-        if (t !== 'ok') {
-            return
-        }
         const [value] = v
         const byPayer = /** @type {ByPayer} */ (value)
         assert(

@@ -198,9 +198,6 @@ const parameterProbeInputs = {
 const lineCents = inputs => taxParams => rule => {
     const outcome = taxGuestCtx(taxParams).form1040Report(inputs)
     assert(outcome.kind === 'ok', ['expected the probe return to compute', outcome])
-    if (outcome.kind !== 'ok') {
-        return 0n
-    }
     const line = outcome.lines.find(candidate => candidate.rule === rule)
     return assertNotNullish(line, ['expected the report to carry', rule]).value
 }

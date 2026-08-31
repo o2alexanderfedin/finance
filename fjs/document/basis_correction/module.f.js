@@ -267,9 +267,7 @@ const assertRequired = field => blob => {
     if (t !== 'error') {
         throw ['expected error', field]
     }
-    if (typeof v === 'string') {
-        throw ['expected a structural ValidationError, not a semantic string', field, v]
-    }
+    assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', field, v])
     assert(v.path.includes(field), ['the ValidationError must name the field', field, v])
 }
 
@@ -283,9 +281,6 @@ export const proof = {
     theRsuCorrectionValidatesAndRoundTrips: () => {
         const [t, v] = validate(rsuSameDaySale)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.brokerageDocumentHash, 'sha256-rsu-vest-and-sell')
         assertEq(v.correctedCostOrOtherBasis, '150000.00')
         assert(v.reason.includes('W-2 box 1'), ['the reason round-trips verbatim', v.reason])
@@ -385,13 +380,8 @@ export const proof = {
     /** A blob tagged as another dialect is rejected structurally, on `dialect`. */
     otherDialectRejected: () => {
         const [t, v] = validate({ ...rsuSameDaySale, dialect: 'vnd.fjs.1099b' })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
-        if (typeof v === 'string') {
-            throw ['expected a structural ValidationError', v]
-        }
+        assert(t === 'error', ['expected error', t, v])
+        assert(typeof v !== 'string', ['expected a structural ValidationError', v])
         assertEq(v.path.length, 1)
         assertEq(v.path[0], 'dialect')
     },

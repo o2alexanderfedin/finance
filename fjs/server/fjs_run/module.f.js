@@ -1094,9 +1094,6 @@ export const proof = {
                             basisCorrectionForms: [], marketplaceStatements: [],
                         })
                         assert(outcome.kind === 'ok', ['expected the engine to compute', outcome])
-                        if (outcome.kind !== 'ok') {
-                            return ctx.pure('')
-                        }
                         const deduction = assertNotNullish(
                             outcome.lines.find(line => line.rule === '1040 line 12e'),
                             'expected line 12e')

@@ -1078,9 +1078,6 @@ export const proof = {
         threeHundredThousandUndeclaredRefusesNamingForm8959AndLine23: () => {
             const outcome = classify('single')(['wages'])(w2sWithMedicareWages(['300000.00']))
             assert(outcome.kind === 'error', ['a $300,000 box 5 must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(outcome.unmodeled[0], 'additionalMedicareTax', ['expected Schedule 2 line 11 named', outcome.unmodeled])
             assert(
@@ -1210,9 +1207,6 @@ export const proof = {
                 retirementForms: [{ value: { ...bare1099R, box3CapitalGain: '5000.00' } }],
             })
             assert(outcome.kind === 'error', ['a non-zero 1099-R box 3 must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'form4972LumpSumDistribution', ['expected Form 4972 named', outcome.unmodeled])
             assert(
                 outcome.message.includes('Form 4972'),
@@ -1260,9 +1254,6 @@ export const proof = {
                 w2s: [{ value: { ...bareW2, box1WagesTipsOtherCompensation: '30000.00', box8AllocatedTips: '2400.00' } }],
             })
             assert(outcome.kind === 'error', ['a non-zero W-2 box 8 must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected unreported tips named', outcome.unmodeled])
             assert(
                 outcome.message.includes('Form 4137'),
@@ -1317,9 +1308,6 @@ export const proof = {
                 isoExerciseForms: [{ value: isoExercise }],
             })
             assert(outcome.kind === 'error', ['a stored Form 3921 must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(
                 outcome.unmodeled[0], 'alternativeMinimumTax',
@@ -1410,9 +1398,6 @@ export const proof = {
                 ],
             })
             assert(outcome.kind === 'error', ['a stored 1099-NEC must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(outcome.unmodeled[0], 'businessIncomeOrLoss', ['expected Schedule 1 line 3 named', outcome.unmodeled])
             assert(
@@ -1492,9 +1477,6 @@ export const proof = {
                 rentalProperties: [{ value: rentalProperty }],
             })
             assert(outcome.kind === 'error', ['a stored rental property must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(
                 outcome.unmodeled[0],
@@ -1540,9 +1522,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['a stored royalty must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'rentalRealEstateAndRoyalties', outcome.unmodeled)
         },
         // THE NEGATIVE CONTROL: no rental property at all, and a property
@@ -1579,9 +1558,6 @@ export const proof = {
                 farmForms: [{ value: farm }],
             })
             assert(outcome.kind === 'error', ['a stored farm must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(
                 outcome.unmodeled[0],
@@ -1758,14 +1734,8 @@ export const proof = {
         aDisposalForNothingStillFires: () => {
             const [asset] = registerWithADisposal.assets
             assert(asset !== undefined, 'the fixture has one asset')
-            if (asset === undefined) {
-                return
-            }
             const disposal = asset.disposal
             assert(disposal !== undefined, 'the fixture asset is disposed of')
-            if (disposal === undefined) {
-                return
-            }
             const outcome = classify('single')(['wages'])({
                 ...noDocuments,
                 assetRegisters: [{
@@ -1803,9 +1773,6 @@ export const proof = {
                 estateTrustK1Forms: [{ value: estateTrustK1 }],
             })
             assert(outcome.kind === 'error', ['a stored Form 1041 K-1 must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(
                 outcome.unmodeled[0],
@@ -1830,9 +1797,6 @@ export const proof = {
                 estateTrustK1Forms: [{ value: estateTrustK1 }],
             })
             assert(outcome.kind === 'error', ['the partnership declaration must not cover a Form 1041 K-1', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'estateAndTrustIncome', [outcome.unmodeled])
         },
         // THE CONTROL: declared, it is silent -- otherwise a tripwire that
@@ -1884,9 +1848,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['a stored K-1 capital gain must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
             assert(outcome.message.includes('Schedule D'), [outcome.message])
             assert(outcome.message.includes('line 5'), ['the remedy must name the printed line', outcome.message])
@@ -1902,9 +1863,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['box 9a is evidence too', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
             assert(outcome.message.includes('line 12'), ['the remedy must name the printed line', outcome.message])
         },
@@ -1984,9 +1942,6 @@ export const proof = {
                 partnershipK1Forms: [{ value: partnershipK1 }],
             })
             assert(outcome.kind === 'error', ['box 1 still trips its own entry', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(
                 !outcome.unmodeled.includes('capitalGainsOrLosses'),
                 ['ordinary business income is not a capital gain', outcome.unmodeled])
@@ -2003,9 +1958,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['a loss still requires the declaration', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
         },
         // ── TAX-38's disjunct: a 1099-B box 11 -> capitalGainsOrLosses ──
@@ -2025,9 +1977,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['a stored box 11 must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
             assert(outcome.message.includes('Schedule D'), [outcome.message])
             assert(
@@ -2099,9 +2048,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['a loss still requires the declaration', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
         },
     },
@@ -2120,9 +2066,6 @@ export const proof = {
                 partnershipK1Forms: [{ value: partnershipK1 }],
             })
             assert(outcome.kind === 'error', ['a stored K-1 must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(
                 outcome.unmodeled[0],
@@ -2159,9 +2102,6 @@ export const proof = {
                 sCorporationK1Forms: [{ value: sCorporationK1 }],
             })
             assert(outcome.kind === 'error', ['a stored 1120-S K-1 must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'partnershipAndSCorporationIncome', [outcome.unmodeled])
         },
         // THE NEGATIVE CONTROL: absent, and a dormant entity's zero box 1.
@@ -2236,9 +2176,6 @@ export const proof = {
             w2s: [{ value: { ...bareW2, box5MedicareWagesAndTips: '300000.00', box8AllocatedTips: '2400.00' } }],
         })
         assert(outcome.kind === 'error', ['two tripwires must refuse', outcome])
-        if (outcome.kind !== 'error') {
-            return
-        }
         assertEq(outcome.unmodeled.length, 2, ['expected both required kinds', outcome.unmodeled])
         assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected 1040 line 1c named first', outcome.unmodeled])
         assertEq(outcome.unmodeled[1], 'additionalMedicareTax', ['expected Schedule 2 line 11 named second', outcome.unmodeled])
@@ -2285,9 +2222,6 @@ export const proof = {
             assetRegisters: [{ value: registerWithADisposal }],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
-        if (outcome.kind !== 'error') {
-            return
-        }
         for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43', '2468.13', '2109.87', '1357.91']) {
             assert(
                 !outcome.message.includes(amount),

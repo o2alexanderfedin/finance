@@ -764,9 +764,6 @@ const dividendForm = hash => overrides => ({
  */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected ok', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 

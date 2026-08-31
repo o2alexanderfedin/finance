@@ -1359,9 +1359,6 @@ const run = input => {
  */
 const refusalMessage = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') {
-        return ''
-    }
     return outcome.message
 }
 
@@ -1370,9 +1367,6 @@ const refusalMessage = outcome => {
  */
 const computed = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed line 4b', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['unreachable', outcome]
-    }
     return outcome
 }
 

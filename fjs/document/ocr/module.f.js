@@ -23,7 +23,7 @@
  */
 import { array, open, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 
 /** @import { Ts } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -77,10 +77,7 @@ export const proof = {
     },
     wrongDialectRejected: () => {
         const [t, v] = validate({ dialect: 'vnd.fjs.wrong', pages: [], fields: {} })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
+        assert(t === 'error', ['expected error', t, v])
         assertEq(v.path[0], 'dialect')
     },
 }

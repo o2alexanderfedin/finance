@@ -362,13 +362,8 @@ export const proof = {
         // Wrong dialect: structural rejection, `dialect` first.
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.wrong' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path[0], 'dialect')
         },
     },
@@ -538,13 +533,8 @@ export const proof = {
                 fields: { 'Box 1 Interest income': '1,234.56' },
             }
             const [t, v] = validate(ocrValue)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },
@@ -554,10 +544,7 @@ export const proof = {
         // works symmetrically.
         oneZeroNineNineIntShapeRejectedByOcr: () => {
             const [t, v] = ocrValidate({ ...minimal, corrected: true })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
+            assert(t === 'error', ['expected error', t, v])
             assertEq(v.path[0], 'dialect')
         },
     },

@@ -1657,9 +1657,6 @@ export const proof = {
                 })],
             })
             assert(loss.kind === 'error', ['a rental loss must refuse through Schedule E', loss])
-            if (loss.kind !== 'error') {
-                return
-            }
             assert(loss.message.includes('Form 8582'),
                 ['the form the filer needs must survive the seam', loss.message])
             assert(loss.message.includes('RENT-0001'),
@@ -1668,9 +1665,6 @@ export const proof = {
                 rentalProperties: [rentalPropertyDoc({ fairRentalDays: 100, personalUseDays: 30 })],
             })
             assert(personalUse.kind === 'error', ['a §280A property must refuse through Schedule E', personalUse])
-            if (personalUse.kind !== 'error') {
-                return
-            }
             assert(personalUse.message.includes('\u00a7280A(c)(5)'),
                 ['a DIFFERENT Part I refusal must survive the seam too', personalUse.message])
             assert(!personalUse.message.includes('Form 8582'),

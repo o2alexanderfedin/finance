@@ -2673,9 +2673,6 @@ export const proof = {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
                     ?? modeledKindDeclarationRemedies.find(r => r.kind === kind)
                 assert(row !== undefined, ['a Schedule E kind is neither refused nor described', kind])
-                if (row === undefined) {
-                    throw ['a Schedule E kind is neither refused nor described', kind]
-                }
                 assert(
                     row.line.startsWith(`${part} -> `),
                     ['a Schedule E row names the wrong printed part', kind, part, row.line],
@@ -2885,9 +2882,6 @@ export const proof = {
             for (const [kind, line] of expected) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
                 assert(row !== undefined, ['a Form 6251 Part I kind must refuse', kind])
-                if (row === undefined) {
-                    continue
-                }
                 assert(
                     row.line.startsWith(`${line} `),
                     ['a Form 6251 refusal row names the wrong printed line', kind, line, row.line])
@@ -2924,9 +2918,6 @@ export const proof = {
             for (const [kind, formLine] of namedByAPreExistingKind) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
                 assert(row !== undefined, ['expected the pre-existing kind to still refuse', kind])
-                if (row === undefined) {
-                    continue
-                }
                 assert(
                     row.line.includes(formLine),
                     ['the pre-existing row must ALSO name its Form 6251 line', kind, row.line])
@@ -4370,9 +4361,6 @@ export const proof = {
             // the words a reader holding the printed schedule can check.
             const misnamed = classifyScope(['premiumTaxCreditReconciliation'])
             assert(misnamed.kind === 'error', ['expected a refusal', misnamed])
-            if (misnamed.kind !== 'error') {
-                throw ['expected error', misnamed]
-            }
             assert(
                 misnamed.message.includes('Form 4255'),
                 ['the corrected remedy must name the form Schedule 2 line 19 actually attaches',
@@ -4642,9 +4630,6 @@ export const proof = {
                 { kind: 'unreportedTips', evidence: 'Form W-2 box 8 (allocated tips) is non-zero' },
             ])
             assert(declared.kind === 'error', ['expected a declared-scope refusal', declared])
-            if (declared.kind !== 'error') {
-                return
-            }
             assert(
                 declared.message !== tripped.message,
                 ['the two refusals must not be the same sentence', tripped.message],

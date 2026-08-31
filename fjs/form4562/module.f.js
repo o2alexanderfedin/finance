@@ -404,9 +404,6 @@ export const assetDeductionCents = taxYear => asset => {
 export const depreciationAllowedOrAllowableCents = asset => {
     const disposal = asset.disposal
     assert(disposal !== undefined, ['only a disposed asset has a cumulative figure', asset.description])
-    if (disposal === undefined) {
-        throw ['only a disposed asset has a cumulative figure', asset.description]
-    }
     const basis = basisForDepreciationCents(asset)
     const finalRecoveryYear = disposal.soldYear - asset.placedInServiceYear + 1
     let total = asset.specialDepreciationAllowanceClaimedCents + asset.section179ElectedCostCents

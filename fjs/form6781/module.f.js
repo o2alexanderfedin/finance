@@ -500,18 +500,12 @@ const sectionTwelveFiftySixDocument = documentHash => box8 => box9 => box10 => b
 /** @type {(outcome: Form6781Outcome) => Form6781Ok} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 6781 Part I to compute', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form6781Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 6781 to refuse', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected error', outcome]
-    }
     return outcome.message
 }
 

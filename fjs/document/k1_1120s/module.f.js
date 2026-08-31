@@ -530,9 +530,6 @@ export const proof = {
     theCorporationAndTheShareholderAreNotTransposed: () => {
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(
             v.corporationEIN,
             '44-4444444',
@@ -753,13 +750,8 @@ export const proof = {
 
     otherDialectRejected: () => {
         const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.k1_1065' })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
-        if (typeof v === 'string') {
-            throw ['expected a structural ValidationError', v]
-        }
+        assert(t === 'error', ['expected error', t, v])
+        assert(typeof v !== 'string', ['expected a structural ValidationError', v])
         assertEq(v.path.length, 1)
         assertEq(v.path[0], 'dialect')
     },
@@ -783,13 +775,8 @@ export const proof = {
                 box1OrdinaryBusinessIncome: '80000.00',
                 box14SelfEmploymentEarnings: [{ code: 'A', amount: '80000.00' }],
             })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },

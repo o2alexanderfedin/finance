@@ -385,9 +385,6 @@ export const proof = {
     theEmployerAndTheEmployeeAreNotTransposed: () => {
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.employerEIN, '11-1111111', 'employerEIN holds box b, in an EIN format')
         assertEq(v.employeeSSN, '222-22-2222', 'employeeSSN holds box a, in an SSN format')
         assertEq(v.controlNumber, '', 'box d is frequently blank, and present-and-empty is not absent')
@@ -442,13 +439,8 @@ export const proof = {
         },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.1099int' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
     },

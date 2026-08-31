@@ -277,13 +277,8 @@ export const proof = {
         // guarantee every other document dialect gets from `base`.
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimalOk, dialect: 'vnd.fjs.wrong' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path[0], 'dialect')
         },
     },
@@ -388,13 +383,8 @@ export const proof = {
                 formRevision: '2024',
             }
             const [t, v] = validate(oneZeroNineNineIntValue)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },

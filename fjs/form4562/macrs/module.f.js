@@ -262,9 +262,6 @@ const tenTo = n => 10n ** BigInt(n)
 export const macrsColumn = classification => method => month => convention => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) {
-        throw ['unknown MACRS classification', classification]
-    }
     const unit = 100n * tenTo(spec.printedDecimals)
     const recovery24 = spec.recoveryTwentyFourths
     const first24 = conventionTwentyFourths(convention)(month)
@@ -318,9 +315,6 @@ export const macrsColumn = classification => method => month => convention => {
 export const macrsRate = classification => method => month => convention => recoveryYear => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) {
-        throw ['unknown MACRS classification', classification]
-    }
     const column = macrsColumn(classification)(method)(month)(convention)
     const units = recoveryYear >= 1 ? column[recoveryYear - 1] : undefined
     return of(units === undefined ? 0n : units)(100n * tenTo(spec.printedDecimals))
@@ -371,9 +365,6 @@ export const macrsDisposalDeductionCents
 const printed = classification => column => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) {
-        throw ['unknown MACRS classification', classification]
-    }
     const unit = tenTo(spec.printedDecimals)
     return column.map(v => {
         const whole = v / unit

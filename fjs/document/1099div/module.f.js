@@ -414,13 +414,8 @@ export const proof = {
         },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.1099r' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
     },
@@ -441,13 +436,8 @@ export const proof = {
         sourceArtifactHashRequired: () => {
             const { sourceArtifactHash, ...withoutHash } = minimal
             const [t, v] = validate(withoutHash)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, not a semantic string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', v])
             assert(
                 v.path.includes('sourceArtifactHash'),
                 ['expected the ValidationError to name sourceArtifactHash', v],

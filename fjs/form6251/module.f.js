@@ -1138,9 +1138,6 @@ const run = input => form6251(taxParams2025)(input)
  */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected ok', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
@@ -2186,9 +2183,6 @@ export const proof = {
                 estateTrustK1Forms: [beneficiaryK1('doc-k1-stmt')([{ code: 'A' }])],
             })
             assert(outcome.kind === 'error', ['expected the whole form to refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('doc-k1-stmt'), ['name the document', outcome.message])
             assert(outcome.message.includes('line 2j'), ['name the line', outcome.message])
             // The CONTROL: the same return whose row carries an amount

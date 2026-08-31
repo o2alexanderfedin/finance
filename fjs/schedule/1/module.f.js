@@ -4395,9 +4395,6 @@ export const proof = {
             const outcome = stageOneWithPassThrough(profileJoint)('marriedFilingJointly')(
                 [partnershipK1Doc('80000.00')])([spouseBusinessDoc])([])
             assert(outcome.kind === 'error', ['two self-employed people must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('333-33-3333'), ['the proprietor', outcome.message])
             assert(outcome.message.includes('222-22-2222'), ['the partner', outcome.message])
             assert(outcome.message.includes('§1402(b)(1)'), [outcome.message])

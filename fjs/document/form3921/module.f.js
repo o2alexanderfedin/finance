@@ -387,9 +387,6 @@ export const proof = {
     theInstructionsWorkedExampleRoundTrips: () => {
         const [t, v] = validate(publishedExample)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.box1DateOptionGranted, '01/03/2024')
         assertEq(v.box2DateOptionExercised, '03/13/2025')
         assertEq(v.box3ExercisePricePerShare, '10.00')
@@ -422,9 +419,6 @@ export const proof = {
     blankBoxesOmittedValidatesAndReadsBackAbsent: () => {
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.box3ExercisePricePerShare, undefined)
         assertEq(v.box4FairMarketValuePerShareOnExerciseDate, undefined)
         assertEq(v.box5NumberOfSharesTransferred, undefined)
@@ -462,9 +456,6 @@ export const proof = {
         const filersOwnTin = '222-22-2222'
         const [t, v] = validate({ ...minimal, employeeTin: '444-44-4444', box5NumberOfSharesTransferred: '10' })
         assert(t === 'ok', ['a spouse\'s Form 3921 must be storable', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assert(
             v.employeeTin !== filersOwnTin,
             ['this fixture is deliberately a spouse\'s form, not the filer\'s', v.employeeTin])
@@ -490,9 +481,6 @@ export const proof = {
     theTransferorAndTheEmployeeAreNotTransposed: () => {
         const [t, v] = validate(publishedExample)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(
             v.transferorTin,
             '11-1111111',
@@ -536,13 +524,8 @@ export const proof = {
         sourceArtifactHashRequired: () => {
             const { sourceArtifactHash, ...withoutHash } = minimal
             const [t, v] = validate(withoutHash)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, not a semantic string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', v])
             assert(v.path.includes('sourceArtifactHash'), ['expected the field named', v])
         },
         // The two dates and box 6 are free text and are NOT exactness-checked
@@ -565,13 +548,8 @@ export const proof = {
     /** A blob tagged as another dialect is rejected structurally, on `dialect`. */
     otherDialectRejected: () => {
         const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.form3922' })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
-        if (typeof v === 'string') {
-            throw ['expected a structural ValidationError', v]
-        }
+        assert(t === 'error', ['expected error', t, v])
+        assert(typeof v !== 'string', ['expected a structural ValidationError', v])
         assertEq(v.path.length, 1)
         assertEq(v.path[0], 'dialect')
     },

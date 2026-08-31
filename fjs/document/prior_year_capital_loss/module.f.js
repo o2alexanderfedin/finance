@@ -276,13 +276,8 @@ const generatedRequiredFieldProof = Object.fromEntries(
                 Object.entries(minimal).filter(([key]) => key !== field),
             )
             const [t, v] = validate(withoutField)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, not a semantic string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', v])
             assert(v.path.includes(field), ['expected the ValidationError to name the missing field', field, v])
         },
     ]),
@@ -303,13 +298,8 @@ export const proof = {
     },
     wrongDialectRejected: () => {
         const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.medical_expenses' })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
-        if (typeof v === 'string') {
-            throw ['expected a structural ValidationError', v]
-        }
+        assert(t === 'error', ['expected error', t, v])
+        assert(typeof v !== 'string', ['expected a structural ValidationError', v])
         assertEq(v.path[0], 'dialect')
     },
     correctedFalseRejected: () => {
@@ -335,10 +325,7 @@ export const proof = {
     // absence-vs-broken distinction (see module docstring).
     presentButInvalidFieldRefusesNamingTheField: () => {
         const [t, v] = validate({ ...minimal, priorYearScheduleDLine7: 'approx. -10000' })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
+        assert(t === 'error', ['expected error', t, v])
         if (typeof v !== 'string') {
             throw ['expected a semantic string error naming the field, not a structural ValidationError', v]
         }

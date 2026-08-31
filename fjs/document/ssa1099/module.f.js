@@ -259,9 +259,6 @@ export const proof = {
     theBeneficiaryAndTheClaimNumberAreNotTransposed: () => {
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.beneficiarySSN, '222-22-2222', 'beneficiarySSN holds box 2, in an SSN format')
         assertEq(v.claimNumber, 'CLAIM-0001', 'claimNumber holds box 8, which is not a TIN at all')
         assertEq(v.payerTin, '', 'SSA-1099 prints no payer TIN, so the payer role is empty')
@@ -297,13 +294,8 @@ export const proof = {
         },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.1099r' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
         // Pins the deliberate deviation as a proof, not merely a docstring

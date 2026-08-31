@@ -141,9 +141,6 @@ export const proof = {
             sourceArtifactHash: differentSourceArtifactHash,
         })
         assert(t === 'ok', ['expected the unrelated instance to validate', t, thirdInstance])
-        if (t !== 'ok') {
-            throw ['expected ok', t, thirdInstance]
-        }
         assertEq(sharedSourceArtifactHash === differentSourceArtifactHash, false)
         assertEq(
             thirdInstance.sourceArtifactHash === sharedSourceArtifactHash,

@@ -773,18 +773,12 @@ const inputOf = record => line29Cents => ({
 /** @type {(outcome: Form8829Outcome) => Form8829Result} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 8829 to compute, not refuse', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form8829Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 8829 to refuse', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected error', outcome]
-    }
     return outcome.message
 }
 

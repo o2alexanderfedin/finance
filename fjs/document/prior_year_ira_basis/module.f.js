@@ -222,13 +222,8 @@ export const proof = {
     },
     wrongDialectRejected: () => {
         const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.prior_year_capital_loss' })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
-        if (typeof v === 'string') {
-            throw ['expected a structural ValidationError', v]
-        }
+        assert(t === 'error', ['expected error', t, v])
+        assert(typeof v !== 'string', ['expected a structural ValidationError', v])
         assertEq(v.path[0], 'dialect')
     },
     correctedFalseRejected: () => {
@@ -242,13 +237,8 @@ export const proof = {
         const withoutBasis = Object.fromEntries(
             Object.entries(minimal).filter(([key]) => key !== basisField))
         const [t, v] = validate(withoutBasis)
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
-        if (typeof v === 'string') {
-            throw ['expected a structural ValidationError, not a semantic string', v]
-        }
+        assert(t === 'error', ['expected error', t, v])
+        assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', v])
         assert(v.path.includes(basisField), ['expected the missing field named', basisField, v])
     },
     // Present-but-malformed refuses through `checkReferences` instead, with a

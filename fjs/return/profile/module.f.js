@@ -2116,13 +2116,8 @@ export const proof = {
         },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.wrong' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path[0], 'dialect')
         },
     },
@@ -3029,13 +3024,8 @@ export const proof = {
                 box1InterestIncome: '1234.56',
             }
             const [t, v] = validate(oneZeroNineNineIntValue)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },

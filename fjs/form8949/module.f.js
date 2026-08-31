@@ -1035,9 +1035,6 @@ const employeeStockPurchaseForm = {
  */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected ok', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
@@ -1072,9 +1069,6 @@ export const proof = {
             })
             const outcome = form8949(over([categoryADoc, categoryEDoc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, 200000n, 'Category A: $5,000.00 - $3,000.00 = $2,000.00')
             assertEq(outcome.categoryA.sources.length, 2)
             assertEq(outcome.categoryE.value, 500000n, 'Category E: $9,000.00 - $4,000.00 = $5,000.00')
@@ -1094,9 +1088,6 @@ export const proof = {
             })
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryB.value, 50000n, '$2,000.00 - $1,500.00 = $500.00')
         },
         // Category D: long-term, basis reported to the IRS.
@@ -1109,9 +1100,6 @@ export const proof = {
             })
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryD.value, 800000n, '$20,000.00 - $12,000.00 = $8,000.00')
         },
         // A loss (basis exceeds proceeds) must accumulate as a NEGATIVE
@@ -1126,9 +1114,6 @@ export const proof = {
             })
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, -300000n, '$1,000.00 - $4,000.00 = -$3,000.00')
         },
         // Multiple documents landing in the SAME category sum correctly, and
@@ -1148,9 +1133,6 @@ export const proof = {
             })
             const outcome = form8949(over([docOne, docTwo]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, 190000n, '$400.00 + $1,500.00 = $1,900.00')
             assertEq(outcome.categoryA.sources.length, 4)
             assertEq(outcome.categoryA.sources[0]?.documentHash, 'doc-multi-1')
@@ -1190,9 +1172,6 @@ export const proof = {
             })
             const outcome = form8949(over([withBasis]))
             assert(outcome.kind === 'ok', ['expected ok when basis is present', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryE.value, 400000n, '$10,000.00 - $6,000.00 = $4,000.00')
         },
     },
@@ -1307,9 +1286,6 @@ export const proof = {
         })
         const outcome = form8949(over([noSaleDoc, realDoc]))
         assert(outcome.kind === 'ok', ['expected ok — the no-sale document must not trigger a refusal', outcome])
-        if (outcome.kind !== 'ok') {
-            throw ['expected ok', outcome]
-        }
         assertEq(outcome.categoryA.value, 60000n, 'only the real sale contributes: $1,000.00 - $400.00 = $600.00')
         assertEq(outcome.categoryA.sources.length, 2, 'the no-sale document cites nothing')
     },
@@ -1341,9 +1317,6 @@ export const proof = {
             // this proof, never by form8949 itself.
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, 200000n)
         },
         // Documented, not asserted as a runtime refusal: a fixture where

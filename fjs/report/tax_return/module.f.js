@@ -2146,9 +2146,6 @@ const runTwin = subjects => {
     const ctx = taxGuestCtx(assertNotNullish(taxParams2025, 'TY2025 parameters'))
     const [t, v] = interpret(hostMapOver(subjects))(taxReturnReport(ctx)([]))
     assert(t === 'ok', ['expected the tax return program to run to completion', t, v])
-    if (t !== 'ok') {
-        return { kind: 'error', message: 'unreachable', unmodeled: [] }
-    }
     return v[0]
 }
 
@@ -2160,9 +2157,6 @@ const runTwin = subjects => {
  */
 const renderedCents = result => rule => {
     assert(result.kind === 'ok', ['expected a computed return', result])
-    if (result.kind !== 'ok') {
-        return 0n
-    }
     const line = result.lines.find(candidate => candidate.rule === rule)
     return centsFromString(assertNotNullish(line, ['expected the report to carry', rule]).value)
 }
@@ -2302,9 +2296,6 @@ export const proof = {
     aStoredProgramComputesTheWholeReturnFromStoredDocuments: () => {
         const result = runTwin(fixtureSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         assertEq(result.taxYear, 2025)
         assertEq(result.line16Method, 'taxTable')
         // Hand-typed: Form 1040 carries 56 printed money lines between 1a
@@ -2331,9 +2322,6 @@ export const proof = {
     everyRenderedLineKeepsItsCitations: () => {
         const result = runTwin(fixtureSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         for (const line of result.lines) {
             assert(line.sources.length > 0, ['a rendered line carries no source', line.rule])
         }
@@ -2434,9 +2422,6 @@ export const proof = {
         theRefusalNamesAllFourFacts: () => {
             const refused = runTwin([...fixtureSubjects, subjectW2PriorYear])
             assert(refused.kind === 'error', ['expected a refusal', refused])
-            if (refused.kind !== 'error') {
-                return
-            }
             // WHICH document — the CAS hash a reader can go and `cas_get`.
             assert(
                 refused.message.includes(fixtureW2PriorYearHash),
@@ -2566,9 +2551,6 @@ export const proof = {
     storedProgramRoutesTheTwoCreditDialectsAndComputesBothCredits: () => {
         const result = runTwin(creditsSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 1a'), 3900000n)
         assertEq(cents('1040 line 15'), 2325000n)
@@ -2586,9 +2568,6 @@ export const proof = {
     theSameStoredReturnClaimingNoCreditsOwesTheWholeTax: () => {
         const result = runTwin([subjectCreditsW2, subjectCreditsProfileUndeclared])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 16 (Tax Table)'), 255500n, 'the same tax')
         assertEq(cents('1040 line 20'), 0n)
@@ -2668,9 +2647,6 @@ export const proof = {
     storedProgramRoutesTheTwoIraDialectsAndComputesTheQcdAndTheBasis: () => {
         const result = runTwin(retireeSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 4a'), 5000000n, '$50,000.00 — line 4a stays GROSS')
         assertEq(cents('1040 line 4b'), 2667000n, '$26,670.00')
@@ -2709,9 +2685,6 @@ export const proof = {
     theSameRetireeWithoutTheTwoDocumentsIsTheOverstatementThisPhaseCloses: () => {
         const result = runTwin([subjectRetiree1099R, subjectRetireeProfileOnly])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 4a'), 5000000n, 'the same gross figure')
         assertEq(cents('1040 line 4b'), 5000000n, 'taxed in full')
@@ -2785,9 +2758,6 @@ export const proof = {
     storedProgramComputesAForeignEarnedIncomeExclusionEndToEnd: () => {
         const result = runTwin(expatriateSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         assertEq(result.line16Method, 'foreignEarnedIncomeTaxWorksheet')
         const cents = renderedCents(result)
         assertEq(cents('1040 line 1a'), 9000000n, '$90,000.00 of wages')
@@ -2804,9 +2774,6 @@ export const proof = {
     storedProgramRoutesFormTenNinetyFiveAAndComputesThePremiumTaxCredit: () => {
         const result = runTwin(marketplaceSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 1a'), 3000000n, '$30,000.00 of wages')
         assertEq(cents('1040 line 31'), 480000n, '$4,800.00 of net premium tax credit')
@@ -2819,9 +2786,6 @@ export const proof = {
     theSameStoredFilerWithoutTheFormTenNinetyFiveAComputesNoCredit: () => {
         const result = runTwin([subjectMarketplaceProfile, subjectMarketplaceW2])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 1a'), 3000000n, 'the same $30,000.00 of wages')
         assertEq(cents('1040 line 31'), 0n, 'and no premium tax credit at all')
@@ -2843,9 +2807,6 @@ export const proof = {
     storedProgramRoutesAFormEightyEightTwentyNineInsideTheBusinessRecord: () => {
         const result = runTwin(founderWithHomeOfficeSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         // $350.00 of receipts, $90.00 of advertising, $222.56 of Form 8829
         // line 36. Every figure hand-derived at the fixture above.
@@ -2858,9 +2819,6 @@ export const proof = {
     storedProgramRoutesTheTwoBusinessDialectsAndComputesScheduleC: () => {
         const result = runTwin(founderSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 26000n, '$260.00 through Schedule 1 Part I')
         assertEq(cents('1040 line 9'), 26000n, 'and it is the whole of total income')
@@ -2886,9 +2844,6 @@ export const proof = {
     storedProgramRoutesTheAssetRegisterAndDepreciatesScheduleCLineThirteen: () => {
         const result = runTwin(founderWithRegisterSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 15997n, '$260.00 less $100.03 of depreciation')
         assertEq(cents('1040 line 9'), 15997n, 'and it is the whole of total income')
@@ -2947,9 +2902,6 @@ export const proof = {
     storedProgramRoutesADisposalBlockAndComputesFormFortySevenNinetySeven: () => {
         const result = runTwin(founderWithDisposalSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 13146n,
             '$198.78 of Schedule C profit less $67.32 of §1231 loss on Schedule 1 line 4')
@@ -2968,9 +2920,6 @@ export const proof = {
     theSameStoredFounderWithNoDisposalReachesTheOtherFigure: () => {
         const result = runTwin(founderWithRegisterSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         assertEq(renderedCents(result)('1040 line 8'), 15997n,
             'no Form 4797, and a first-year laptop rather than a sold one')
     },
@@ -2980,9 +2929,6 @@ export const proof = {
     theSameStoredFilerWithoutTheBusinessDocumentsComputesZeros: () => {
         const result = runTwin([subjectFounderProfile])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 0n)
         assertEq(cents('1040 line 9'), 0n)
@@ -3007,9 +2953,6 @@ export const proof = {
     storedProgramRoutesTheRentalPropertyAndComputesScheduleEPartI: () => {
         const result = runTwin(landlordSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 805000n, '$9,600.00 less $1,550.00, through Schedule 1 line 5')
         assertEq(cents('1040 line 9'), 805000n, 'and it is the whole of total income')
@@ -3022,9 +2965,6 @@ export const proof = {
     theSameStoredLandlordWithoutThePropertyComputesZeros: () => {
         const result = runTwin([subjectLandlordProfile])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 0n)
         assertEq(cents('1040 line 9'), 0n)
@@ -3058,9 +2998,6 @@ export const proof = {
     storedProgramRoutesTheFarmAndComputesScheduleF: () => {
         const result = runTwin(farmerSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 4000000n, 'Schedule F line 34, through Schedule 1 line 6')
         assertEq(cents('1040 line 9'), 4000000n, 'and it is the whole of total income')
@@ -3097,9 +3034,6 @@ export const proof = {
     storedProgramCarriesTheFarmLossAndItsQbiCarryforward: () => {
         const result = runTwin([subjectFarmerProfile, subjectFarmerLossFarm])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), -5000000n, 'the whole $50,000.00 farm loss')
         assertEq(cents('1040 line 11a'), -5000000n, 'and it moves adjusted gross income')
@@ -3123,9 +3057,6 @@ export const proof = {
         // the loss rather than about the field always being filled.
         const profitable = runTwin(farmerSubjects)
         assert(profitable.kind === 'ok', ['expected a computed return', profitable])
-        if (profitable.kind !== 'ok') {
-            return
-        }
         assertEq(
             centsFromString(profitable.qualifiedBusinessLossCarryforward.value), 0n,
             'a profitable farm hands nothing to 2026')
@@ -3136,9 +3067,6 @@ export const proof = {
     theSameStoredFarmerWithoutTheFarmComputesZeros: () => {
         const result = runTwin([subjectFarmerProfile])
         assert(result.kind === 'ok', ['expected a computed return', result])
-        if (result.kind !== 'ok') {
-            return
-        }
         const cents = renderedCents(result)
         assertEq(cents('1040 line 8'), 0n)
         assertEq(cents('1040 line 9'), 0n)
@@ -3194,9 +3122,6 @@ export const proof = {
         theProfileAloneComputesEveryPortfolioLineAtZero: () => {
             const result = runTwin([subjectSweepProfile])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             const cents = renderedCents(result)
             assertEq(cents('1040 line 2b'), 0n)
             assertEq(cents('1040 line 3a'), 0n)
@@ -3211,9 +3136,6 @@ export const proof = {
         aStoredFormTenNinetyNineIntReachesLineTwoB: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepInterest])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             const cents = renderedCents(result)
             assertEq(cents('1040 line 2b'), 500000n, '$5,000.00 of box 1 interest')
             // Box 1 is TAXABLE interest; line 2a is the tax-exempt line and
@@ -3227,9 +3149,6 @@ export const proof = {
         aStoredFormTenNinetyNineDivReachesLinesThreeAAndThreeB: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepDividend])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             const cents = renderedCents(result)
             assertEq(cents('1040 line 3b'), 100000n, '$1,000.00 of box 1a')
             assertEq(cents('1040 line 3a'), 40000n, '$400.00 of box 1b, the qualified subset')
@@ -3244,9 +3163,6 @@ export const proof = {
         aStoredFormSsaTenNinetyNineReachesLineSixA: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepSocialSecurity])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             const cents = renderedCents(result)
             assertEq(cents('1040 line 6a'), 1200000n, '$12,000.00 of box 5 net benefits')
             assertEq(cents('1040 line 6b'), 0n, 'and none of it taxable under §86')
@@ -3268,9 +3184,6 @@ export const proof = {
         aStoredFormTenNinetyNineDivBoxTwelveReachesLineTwoA: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepExemptDividend])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             const cents = renderedCents(result)
             assertEq(cents('1040 line 2a'), 330000n, '$3,300.00 of box 12 exempt-interest dividends')
             assertEq(cents('1040 line 2b'), 0n, 'box 12 is TAX-exempt, not taxable interest')
@@ -3301,9 +3214,6 @@ export const proof = {
             const result = runTwin(
                 [subjectSweepProfile, subjectSweepSocialSecurityWithholding])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             const cents = renderedCents(result)
             assertEq(cents('1040 line 6a'), 900000n, '$9,000.00 of box 5 net benefits')
             assertEq(cents('1040 line 25b'), 81000n, '$810.00 of box 6 voluntary withholding')
@@ -3327,18 +3237,12 @@ export const proof = {
         aStoredPartnershipScheduleKOneReachesLineTwoB: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepPartnershipK1])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 2b'), 70000n, '$700.00 of box 5')
         },
         // `vnd.fjs.k1_1120s`. The shareholder's interest is box FOUR.
         aStoredSCorporationScheduleKOneReachesLineTwoB: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepSCorporationK1])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 2b'), 3000n, '$30.00 of box 4')
         },
         // `vnd.fjs.k1_1041`. The beneficiary's interest is box ONE — the box
@@ -3346,9 +3250,6 @@ export const proof = {
         aStoredEstateTrustScheduleKOneReachesLineTwoB: () => {
             const result = runTwin([subjectSweepProfile, subjectSweepEstateTrustK1])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 2b'), 40000n, '$400.00 of box 1')
         },
         // THE CONTROL for the four capital-gains leaves: the same declaring
@@ -3356,9 +3257,6 @@ export const proof = {
         theCapitalGainsProfileAloneComputesLineSevenAAtZero: () => {
             const result = runTwin([subjectSweepGainsProfile])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 7a'), 0n)
         },
         // `vnd.fjs.1099b`. One short-term sale: $5,000.00 of proceeds less
@@ -3367,9 +3265,6 @@ export const proof = {
         aStoredFormTenNinetyNineBReachesLineSevenA: () => {
             const result = runTwin([subjectSweepGainsProfile, subjectSweepBrokerage])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 7a'),
                 200000n,
@@ -3391,9 +3286,6 @@ export const proof = {
                 subjectSweepGainsProfile, subjectSweepSectionTwelveFiftySix,
             ])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 7a'),
                 4300000n,
@@ -3415,9 +3307,6 @@ export const proof = {
                 subjectSweepSectionTwelveFiftySix,
             ])
             assert(result.kind === 'ok', ['both blocks must compute together', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 7a'),
                 4500000n,
@@ -3443,9 +3332,6 @@ export const proof = {
         aStoredPriorYearCapitalLossReachesLineSevenA: () => {
             const result = runTwin([subjectSweepGainsProfile, subjectSweepRealCarryover])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 7a'),
                 -300000n,
@@ -3522,9 +3408,6 @@ export const proof = {
         theItemizerProfileAloneComputesLineTwelveEAtZero: () => {
             const result = runTwin([subjectSweepDeductionProfile])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 12e'), 0n)
         },
         // `vnd.fjs.itemized_deductions`. One $4,200.00 state income tax
@@ -3533,9 +3416,6 @@ export const proof = {
         aStoredItemizedDeductionsDocumentReachesLineTwelveE: () => {
             const result = runTwin([subjectSweepDeductionProfile, subjectSweepItemized])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 12e'),
                 420000n,
@@ -3550,9 +3430,6 @@ export const proof = {
         aStoredMedicalExpensesDocumentReachesLineTwelveE: () => {
             const result = runTwin([subjectSweepDeductionProfile, subjectSweepMedical])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 12e'),
                 100000n,
@@ -3575,9 +3452,6 @@ export const proof = {
                 subjectHealthBusiness,
             ])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 10'),
                 1493239n,
@@ -3598,18 +3472,12 @@ export const proof = {
                 subjectHealthProfile, subjectHealthNec, subjectHealthBusiness,
             ])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 10'), 353239n, 'Schedule 1 line 15 alone')
         },
         // THE CONTROL for the two adjustment leaves.
         theAdjustmentProfileAloneComputesLineTenAtZero: () => {
             const result = runTwin([subjectSweepAdjustmentProfile])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(renderedCents(result)('1040 line 10'), 0n)
         },
         // `vnd.fjs.adjustments`. §62(a)(2)(D) caps the educator-expense
@@ -3619,9 +3487,6 @@ export const proof = {
         aStoredAdjustmentsDocumentReachesLineTen: () => {
             const result = runTwin([subjectSweepAdjustmentProfile, subjectSweepAdjustments])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 10'),
                 30000n,
@@ -3635,9 +3500,6 @@ export const proof = {
         aStoredFormTenNinetyEightEReachesLineTen: () => {
             const result = runTwin([subjectSweepAdjustmentProfile, subjectSweepStudentLoan])
             assert(result.kind === 'ok', ['expected a computed return', result])
-            if (result.kind !== 'ok') {
-                return
-            }
             assertEq(
                 renderedCents(result)('1040 line 10'),
                 100000n,

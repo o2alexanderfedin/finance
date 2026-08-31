@@ -2697,9 +2697,6 @@ export const proof = {
             }))
             const [source, ...rest] = outcome.partII.line30.sources
             assert(source !== undefined, ['line 30 must cite a source', outcome.partII.line30])
-            if (source === undefined) {
-                throw 'expected a source'
-            }
             assertEq(rest.length, 0, 'one home, one source')
             assertEq(source.documentHash, 'sha256-business-home')
             assertEq(source.boxPath, 'businessUseOfHome -> Form 8829 line 36')
