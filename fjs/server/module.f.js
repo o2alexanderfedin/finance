@@ -62,7 +62,7 @@ import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { create, write } from 'functionalscript/fjs/effects/memory/module.f.mjs'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.mjs'
-import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { mcpStep, uninitializedState, fromRegistry, toolEntry, toolResultStep } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { initEvo, evo, buildCache } from 'functionalscript/fjs/cas/evo/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
@@ -182,11 +182,15 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
                 ),
             ),
         ))
-        const answered = mapStep(counted, dialectCounts => okResult(jsonText({ status: 'refreshed', dialectCounts })))
         // An MCP handler answers `never`, and that is the claim upstream says
         // it is: a refresh that could not read the store becomes a JSON-RPC
         // error response rather than a failure the transport has to carry.
-        return catchStep(answered, e => pureOk(errorResult(`cas_refresh failed: ${errorSummary(e)}`)))
+        // `toolResultStep` (MAINT-11) states both renderers in one call, which
+        // is what deleted the `mapStep`/`catchStep` pair that stood here.
+        return toolResultStep(
+            counted,
+            dialectCounts => jsonText({ status: 'refreshed', dialectCounts }),
+            e => `cas_refresh failed: ${errorSummary(e)}`)
     },
 )
 
@@ -213,8 +217,7 @@ export const fjsCheckTool = materializeHomeRoot => cas => toolEntry(
     'answers. Use fjs_run to actually execute a program.',
     { hash: string },
     args => {
-        const checked = mapStep(fjsCheck(materializeHomeRoot)(cas)(args.hash), r => okResult(jsonText(r)))
-        return catchStep(checked, message => pureOk(errorResult(message)))
+        return toolResultStep(fjsCheck(materializeHomeRoot)(cas)(args.hash), jsonText, message => message)
     },
 )
 

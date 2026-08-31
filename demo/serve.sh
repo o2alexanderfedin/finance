@@ -71,5 +71,22 @@ echo "  ← / →  move between steps"
 echo "  stop   Ctrl-C"
 echo
 
+# STILL `python3 -m http.server`, and MAINT-11 wanted this line to be
+# `fjs web` (2026-08-31). It cannot be, yet.
+#
+# `fjs web` answers **413** for any file larger than one `Vec` — 131072 bytes —
+# and ELEVEN files this demo loads are over that, `fjs/form1040/core/module.f.js`
+# at 995159 bytes being 7.6x the ceiling. The swap was made, and the UI suite
+# caught it: 44 of 46 tests failed with an empty `#dialect` and an empty `#step`,
+# because the engine modules the page imports never arrived. Recorded in
+# `fjs/todo/upstream-web-vec-size-limit.md`.
+#
+# So this is the one place something outside `functionalscript` is still
+# executed, and it is not an oversight — it is the open gap named above. When
+# `fjs web` can stream a file larger than a `Vec`, this becomes:
+#
+#     exec "$repo/node_modules/.bin/fjs" web "$site" "$port"
+#
+# and the dependency rule holds everywhere.
 cd "$site"
 exec python3 -m http.server "$port"

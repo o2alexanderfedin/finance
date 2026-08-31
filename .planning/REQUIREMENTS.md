@@ -1878,7 +1878,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       already validating voluntarily. **The honest ordering is the reverse of the obvious
       one: close the hole first, then choose.**
 
-- [ ] **MAINT-11** *(T3)*: **Adopt the 0.47.0 capabilities that remove code here.** Each is
+- [x] **MAINT-11** *(T3)*: **Adopt the 0.47.0 capabilities that remove code here.** Each is
       admitted on the ground that it deletes something, not that it is new: `fjs web [root]
       [port]`, a hardened static server, lets `demo/serve.sh` drop `python3 -m http.server`
       and serve the demo out of fjs itself — which is the functionalscript-only dependency
@@ -1889,7 +1889,18 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       `rest(c, r)` — a stated rest rather than the all-or-nothing of open versus closed — is
       listed here as available, and is the tool DOC-25 may want.
 
-- [ ] **MAINT-12** *(T3)*: **A consumer-side migration report for 0.47.0**, in the shape of
+
+      **Outcome, 2026-08-31 (Phase 41): `toolResultStep` adopted at three sites; `fjs web` blocked
+      upstream and filed.** `toolResultStep` deleted a `mapStep`/`catchStep` sandwich at each site
+      and, in two modules, the `okResult`/`errorResult` imports entirely. `fjs web` was swapped into
+      `demo/serve.sh` and reverted: it answers **413** for any file over one `Vec` (131072 bytes) and
+      **eleven files the demo loads exceed that**, `fjs/form1040/core/module.f.js` at 995159 bytes
+      being 7.6x the ceiling. The UI suite caught it — 44 of 46 failed with an empty `#dialect` —
+      while every `curl` of an individual small path returned 200, so a smoke test would not have.
+      Recorded in `fjs/todo/upstream-web-vec-size-limit.md`. `path.escapes` and `memoryRun` are
+      **deliberately not adopted**: neither has a hand-rolled equivalent here to delete, which is
+      this requirement's own criterion for adoption.
+- [x] **MAINT-12** *(T3)*: **A consumer-side migration report for 0.47.0**, in the shape of
       `.planning/reports/fjs-0.46.1-migration.md`. Sergey asked for the 0.46 one explicitly
       in `todo/update-fjs-0.46.0` (PR #96): *"an extensive, structured report on the migration
       … whether you learned anything new and how you adapted to the project, as well as what
@@ -1902,7 +1913,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       radius, and that the failing proof in MAINT-10 is a check surviving the change it
       guards against.
 
-- [ ] **MAINT-13** *(T3)*: **An fjs gap may be taken upstream directly.** Standing authority
+- [x] **MAINT-13** *(T3)*: **An fjs gap may be taken upstream directly.** Standing authority
       granted by the owner on 2026-08-27: when this project reaches a gap in
       `functionalscript`, requesting the change or the new feature in that repository is an
       available move, not only the local workaround plus an `fjs/todo/upstream-*.md` note.
@@ -1920,9 +1931,9 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
 | MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | v5 | Complete |
 | MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v5 | Pending |
 | DOC-25 | T3 | 40. Validation on the Write Path | v5 | Complete |
-| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
-| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
-| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
+| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v5 | Partial - blocked upstream |
+| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v5 | Complete |
+| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v5 | Complete |
 
 **Five columns, not four, because the gate reads the fifth.** `parseRequirements` in
 `planning-truth-gate.test.js` takes a row's status from `columns[5]`, the shape of the `##
@@ -2283,9 +2294,9 @@ written against: 0.47.0 is superseded, so each phase reads 0.48.0's behaviour be
 | MAINT-14 | T3 | 42. Take FunctionalScript 0.48.0 | v6 | Complete |
 | MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v6 | Complete |
 | DOC-25 | T3 | 40. Validation on the Write Path | v6 | Complete |
-| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
-| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
-| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
+| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v6 | Partial - blocked upstream |
+| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v6 | Complete |
+| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v6 | Complete |
 
 **The five carried-forward IDs appear in both tables on purpose.** The v5 rows are the
 record of what that milestone scoped; these are what v6 owns. `parseRequirements` takes an
