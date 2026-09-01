@@ -1897,7 +1897,8 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       **eleven files the demo loads exceed that**, `fjs/form1040/core/module.f.js` at 995159 bytes
       being 7.6x the ceiling. The UI suite caught it — 44 of 46 failed with an empty `#dialect` —
       while every `curl` of an individual small path returned 200, so a smoke test would not have.
-      Recorded in `fjs/todo/upstream-web-vec-size-limit.md`. `path.escapes` and `memoryRun` are
+      Recorded in `fjs/todo/upstream-web-vec-size-limit.md` and taken upstream as
+      `functionalscript#1819`. `path.escapes` and `memoryRun` are
       **deliberately not adopted**: neither has a hand-rolled equivalent here to delete, which is
       this requirement's own criterion for adoption.
 - [x] **MAINT-12** *(T3)*: **A consumer-side migration report for 0.47.0**, in the shape of

@@ -1118,7 +1118,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: DOC-25 · **Tier**: T3 · **Status**: complete — milestone v6, 2026-08-31. Option 1 (the write boundary), not the note's preferred Option 2; the reason is in `fjs/todo/no-dialect-validation-on-the-write-path.md` under "How it was closed".
 
 ### Phase 41: New Capabilities and the Migration Report
-**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: complete except MAINT-11's `fjs web` item, blocked upstream — milestone v6, 2026-08-31. The report is `fjs-0.48.0-migration.md`, not `-0.47.0-`: v6 superseded 0.47.0 before this phase ran, and 0.47.0's own unreported migration is folded in as §5.1. `fjs web` cannot serve a file over 131072 bytes and eleven of the demo's do; see `fjs/todo/upstream-web-vec-size-limit.md`.
+**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: complete except MAINT-11's `fjs web` item, blocked upstream — milestone v6, 2026-08-31. The report is `fjs-0.48.0-migration.md`, not `-0.47.0-`: v6 superseded 0.47.0 before this phase ran, and 0.47.0's own unreported migration is folded in as §5.1. `fjs web` cannot serve a file over 131072 bytes and eleven of the demo's do; see `fjs/todo/upstream-web-vec-size-limit.md`, filed upstream as `functionalscript#1819`.
 
 ### Phase 42: Take FunctionalScript 0.48.0
 **Requirements**: MAINT-14 · **Tier**: T3 · **Status**: complete — milestone v6, shipped in PR #144 (merge `80b5e1e`)
