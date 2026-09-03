@@ -165,7 +165,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { form8959 } from '../../form8959/module.f.js'
 import { form8960 } from '../../form8960/module.f.js'
@@ -608,17 +608,26 @@ export const scheduleTwo = taxParamSet => input => {
         // `fjs/return/scope` kind, no line below this point computed.
         return { kind: 'error', message: form6251Result.message }
     }
+    // One citation per Form 3921 whose spread reached line 2i.
+    //
+    // **Box 4 cannot be absent here, and the check that guarantees it is the
+    // refusal immediately above.** `fjs/form6251`'s `isoSpreadTotal` refuses any
+    // stored Form 3921 missing box 3, 4 or 5 -- DOC-11's absent-is-absent
+    // rule, at the point where it changes an answer -- and that refusal was
+    // threaded verbatim before this line could run. So the absent arm this
+    // used to carry repeated a condition already established, and no legal
+    // input could take it. One narrowing `assertNotNullish` instead, which
+    // is what AGENTS.md's "no non-null assertion" rule asks for: if a later
+    // phase ever lets a box-4-less form through, this fires by name.
     /** @type {readonly Source[]} */
-    const isoSources = isoExerciseForms.flatMap(form => {
-        const fairMarketValue = form.value.box4FairMarketValuePerShareOnExerciseDate
-        return fairMarketValue === undefined
-            ? []
-            : [{
-                documentHash: form.documentHash,
-                boxPath: 'box4FairMarketValuePerShareOnExerciseDate',
-                value: fairMarketValue,
-            }]
-    })
+    const isoSources = isoExerciseForms.map(form => ({
+        documentHash: form.documentHash,
+        boxPath: 'box4FairMarketValuePerShareOnExerciseDate',
+        value: assertNotNullish(
+            form.value.box4FairMarketValuePerShareOnExerciseDate,
+            ['Form 6251 line 2i computed, so every stored Form 3921 has box 4', form.documentHash],
+        ),
+    }))
     // One citation per Schedule K-1 (Form 1041) box 12 entry that reached line
     // 2j, built by the module that decided which entries those were -- never a
     // second code match here, which is how a citation comes to name a row that
@@ -1386,6 +1395,34 @@ export const proof = {
             assert(
                 outcome.message.includes('Form 6251 line 2i'),
                 ['and still name the line it could not compute', outcome.message])
+        },
+        // The invariant the `isoSources` narrowing above stands on, proved at
+        // THIS layer rather than borrowed from the one below: a stored Form
+        // 3921 with box 4 DELETED refuses here too, so no box-4-less form can
+        // reach the citation loop. Without this leaf the `assertNotNullish`
+        // would be a claim about `fjs/form6251` that nothing in this module
+        // checks — and the box is DELETED, not set to `undefined`, for the
+        // reason `fjs/form6251`'s own leaf of this shape records.
+        aFormThreeNineTwoOneMissingBoxFourRefusesBeforeAnyCitationIsBuilt: () => {
+            const base = isoForm('doc-iso-no-box-4')('5.00')('105.00')('10000')
+            const { box4FairMarketValuePerShareOnExerciseDate: _absent, ...value } = base.value
+            const outcome = runOutcome({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5500000n),
+                isoExerciseForms: [{ ...base, value }],
+            })
+            assert(
+                outcome.kind === 'error',
+                ['expected a refusal, never a citation built from an absent box', outcome])
+            assert(
+                outcome.message.includes('box4FairMarketValuePerShareOnExerciseDate'),
+                ['the refusal must name the box that is missing', outcome.message])
+            assert(
+                outcome.message.includes('doc-iso-no-box-4'),
+                ['and the document it is missing from', outcome.message])
         },
         // **REPOINTED at TAX-36, not deleted.** This leaf was
         // `theForeignTaxCreditCycleIsResolvedByARefusal`, and it existed to
