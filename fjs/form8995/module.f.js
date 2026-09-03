@@ -1229,6 +1229,39 @@ export const proof = {
             // $3,141.59 on line 17.
             assert(form.line8 > 0n, 'the control: line 8 is a real positive amount')
         },
+        // **THE OTHER SIDE OF LINE 17'S FLOOR**, which the leaf above cannot
+        // reach: line 17 carries a NEGATIVE line 8 forward, and nothing in the
+        // product path can produce one today — line 7 is a structural zero and
+        // box 5 is a dividend, so line 6 cannot go negative. That is exactly
+        // the situation line 4/line 16 were in until Form 461 wired a net farm
+        // loss, which is why this leaf is built the same way that one is: the
+        // printed-form function is called DIRECTLY with the hand-built figure,
+        // rather than through `run`, so the input is visibly the page's own
+        // arithmetic and not a claim about what the engine can compute.
+        //
+        // The day a qualified PTP loss is wired (see this module's docstring),
+        // this stops being hypothetical and the leaf keeps its meaning
+        // unchanged.
+        aNegativeLineEightIsFlooredAtZeroAndCarriedWholeOnLineSeventeen: () => {
+            const form = form8995(taxParams2025)({
+                qualifiedBusinessIncomeCents: 5000000n,
+                priorYearLossCarryforwardCents: 0n,
+                taxableIncomeBeforeQbiCents: 12000000n,
+                netCapitalGainCents: 0n,
+                qualifiedReitDividendsCents: -250000n,
+            })
+            assertEq(form.line6, -250000n, 'printed line 6 carries the -$2,500.00 loss')
+            assertEq(form.line8, 0n, 'printed line 8 is where "-0-" is printed')
+            assertEq(form.line9, 0n, 'so the 20% REIT/PTP component is zero, never negative')
+            assertEq(form.line17, -250000n, 'line 17 hands the whole -$2,500.00 to next year')
+            // The business half is untouched by the REIT loss: §199A's two
+            // components are added on line 10, never netted before it, so the
+            // $50,000.00 of QBI still yields its full $10,000.00 component.
+            assertEq(form.line5, 1000000n, 'line 5 = $10,000.00, the QBI component')
+            assertEq(form.line10, 1000000n, 'line 10 = line 5 + line 9, with line 9 at zero')
+            assertEq(form.line15, 1000000n, 'the deduction is $10,000.00, not $7,500.00')
+            assertEq(form.line16, 0n, 'and the BUSINESS carryforward stays -0-')
+        },
         // A return with no 1099-DIV box 5 at all keeps the zeros it always
         // had, asserted at a REALISTIC business input rather than at zero —
         // where "zero because the input was zero" and "zero because the lines
