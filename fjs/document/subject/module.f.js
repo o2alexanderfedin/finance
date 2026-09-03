@@ -55,6 +55,7 @@
  * @module
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { refuses } from '../../refuses/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /**
@@ -406,5 +407,71 @@ export const proof = {
             declaredSubject(key)(stored),
             '["vnd.fjs.w2","2024","11-1111111","222-22-2222","ACC-0001"]',
         )
+    },
+    // `roleText`'s PANIC, read rather than merely observed. The refusal is a
+    // panic and not a `Result` because a `SubjectKey` is source code in the
+    // same module as the schema it describes (see `roleText`) — but "cannot
+    // happen in a correct dialect" is not "cannot be written", and a proof
+    // builds its documents by hand, so the bad input IS constructible here.
+    //
+    // The thrown value's CONTENT is asserted, not merely that something threw:
+    // the encoding is a fixed-order five-slot array, so a `roleText` that
+    // panicked one role too early or too late would still throw. Only the
+    // NAME in the message says which role the declaration got wrong, and that
+    // name is the whole diagnostic value of a panic nobody can catch. The
+    // other four roles carry legitimate values so the panic can only be the
+    // one this leaf names.
+    aSubjectKeyNamingAFieldThatIsNeitherTextNorANumberPanics: () => {
+        /** @type {SubjectKey} */
+        const key = {
+            formType: 'dialect',
+            taxYear: 'taxYear',
+            payer: 'payerTin',
+            recipient: 'recipientTin',
+            account: 'accountNumber',
+        }
+        const stored = {
+            dialect: 'vnd.fjs.1099int',
+            payerTin: '11-1111111',
+            // A checkbox-shaped `true` where a TIN belongs: the shape a
+            // dialect declaring the wrong field would actually produce, since
+            // DOC-12's certifications are the one non-string, non-number thing
+            // these documents carry.
+            recipientTin: true,
+            accountNumber: 'ACC-0001',
+            taxYear: 2024,
+        }
+        refuses(() => declaredSubject(key)(stored))(message => {
+            assertEq(
+                message,
+                'a subjectKey names a field that is not a string or a number recipientTin true',
+            )
+        })
+    },
+    // The other half of the same panic, and the half a dialect actually hits:
+    // a declaration naming a field the schema does not have. `roleText` reads
+    // `undefined` and refuses rather than encoding the string `"undefined"` —
+    // which would be a subject that looks fine and files every document of
+    // that dialect under a fifth value nobody typed.
+    //
+    // The message's trailing space is real and is asserted as such: `refuses`
+    // joins the thrown array with single spaces, and `Array.prototype.join`
+    // renders an `undefined` element as the empty string. Asserting the exact
+    // text is what distinguishes "the value slot was empty" from a message
+    // that had quietly started printing the string `"undefined"`.
+    aSubjectKeyNamingAFieldTheDocumentDoesNotHavePanics: () => {
+        /** @type {SubjectKey} */
+        const key = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTIN' }
+        const stored = {
+            dialect: 'vnd.fjs.medical_expenses',
+            recipientTin: '222-22-2222',
+            taxYear: 2025,
+        }
+        refuses(() => declaredSubject(key)(stored))(message => {
+            assertEq(
+                message,
+                'a subjectKey names a field that is not a string or a number recipientTIN ',
+            )
+        })
     },
 }

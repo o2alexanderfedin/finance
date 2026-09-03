@@ -98,7 +98,14 @@ const isDigit = c => c >= '0' && c <= '9'
  */
 const runEnd = kind => name => from => {
     let end = from
-    while (end < name.length && kind(name[end] ?? '')) { end += 1 }
+    // `assertNotNullish` rather than `?? ''`: the `end < name.length` guard on
+    // its left already makes the index in range, so the `''` was a fallback no
+    // input could reach — and an unreachable fallback is a silent answer
+    // waiting for the guard to be weakened. `''` satisfies neither `isUpper`,
+    // `isLower` nor `isDigit`, so a `runEnd` that HAD started reading past the
+    // end would simply stop, and `labelOf` would truncate a label rather than
+    // refuse. Narrowing instead makes that a panic naming the index.
+    while (end < name.length && kind(assertNotNullish(name[end], ['index in range', name, end]))) { end += 1 }
     return end
 }
 
@@ -113,7 +120,11 @@ export const labelOf = name => {
     const words = []
     let i = 0
     while (i < name.length) {
-        const c = name[i] ?? ''
+        // Same narrow as `runEnd`'s, for the same reason: `i < name.length` is
+        // the loop's own condition, so `''` was unreachable — and reachable it
+        // would have matched none of the three classes below and fallen to the
+        // lowercase run, pushing an empty word into `words` forever.
+        const c = assertNotNullish(name[i], ['index in range', name, i])
         if (c === '_') { i += 1; continue }
         if (isDigit(c)) {
             const end = runEnd(isDigit)(name)(i)
@@ -130,7 +141,17 @@ export const labelOf = name => {
             if (end - i >= 2) {
                 // `HTTPServer`: the last capital of a run that is followed by
                 // lowercase belongs to the NEXT word, not to the acronym.
-                const acronymEnd = end < name.length && isLower(name[end] ?? '') ? end - 1 : end
+                // `end < name.length &&` short-circuits before the narrow, so
+                // the index is in range wherever `assertNotNullish` runs — the
+                // `?? ''` it replaces was the third copy of the same
+                // unreachable fallback, and here it was the most dangerous of
+                // the three: `''` is not lowercase, so a run at the very end of
+                // the name would have kept its last capital either way and the
+                // dead fallback looked load-bearing.
+                const acronymEnd = end < name.length
+                    && isLower(assertNotNullish(name[end], ['index in range', name, end]))
+                    ? end - 1
+                    : end
                 words.push(name.slice(i, acronymEnd))
                 i = acronymEnd
                 continue

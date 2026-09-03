@@ -900,6 +900,21 @@ export const proof = {
             const message = expectRefusal(validate(withAsset({ ...officeFurniture, section168kStatus: '' })))
             assert(message.includes('§56(a)(1)'), ['the refusal must name what the field decides', message])
         },
+        // A convention that is not one of the three at all, which is a
+        // different refusal from the one below: that one rejects a REAL
+        // convention paired with the wrong class, this one rejects a string
+        // that is not a convention. The schema types `convention` as `string`
+        // (rtti has no enum), so nothing structural stops it, and
+        // `depreciableAssets` re-narrows through this same frozen list and
+        // PANICS on a miss — so an unrecognized value that got past here would
+        // not produce a wrong deduction, it would take the run down.
+        unknownConventionIsRefusedByName: () => {
+            const message = expectRefusal(validate(withAsset({ ...officeFurniture, convention: 'half-year' })))
+            assert(message.includes('"half-year"'), ['the refusal must quote the value', message])
+            assert(message.includes('HY, MQ, MM'),
+                ['the refusal must list the three the printed column admits', message])
+            assert(message.includes('column (e)'), ['the refusal must name the printed column', message])
+        },
         // Mid-month applies to real property and to nothing else, in BOTH
         // directions — the pair is what makes the rule a rule rather than a
         // one-sided check.
@@ -925,6 +940,44 @@ export const proof = {
         },
     },
     money: {
+        // The arm BEFORE the sign one, on all three fields the money loop
+        // walks. `-1.00` (the leaf below) is an exact decimal and is caught by
+        // the sign check, so it never reaches this one — the two refusals read
+        // alike and fire on different inputs, and only this one covers what
+        // the OCR boundary actually hands over. DOC-04: a comma-grouped
+        // amount is REFUSED, never repaired.
+        //
+        // All three can be probed with a bare spread because the money loop
+        // is the FIRST check on an asset's amounts and returns on the first
+        // refusal: neither the zero-basis check, the business-use percentage
+        // parse, nor §168(k)'s status/amount agreement is reached. That is why
+        // `specialDepreciationAllowanceClaimed` can carry an amount here
+        // without the `allowanceClaimed` status that would otherwise be a
+        // half-recorded election.
+        //
+        // The three names are hand-typed rather than read off the loop, so a
+        // field dropped from the loop fails here instead of quietly shortening
+        // it.
+        inexactMoneyIsRefusedOnEveryFieldTheLoopWalks: () => {
+            const one = expectRefusal(validate(withAsset({ ...officeFurniture, costOrOtherBasis: '1,000.00' })))
+            assert(one.includes('costOrOtherBasis'), ['the refusal must name the field', one])
+            assert(one.includes('office furniture'), ['and the asset it came from', one])
+            assert(one.includes('1,000.00'), ['and quote the value', one])
+            assert(one.includes('not an exact decimal'),
+                ['the exactness refusal, not the sign one', one])
+            const two = expectRefusal(validate(withAsset({
+                ...officeFurniture, specialDepreciationAllowanceClaimed: '1,000.00',
+            })))
+            assert(two.includes('specialDepreciationAllowanceClaimed'),
+                ['the refusal must name the field', two])
+            assert(two.includes('not an exact decimal'),
+                ['and refuse for exactness rather than for the missing §168(k) status', two])
+            const three = expectRefusal(validate(withAsset({
+                ...officeFurniture, section179ElectedCost: '1,000.00',
+            })))
+            assert(three.includes('section179ElectedCost'), ['the refusal must name the field', three])
+            assert(three.includes('not an exact decimal'), ['for exactness', three])
+        },
         negativeCostIsRefused: () => {
             const message = expectRefusal(validate(withAsset({ ...officeFurniture, costOrOtherBasis: '-1.00' })))
             assert(message.includes('negative'), message)
@@ -1010,6 +1063,27 @@ export const proof = {
             assert(message.includes('holding period'),
                 ['and say what the day decides', message])
         },
+        // A MONTH the year does not have, in both directions. The equivalent
+        // check on `datePlacedInService` is proven separately; this is the
+        // full-date one, and it is not the same code. Both ends matter because
+        // neither survives being read as a month: `daysInMonth` answers 31 for
+        // month 0 and for month 13 alike (its only special cases are February
+        // and the four thirty-day months), so an out-of-range month would sail
+        // through the day check and then sort correctly, since only the ORDER
+        // of these dates is ever used.
+        aMonthTheYearDoesNotHaveIsRefused: () => {
+            const above = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2025-13-03' },
+            })))
+            assert(above.includes('disposal.dateSold'), ['the refusal must name the field', above])
+            assert(above.includes('names month 13'), ['and quote the offending month', above])
+            assert(above.includes('not a month'), ['and say what is wrong with it', above])
+            const below = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2023-00-14' },
+            })))
+            assert(below.includes('disposal.dateAcquired'), ['the refusal must name the field', below])
+            assert(below.includes('names month 00'), ['and quote the offending month', below])
+        },
         // A day the month does not have. Only the ORDER of these dates is ever
         // used, so `2025-02-30` would sort correctly and produce a plausible
         // answer — which is exactly why it is checked.
@@ -1045,6 +1119,41 @@ export const proof = {
                 ...soldServer,
                 disposal: { ...soldDisposal, dateSold: '2025-02-29' },
             }))).includes('28 days'), '2025 does not')
+        },
+        // THE CENTURY RULE, which the leaf above cannot reach: 2024 and 2025
+        // settle `year % 4` and never evaluate the rest of the Gregorian
+        // condition, so a `daysInMonth` written as the naive `year % 4 === 0`
+        // passes every leaf above this one. It takes a year divisible by 100
+        // to tell the two rules apart, and both such years are reachable
+        // through `validate` — the full-date checks run BEFORE the ordering
+        // ones, and `dateAcquired` has no lower bound of its own.
+        //
+        // 2000 is divisible by 400 and DOES have a 29th of February; 1900 is
+        // divisible by 100 and not by 400 and does NOT. A naive `% 4` rule
+        // accepts both, and the 1900 half is what turns red — which is the
+        // point of asserting the refusal's own arithmetic ("02/1900 has 28
+        // days") rather than only that it refused.
+        theCenturyLeapRuleDecidesFebruaryInBothDirections: () => {
+            assertEq(validate({
+                ...minimalAssetRegister,
+                assets: [{
+                    ...soldServer,
+                    datePlacedInService: '2000-03',
+                    disposal: { ...soldDisposal, dateAcquired: '2000-02-29' },
+                }],
+            })[0], 'ok', '2000 is divisible by 400 and HAS a 29th of February')
+            const message = expectRefusal(validate({
+                ...minimalAssetRegister,
+                assets: [{
+                    ...soldServer,
+                    datePlacedInService: '2000-03',
+                    disposal: { ...soldDisposal, dateAcquired: '1900-02-29' },
+                }],
+            }))
+            assert(message.includes('02/1900 '),
+                ['the refusal must name the month and year it counted', message])
+            assert(message.includes('28 days'),
+                ['and say how many days that century year’s February has', message])
         },
         // One register is one business for ONE year, and Form 4797 reports
         // that year's dispositions: a sale in another year belongs on that
@@ -1089,6 +1198,27 @@ export const proof = {
             })))
             assert(message.includes('Step 3'),
                 ['the refusal must name the decimal it would take', message])
+        },
+        // The arm BEFORE the sign one, on both disposal amounts. `-1.00` (the
+        // leaf below) is an exact decimal and is caught by the sign check, so
+        // it never reaches this one. The two probes are deliberately different
+        // failures — comma grouping is what the OCR boundary hands over, and a
+        // third fractional digit is what a spreadsheet export produces — so a
+        // check narrowed to either one alone still turns red here.
+        inexactDisposalMoneyIsRefused: () => {
+            const price = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, grossSalesPrice: '4,250.75' },
+            })))
+            assert(price.includes('disposal.grossSalesPrice'), ['the refusal must name the field', price])
+            assert(price.includes('rack server'), ['and the asset it came from', price])
+            assert(price.includes('4,250.75'), ['and quote the value', price])
+            assert(price.includes('not an exact decimal'), ['for exactness, not for sign', price])
+            const expense = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, expenseOfSale: '125.000' },
+            })))
+            assert(expense.includes('disposal.expenseOfSale'), ['the refusal must name the field', expense])
+            assert(expense.includes('more than 2 fractional digits'),
+                ['and say that the cents scale is what it exceeded', expense])
         },
         // A negative expense of sale would INCREASE the gain line 25a
         // recaptures as ordinary income; a negative price is not a price.
