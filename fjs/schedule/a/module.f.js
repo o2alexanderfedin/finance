@@ -1227,6 +1227,54 @@ export const proof = {
             assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding(
                 [itemizedEntry('saltIncomeTax')('175.00')('itemized-doc-1')])(w2s)([])
         },
+        // A row that names a STATE but no withheld amount contributes ZERO,
+        // on both faces. `stateIncomeTax` and `stateTaxWithheld` are optional
+        // in their own dialects (`fjs/document/w2` proves `{ state: 'TX' }`
+        // validates), and the ordinary reason for the shape is a state that
+        // levies no income tax at all: box 15 still names it, boxes 16-17 are
+        // blank. Treating such a row as anything but zero would raise the
+        // stored-withholding side and refuse a return whose asserted line 5a
+        // is perfectly consistent.
+        //
+        // Proved by PINNING THE TOTAL rather than by not throwing: each
+        // document carries one blank row and one withheld row, and the
+        // refusal one cent below the sum prints `storedWithholding 10000` --
+        // $100.00, which is the two withheld rows and nothing else. If a
+        // blank row were read as anything, that hand-typed figure moves.
+        aRowNamingAStateWithNoWithheldAmountAddsNothingToEitherSide: () => {
+            const w2s = [w2Fixture([{ state: 'TX' }, { state: 'CA', stateIncomeTax: '90.00' }])('w2-doc-1')]
+            const rs = [oneZeroNineNineRFixture(
+                [{ state: 'TX' }, { state: 'CA', stateTaxWithheld: '10.00' }])('1099r-doc-1')]
+            // $90.00 + $10.00 = $100.00 exactly, so $100.00 asserted passes.
+            assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding(
+                [itemizedEntry('saltIncomeTax')('100.00')('itemized-doc-1')])(w2s)(rs)
+            refuses(() => assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding(
+                [itemizedEntry('saltIncomeTax')('99.99')('itemized-doc-1')])(w2s)(rs))(message => {
+                assert(
+                    message.includes('asserted 9999 storedWithholding 10000'),
+                    ['expected the blank rows to add nothing to either side of the drift', message],
+                )
+            })
+        },
+        // …and the same two blank rows reach the line the schedule actually
+        // prints: line 5a is the taxpayer-asserted figure, unmoved, and the
+        // return computes rather than refusing.
+        aBlankWithholdingRowDoesNotRefuseARealReturn: () => {
+            const outcome = scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltIncomeTax')('1200.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+                w2Forms: [w2Fixture([{ state: 'TX' }])('w2-doc-1')],
+                oneZeroNineNineRForms: [oneZeroNineNineRFixture([{ state: 'TX' }])('1099r-doc-1')],
+            })
+            assertEq(outcome.kind, 'ok', 'a no-income-tax state withheld nothing; there is no drift to refuse')
+            if (outcome.kind === 'ok') {
+                assertEq(outcome.line5a.value, 120000n, 'line 5a = the asserted $1,200.00')
+                assertEq(outcome.line5d, 120000n, 'line 5d = $1,200.00 -- 5a is its only summand here')
+            }
+        },
     },
 
     // WR-02 (13-REVIEW.md): the SAME withholding-drift check, now exercised

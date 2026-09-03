@@ -892,20 +892,32 @@ export const scheduleOnePartI = taxParamSet => input => {
     if (form461Outcome.kind === 'error') {
         return form461Outcome
     }
-    // **This ternary's non-zero arm is unreachable today, and that is worth
-    // writing down rather than simplifying away.** `fjs/form461` returns its
-    // error arm on exactly `line16 < 0n`, so by the time execution is here line
-    // 16 is at or above zero and `excessBusinessLossCents` is always `0n` —
-    // mutating the whole expression to `form461Outcome.line16 * 0n` leaves the
-    // entire suite green, which is an equivalent mutant in AGENTS.md's sense: a
-    // neighbouring operation (the refusal two lines up) already enforces what
-    // this token enforces. It is written as the printed rule anyway — i461:
-    // "enter the amount from line 16 as a POSITIVE number on Schedule 1 (Form
-    // 1040), line 8p" — so that the day Form 172 is modeled and a binding
-    // limitation may compute, this line is already correct and only the refusal
-    // has to go. The same argument `fjs/form1040/core` makes for writing §199A's
-    // two business terms as a sum rather than a branch.
-    const excessBusinessLossCents = form461Outcome.line16 < 0n ? -form461Outcome.line16 : 0n
+    // **Written as the constant it can only be, with an assert in place of a
+    // comparison.** `fjs/form461` returns its error arm on exactly
+    // `line16 < 0n`, and that refusal returned two lines up, so by the time
+    // execution is here line 16 is at or above zero and line 8p can only be
+    // `0n`. This was spelled as the printed rule — i461: "enter the amount
+    // from line 16 as a POSITIVE number on Schedule 1 (Form 1040), line 8p" —
+    // but the printed rule's non-zero arm was unreachable by any input, and
+    // `fjs/form461` itself says why that is the wrong spelling, at its own
+    // clause (i): a comparison that can never be true is a claim a reader has
+    // to re-derive. Mutating the old expression to `form461Outcome.line16 *
+    // 0n` left the entire suite green, which is an equivalent mutant in
+    // AGENTS.md's sense — a neighbouring operation (that refusal) already
+    // enforced what the token enforced.
+    //
+    // The assert is what the comparison was really doing, and it is the
+    // stronger check of the two: this guarantee crosses a MODULE boundary, so
+    // if `fjs/form461` ever returns `kind: 'ok'` carrying a negative line 16,
+    // it fires by name instead of silently dropping the excess business loss
+    // the printed rule says belongs here. That is the day Form 172 is modeled
+    // and a binding limitation may compute — and on that day the printed rule
+    // comes back beside it.
+    assert(
+        form461Outcome.line16 >= 0n,
+        ['a computed Form 461 cannot carry a negative line 16', form461Outcome.line16],
+    )
+    const excessBusinessLossCents = 0n
     const line8p = documentLine(profile)(
         'Schedule 1 line 8p (excess business loss adjustment, Form 461 line 16)')(
         excessBusinessLossCents)(unionSources([line3, line5, line6]))
@@ -4753,6 +4765,33 @@ export const proof = {
     // ── Line 13: the HSA deduction (TAX-24, through Form 8889) ──────────────
 
     hsaDeduction: {
+        // The vocabulary check `hsaCoverageTypeNamed` exists for. §223(b)
+        // sets ONE limit per coverage type and this engine stores two, so a
+        // third spelling has no limit to apply and the return refuses by
+        // name. `vnd.fjs.adjustments`' own `checkReferences` refuses it at
+        // storage too — this is the second layer, and it is written because
+        // `scheduleOnePartIIExceptStudentLoanInterest` takes a
+        // `Stored<Adjustments>` whose `coverageType` is a plain `string` and
+        // nothing in its signature says the document was validated. Silently
+        // computing no HSA deduction for a filer who has one is the outcome
+        // this refusal exists to prevent.
+        anUnrecognizedCoverageTypeIsRefusedNamingIt: () => {
+            const result = refusal(partIIOf(profileNoDeclaredKinds)('single')(
+                [adjustmentsDoc([hsaEntry('2000.00')('taxpayer')])(
+                    [fullYearCoverage('taxpayer')('highDeductible')])])([])([])(0n))
+            assert(
+                result.message.includes("'highDeductible'"),
+                ['must quote the coverage type it could not price', result.message],
+            )
+            assert(
+                result.message.includes('§223(b)'),
+                ['must name the limit it has none of', result.message],
+            )
+            assert(
+                result.message.includes('Schedule 1 line 13'),
+                ['must name the line that could not be computed', result.message],
+            )
+        },
         theOrdinaryCaseReachesLineThirteenCitingBothTheCoverageAndTheEntry: () => {
             const result = okPartII(partIIOf(profileNoDeclaredKinds)('single')(
                 [adjustmentsDoc([hsaEntry('2000.00')('taxpayer')])(
@@ -5049,6 +5088,33 @@ export const proof = {
                 boxPaths.includes('entries[lineTag=studentLoanInterest]'),
                 ['the asserted half must be cited', boxPaths],
             )
+        },
+        // Box 1 is OPTIONAL on the stored 1098-E — `fjs/document/1098e`
+        // proves an absent one stays absent — and a servicer files a
+        // statement for the loan, not for an amount. Such a form contributes
+        // NO transcribed source and NO amount, while the servicer beside it
+        // still does. Paired that way on purpose: with the box-1-less form
+        // alone the citation list would be empty for two different reasons
+        // and the leaf could not tell them apart.
+        aFormWithNoBoxOneContributesNeitherAmountNorCitation: () => {
+            const withBoxOne = oneZeroNineEightEDoc('1842.63')
+            const { box1StudentLoanInterestReceived: _absent, ...withoutBoxOne } = withBoxOne.value
+            const result = okPartII(partIIOf(profileNoDeclaredKinds)('single')([])([
+                withBoxOne,
+                { documentHash: 'sha256-1098e-b', value: withoutBoxOne },
+            ])([])(1000000n))
+            assertEq(result.line21.value, 184263n, '$1,842.63 — the second form adds nothing')
+            const transcribed = result.line21.sources.filter(
+                source => source.boxPath === 'box1StudentLoanInterestReceived')
+            assertEq(transcribed.length, 1, 'one box 1 citation: the form that HAS a box 1')
+            assertEq(transcribed[0]?.documentHash, 'sha256-1098e-a')
+            assert(
+                result.line21.sources.every(source => source.documentHash !== 'sha256-1098e-b'),
+                ['an absent box is ABSENT, never a zero citation', result.line21.sources],
+            )
+            // The whole citation, hand-typed: that one box 1, the filing
+            // status the threshold turns on, and total income's own source.
+            assertEq(result.line21.sources.length, 3)
         },
         // A checked box 2 means box 1 is INCOMPLETE. Refused, naming the box
         // and what is missing from it.
@@ -6335,7 +6401,89 @@ export const proof = {
             w2Forms: [],
             totalIncomeLine: totalIncomeOf(0n),
         })
-        assertEq(composed.kind, 'error')
+        assert(
+            composed.kind === 'error' && composed.message.includes('spouse')
+                && composed.message.includes('single')
+                && composed.message.includes('classroom supplies'),
+            ['the stage-1 refusal must arrive whole, not merely as some error', composed],
+        )
+    },
+
+    // ...and so must a PART I refusal, which reaches the composition through
+    // a different arm: Part I runs first, so nothing downstream of it has
+    // been computed when it stops. A partnership K-1 reporting a $9,000.00
+    // loss is the cheapest such refusal — `fjs/schedule/e`'s three loss
+    // limitations, named by §704(d).
+    aPartOneRefusalPropagatesThroughTheComposedForm: () => {
+        const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
+            profile: profileNoDeclaredKinds,
+            interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
+            status: 'single',
+            unemploymentForms: [],
+            nonemployeeCompensationForms: [],
+            businessExpenseForms: [],
+            partnershipK1Forms: [partnershipK1Doc('-9000.00')],
+            sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
+            adjustmentForms: [],
+            studentLoanInterestForms: [],
+            w2Forms: [],
+            totalIncomeLine: totalIncomeOf(0n),
+        })
+        assert(
+            composed.kind === 'error' && composed.message.includes('§704(d)')
+                && composed.message.includes('900000'),
+            ['the Part I refusal must arrive whole, naming the section and the loss', composed],
+        )
+    },
+
+    // ...and a PART II refusal, the third and last arm. A 1098-E with box 2
+    // checked reports an INCOMPLETE box 1, and Part II refuses before line 21
+    // is built. Three leaves rather than one because the three arms are three
+    // separate `if`s in `scheduleOne`, and a composition that swallowed any
+    // one of them would return a half-built schedule for a return this engine
+    // has said it cannot compute.
+    aPartTwoRefusalPropagatesThroughTheComposedForm: () => {
+        const withBoxTwo = oneZeroNineEightEDoc('1842.63')
+        const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
+            profile: profileNoDeclaredKinds,
+            interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
+            status: 'single',
+            unemploymentForms: [],
+            nonemployeeCompensationForms: [],
+            businessExpenseForms: [],
+            partnershipK1Forms: [],
+            sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
+            adjustmentForms: [],
+            studentLoanInterestForms: [{
+                ...withBoxTwo,
+                value: {
+                    ...withBoxTwo.value,
+                    box2ExcludesOriginationFeesAndCapitalizedInterest: true,
+                },
+            }],
+            w2Forms: [],
+            totalIncomeLine: totalIncomeOf(0n),
+        })
+        assert(
+            composed.kind === 'error' && composed.message.includes('box 2')
+                && composed.message.includes('origination fees')
+                && composed.message.includes('sha256-1098e-a'),
+            ['the Part II refusal must arrive whole, naming the box and the form', composed],
+        )
     },
 
     // ── The refusals `vnd.fjs.adjustments` deliberately leaves to this layer ─
