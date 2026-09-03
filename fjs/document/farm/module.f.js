@@ -678,6 +678,50 @@ export const proof = {
                 assert(t === 'ok', ['a positive amount is storable', name, t, v])
             }
         },
+        // The arm BEFORE the sign one, on the SAME seventeen fields and driven
+        // off the same table for the same reason: a field added to the schema
+        // and forgotten here cannot pass. `-1.00` (the leaf above) is an exact
+        // decimal and is caught by the sign check, so it never reaches this
+        // one — the two refusals read alike and fire on different inputs, and
+        // only this one covers what the OCR boundary actually hands over.
+        // DOC-04: a comma-grouped amount is REFUSED here, never repaired,
+        // because repairing it would be the second conversion path a stored
+        // document must not have.
+        //
+        // Every field can be probed uniformly because the money loop is the
+        // first of `checkReferences`' three and returns on the first refusal:
+        // neither the taxable-pair comparison nor printed line 5a's §77
+        // cross-check is reached, so no field needs a special case.
+        everyMoneyFieldRefusesAnInexactDecimal: () => {
+            let checked = 0
+            for (const [name] of moneyFieldsOf(minimalFarm)) {
+                const [t, v] = validate({ ...minimalFarm, [name]: '1,000.00' })
+                assert(t === 'error', ['expected a refusal', name, t, v])
+                assert(typeof v === 'string' && v.includes(name), ['expected the field named', name, v])
+                assert(typeof v === 'string' && v.includes('1,000.00'),
+                    ['expected the amount quoted', name, v])
+                assert(typeof v === 'string' && v.includes('not an exact decimal'),
+                    ['expected the exactness refusal rather than the sign one', name, v])
+                checked = checked + 1
+            }
+            assertEq(checked, expectedMoneyFieldCount)
+        },
+        // The same arm one loop down, on an ENTRY. Its label is built from the
+        // entry's description AND its date, and both are asserted: printed
+        // lines 10 through 32f take many entries, several of them plausibly
+        // sharing a description, so a refusal naming only "amount" would send
+        // a filer looking through all of them.
+        anInexactEntryAmountRefusesNamingTheEntryAndTheDate: () => {
+            const [t, v] = validate({
+                ...minimalFarm, entries: [{ ...feedExpense, amount: '31,250.00' }],
+            })
+            assert(t === 'error', ['expected a refusal', t, v])
+            assert(typeof v === 'string' && v.includes('winter hay'), ['expected the entry named', v])
+            assert(typeof v === 'string' && v.includes('2025-04-15'), ['expected the date named', v])
+            assert(typeof v === 'string' && v.includes('31,250.00'), ['expected the amount quoted', v])
+            assert(typeof v === 'string' && v.includes('not an exact decimal'),
+                ['expected the exactness refusal rather than the sign one', v])
+        },
         aNegativeEntryAmountRefusesNamingSection263A: () => {
             const [t, v] = validate({
                 ...minimalFarm, entries: [{ ...feedExpense, amount: '-5.00' }],

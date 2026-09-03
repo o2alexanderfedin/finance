@@ -928,8 +928,14 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             const record = v.saversCreditEligibility?.[0]
             assert(record !== undefined, ['expected the record', v])
-            assertEq(Object.keys(record ?? {}).includes('claimedAsDependent'), false)
-            assertEq(Object.keys(record ?? {}).includes('claimableAsDependent'), false)
+            // No `?? {}` on the two lines below. The `assert` above already
+            // narrows `record`, so the fallback was unreachable — and an
+            // unreachable `{}` is the one value that would make this leaf pass
+            // for the WRONG reason: `Object.keys({})` includes nothing, so a
+            // `saversCreditEligibility` that had stopped round-tripping at all
+            // would satisfy both assertions.
+            assertEq(Object.keys(record).includes('claimedAsDependent'), false)
+            assertEq(Object.keys(record).includes('claimableAsDependent'), false)
         },
     },
     educationStudents: {
@@ -1142,9 +1148,16 @@ export const proof = {
             })
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.filerAttainedAgeTwentyFourBeforeTheEndOfTheYear, true)
+            // Bound and narrowed rather than `?? {}`, matching the shape
+            // `theDependentTestIsNotAFieldOnThisDialect` uses. The fallback
+            // was unreachable — the student is stored three lines up — and
+            // `Object.keys({})` includes nothing, so it would have made this
+            // leaf pass for an `educationStudents` that had vanished entirely,
+            // which is the opposite of what it exists to say.
+            const student = v.educationStudents?.[0]
+            assert(student !== undefined, ['expected the student to round-trip', v])
             assertEq(
-                Object.keys(v.educationStudents?.[0] ?? {})
-                    .includes('filerAttainedAgeTwentyFourBeforeTheEndOfTheYear'),
+                Object.keys(student).includes('filerAttainedAgeTwentyFourBeforeTheEndOfTheYear'),
                 false,
             )
         },

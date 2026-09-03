@@ -554,6 +554,49 @@ export const proof = {
             assert(typeof v3 === 'string' && v3.includes('town of Wells property tax'),
                 ['expected the entry named', v3])
         },
+        // The arm BEFORE the negative one, on both printed receipt lines. A
+        // comma-grouped amount is what the OCR boundary hands over and what a
+        // hand edit produces, and DOC-04 refuses it here rather than repairing
+        // it — repairing would be the second conversion path a stored document
+        // must not have. `-100.00` (the leaf above) parses fine and is caught
+        // by the sign check, so it never reaches this one: the two refusals
+        // look alike and fire on different inputs.
+        //
+        // Both directions of the loop are driven, because the pair is written
+        // out by hand inside `checkReferences` and a line dropped from it would
+        // otherwise be invisible. What is asserted is what a reader acts on:
+        // WHICH field, and WHICH value.
+        inexactMoneyRefusesByNameAndValue: () => {
+            const [t, v] = validate({ ...minimalRentalProperty, rentsReceived: '1,000.00' })
+            assert(t === 'error', ['expected a refusal', t, v])
+            assert(typeof v === 'string' && v.includes('rentsReceived'), ['expected the field named', v])
+            assert(typeof v === 'string' && v.includes('1,000.00'), ['expected the amount quoted', v])
+            assert(typeof v === 'string' && v.includes('not an exact decimal'),
+                ['expected the exactness refusal rather than the sign one', v])
+            const [t2, v2] = validate({ ...minimalRoyaltyProperty, royaltiesReceived: '3.2e3' })
+            assert(t2 === 'error', ['expected a refusal', t2, v2])
+            assert(typeof v2 === 'string' && v2.includes('royaltiesReceived'), ['expected the field named', v2])
+            assert(typeof v2 === 'string' && v2.includes('3.2e3'), ['expected the amount quoted', v2])
+            assert(typeof v2 === 'string' && v2.includes('not an exact decimal'),
+                ['expected the exactness refusal', v2])
+        },
+        // The same arm one loop down, on an ENTRY. Its label is built from the
+        // entry's description AND its date, and both are asserted: printed
+        // lines 5-19 take many entries, several of them plausibly sharing a
+        // description, so a refusal naming only "amount" would send a filer
+        // looking through all of them.
+        anInexactEntryAmountRefusesNamingTheEntryAndTheDate: () => {
+            const [t, v] = validate({
+                ...minimalRentalProperty, entries: [{ ...propertyTax, amount: '3,180.00' }],
+            })
+            assert(t === 'error', ['expected a refusal', t, v])
+            assert(typeof v === 'string' && v.includes('town of Wells property tax'),
+                ['expected the entry named', v])
+            assert(typeof v === 'string' && v.includes('2025-09-30'), ['expected the date named', v])
+            assert(typeof v === 'string' && v.includes('3,180.00'), ['expected the amount quoted', v])
+            assert(typeof v === 'string' && v.includes('not an exact decimal'),
+                ['expected the exactness refusal rather than the sign one', v])
+        },
         datePaidMustBeInTheDocumentsTaxYear: () => {
             const [t, v] = validate({
                 ...minimalRentalProperty, entries: [{ ...propertyTax, datePaid: '2024-09-30' }],
