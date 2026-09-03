@@ -2159,6 +2159,41 @@ const runTwin = subjects => {
 }
 
 /**
+ * TEST-FIXTURE ONLY. {@link runTwin}, plus ONE extra subject that `evoList`
+ * enumerates and `evoHead` answers with an EMPTY head list.
+ *
+ * That is not a corrupted store: it is a subject that has been created and
+ * never written to, and a real Evo store answers `evoHead` for it with `[]`
+ * rather than an error. {@link hostMapOver} cannot express it — its
+ * `evoHead` derives a head from the subject name unconditionally — so the
+ * two handlers it needs are overridden here and the other two are inherited.
+ *
+ * `evoHead` DELEGATES to {@link hostMapOver}'s own handler for every subject
+ * that is not the headless one, rather than restating the `head:` prefix
+ * convention: a second copy of that convention could drift from the first
+ * and the leaf below would still pass.
+ * @type {(subjects: readonly string[]) => (headless: string) => TaxReturnResult}
+ */
+const runTwinWithHeadlessSubject = subjects => headless => {
+    const base = hostMapOver(subjects)
+    const ctx = taxGuestCtx(assertNotNullish(taxParams2025, 'TY2025 parameters'))
+    // Annotated rather than inferred: a spread-and-override object literal
+    // handed straight to `interpret` has no contextual type, and `O` widens
+    // to `never` — the same reason `seedText`'s payload is annotated in
+    // `fjs/report/amend`.
+    /** @type {OperationMap<CasOp, Result<string, string>>} */
+    const hostMap = {
+        ...base,
+        evoList: () => ok(JSON.stringify([...subjects, headless])),
+        evoHead: (/** @type {string} */ subject) =>
+            subject === headless ? ok(JSON.stringify([])) : base.evoHead(subject),
+    }
+    const [t, v] = interpret(hostMap)(taxReturnReport(ctx)([]))
+    assert(t === 'ok', ['expected the tax return program to run to completion', t, v])
+    return v[0]
+}
+
+/**
  * Reads one printed line's cents out of a rendered result by its `rule`
  * string — a LOOKUP by a hand-typed rule, never an iteration over the
  * program's own output. A line that vanishes fails `assertNotNullish` here.
@@ -2392,6 +2427,32 @@ export const proof = {
                 fixtureSubjects.filter(subject => subject !== subjectOutOfScope))
             assertEq(withOutOfScope.kind, 'ok')
             assertEq(jsonText(withOutOfScope), jsonText(withoutOutOfScope))
+        },
+        // The leaf above's sibling one level lower down: a subject the
+        // enumeration KNOWS about but which has no revision at all. A store
+        // an accountant has been working in will have them — a subject
+        // created for a document that has not arrived yet — and `evoHead`
+        // answers `[]` for one, not an error.
+        //
+        // The walk must skip it and carry on. Without the skip the very
+        // next step would ask `evoRevision` for `undefined`, and what
+        // reaches the filer is a crash in the middle of a return that was
+        // otherwise computable — the failure mode that costs the most,
+        // because the documents that WERE there are all fine.
+        //
+        // Byte-identical output to the same five subjects with the headless
+        // one absent from the list altogether is the whole claim: the
+        // subject contributed nothing, not even an empty citation.
+        aSubjectWithNoRevisionsYetIsSkippedRatherThanEndingTheWalk: () => {
+            const withHeadless =
+                runTwinWithHeadlessSubject(fixtureSubjects)('subject-awaiting-its-first-document')
+            // The return really did compute, so the equality below compares
+            // two real 1040s rather than two identical refusals — line 9 is
+            // `aStoredProgramComputesTheWholeReturnFromStoredDocuments`'s
+            // own hand-typed $50,059.00 of total income.
+            assert(withHeadless.kind === 'ok', ['expected a computed return', withHeadless])
+            assertEq(renderedCents(withHeadless)('1040 line 9'), 5005900n)
+            assertEq(jsonText(withHeadless), jsonText(runTwin(fixtureSubjects)))
         },
     },
     // ── The mixed-year refusal (Phase 21) ────────────────────────────
