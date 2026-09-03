@@ -2364,6 +2364,52 @@ export const proof = {
         },
 
         /**
+         * **THE BOUNDARY of the refusal above**, and the arm no leaf reached:
+         * a limited partner's box 14 code A of exactly ZERO is not an amount
+         * §1402(a)(13) has to exclude — it is the partnership stating there
+         * were no self-employment earnings, which is what a Form 1065 prints
+         * for an ordinary limited partner. It COMPUTES, and one cent on the
+         * same document refuses.
+         *
+         * The pair is the point: `cents === 0n` and `cents > 0n` are one
+         * token apart in {@link selfEmploymentEarningsForRow}, and only a
+         * leaf on each side says which. Box 1 is zero here so the row stops
+         * at this rule rather than at §1411(c)(6)'s passive-income gate two
+         * checks later, which is the leaf above's subject, not this one's.
+         */
+        aLimitedPartnersCodeAOfZeroComputesAndOneCentRefuses: () => {
+            /** @type {(codeAAmount: string) => Stored<K1Partnership>} */
+            const dormantLimitedPartner = codeAAmount => {
+                const doc = partnershipDoc({
+                    boxGLimitedPartnerOrOtherLlcMember: true,
+                    box1OrdinaryBusinessIncome: '0.00',
+                    box14SelfEmploymentEarnings: [{ code: 'A', amount: codeAAmount }],
+                })
+                const {
+                    boxGGeneralPartnerOrLlcMemberManager: _droppedGeneral,
+                    materialParticipation: _droppedDetermination,
+                    ...limited
+                } = doc.value
+                return { ...doc, value: limited }
+            }
+            const result = ok(run({ partnershipK1Forms: [dormantLimitedPartner('0.00')] }))
+            assertEq(result.selfEmploymentEarningsCents, 0n, '§1402(a)(13) excludes the whole share')
+            assertEq(result.selfEmployedRecipientTin, undefined, 'so there is no self-employed filer to name')
+            // ...and the row EXISTS: a dormant limited partnership is not the
+            // same as no partnership, exactly as the general partner's own
+            // control leaf says one screen up.
+            assertEq(result.partII.rows.length, 1)
+            assertEq(result.parts.line41.value, 0n)
+            // One cent on the same document takes the other arm, and names
+            // both the section and the amount it refused.
+            const refused = refusal(run({ partnershipK1Forms: [dormantLimitedPartner('0.01')] }))
+            assert(refused.message.includes('§1402(a)(13)'), [refused.message])
+            assert(
+                refused.message.includes('reports 1 cents in box 14 code A'),
+                ['the refusal must name the amount it refused', refused.message])
+        },
+
+        /**
          * **Box 14 codes B and C do NOT refuse**, and this is the leaf that
          * pins the one documented exception to the coded sweep. They are gross
          * farming/fishing and gross non-farm income, read by nothing because
