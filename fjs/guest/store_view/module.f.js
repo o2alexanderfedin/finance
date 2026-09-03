@@ -212,8 +212,15 @@ export const proof = {
             const [tag, value] = interpret(storeView(proofStore))(taxReturnReport(ctx)([]))
             assert(tag === 'ok', ['the program must run to completion', tag, value])
             const result = value[0]
-            assertEq(result.kind, 'ok')
-            if (result.kind !== 'ok') { return }
+            // `assert` rather than `assertEq` followed by a narrowing `if`:
+            // `assert` is an assertion function (`asserts v`), so the one
+            // check both states the expectation and gives the lines below
+            // the narrowing they need. The `if (result.kind !== 'ok') {
+            // return }` this replaces was a second statement of the very
+            // condition just asserted, with a body that could not run — a
+            // branch that existed only to repeat to `tsc` what the assertion
+            // above had already established.
+            assert(result.kind === 'ok', ['the two documents must compute a return, not a refusal', result])
             // Line 1a is the W-2's box 1, to the cent, and it cites the
             // document it came from -- the citation is the demo's whole point.
             const line1a = assertNotNullish(
