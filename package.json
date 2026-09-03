@@ -18,7 +18,7 @@
     "test:integration": "node --test fjs-run-integration.test.js",
     "start": "node index.js",
     "fjs-start": "fjs r ./fjs/index.f.js",
-    "cov": "tsc && node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90 *.test.js",
+    "cov": "tsc && node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 *.test.js",
     "test:ui": "npm --prefix ui-tests test"
   },
   "dependencies": {
