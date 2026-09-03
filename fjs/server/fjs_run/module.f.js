@@ -144,7 +144,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 import { paramSetHash, reviewedEstimateFraming } from '../../report/provenance/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
-import { readUtf8File, errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { readUtf8File, errorSummary, mkdir } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
 import { parse } from 'functionalscript/fjs/path/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
@@ -1009,6 +1009,54 @@ export const proof = {
             assertEq(outcome.kind, 'error')
             if (outcome.kind === 'error') {
                 assert(outcome.message.includes('node:fs'), outcome.message)
+            }
+        },
+        /**
+         * The materialize-WRITE step, named by the message when it cannot
+         * happen — the row this module's error taxonomy did not have. The
+         * five steps `executeRun` runs each have their own vocabulary
+         * precisely so a caller can tell WHICH one surfaced; a taxonomy
+         * missing a row cannot prove that of the step it is missing.
+         *
+         * The path is blocked with a real `mkdir`: a DIRECTORY where the
+         * program file must go, so `writeUtf8File` refuses. That is a
+         * blocker, not a stand-in — nothing is placed that pretends to be a
+         * program, and nothing about it can be mistaken for one.
+         *
+         * **The control is the same call with the path free, and it is the
+         * half that makes the message mean something.** There the write
+         * SUCCEEDS and the run fails one step later, at the import
+         * (`virtual` cannot execute freshly-written bytes) — so the two rows
+         * differ only in whether the write could happen, and the messages
+         * name the two different steps accordingly. A message that named the
+         * same step in both, or a `materialize failed` that appeared when the
+         * write was possible, fails here.
+         */
+        aBlockedProgramPathNamesTheMaterializeStepAndAFreeOneNamesTheImport: () => {
+            const home = '/blocked-materialize'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(goodProgramSource))
+            const run = executeRun(home)(cas)(e)({ hash: programHash, args: [], taxParams: taxParamsFixture })
+
+            // Control: nothing in the way, so the write happens and the
+            // failure is the import's.
+            const [, freeOutcome] = virtualOrPanic(state1)(run)
+            assertEq(freeOutcome.kind, 'error')
+            if (freeOutcome.kind === 'error') {
+                assert(freeOutcome.message.includes('import failed'), freeOutcome.message)
+                assert(!freeOutcome.message.includes('materialize failed'), freeOutcome.message)
+            }
+
+            // A directory exactly where the program file must be written.
+            const [state2] = virtualOrPanic(state1)(
+                mkdir(programPath(materializeHome(home))(programHash), { recursive: true }))
+            const [, blockedOutcome] = virtualOrPanic(state2)(run)
+            assertEq(blockedOutcome.kind, 'error')
+            if (blockedOutcome.kind === 'error') {
+                assert(blockedOutcome.message.includes('materialize failed'), blockedOutcome.message)
+                assert(!blockedOutcome.message.includes('import failed'), blockedOutcome.message)
             }
         },
         // The pin override changes what ctx.evoHead resolves to inside a
