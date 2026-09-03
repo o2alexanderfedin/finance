@@ -1683,6 +1683,48 @@ export const proof = {
             assertEq(ok.qcdExclusionCents, 4999998n)
             assertEq(ok.line4b.value, 2n, 'two cents left taxable')
         },
+        /**
+         * The aggregate ceiling walks EVERY 1099-R the recipient holds, not
+         * only the ones a gift names — a retiree with two IRAs who gave out of
+         * one of them is the ordinary case, and the account with no gift
+         * against it has a zero total that must be SKIPPED.
+         *
+         * Both halves are asserted, because they fail differently:
+         *
+         *  - a skip that measured the zero instead would still not refuse
+         *    (0 is under any box 2a), so only the untouched account's own
+         *    $9,000.00 still arriving on line 4b says the skip was a skip;
+         *  - a skip that STOPPED the loop rather than continuing it would let
+         *    a genuinely over-ceiling second account through, which is the
+         *    second half here: the same giftless account, ordered FIRST, in
+         *    front of $60,000.00 of gifts out of a $50,000.00 distribution.
+         */
+        anAccountWithNoGiftAgainstItIsSkippedAndTheLoopGoesOn: () => {
+            const untouched = iraForm('sha256-1099r-untouched')('44-4444444')('IRA-0003')('9000.00')
+            /** @type {(gifts: NonNullable<Ira['qualifiedCharitableDistributions']>) => IraTaxableAmountOutcome} */
+            const withGifts = gifts => run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: true,
+                    qualifiedCharitableDistributions: gifts,
+                })],
+                iraRetirementForms: [untouched, singleIra],
+            })
+            const ok = computed(withGifts([twentyThousandGift]))
+            assertEq(ok.qcdExclusionCents, 2000000n, '$20,000.00, out of the account the gift names')
+            assertEq(
+                ok.line4b.value, 3900000n,
+                '$50,000.00 + $9,000.00 - $20,000.00 -- the giftless account is untouched, not zeroed')
+            // …and the ceiling still fires on the SECOND form.
+            const message = refusalMessage(withGifts([
+                { ...twentyThousandGift, charity: 'A' },
+                { ...twentyThousandGift, charity: 'B' },
+                { ...twentyThousandGift, charity: 'C' },
+            ]))
+            assert(message.includes('60000.00'), ['quote the total claimed', message])
+            assert(message.includes('50000.00'), ['quote the SECOND form\'s box 2a', message])
+            assert(message.includes('IRA-0001'), ['and name that account, not the giftless one', message])
+        },
         // A gift naming a distribution that is not in the store at all.
         aGiftNamingNoStoredDistributionRefuses: () => {
             const message = refusalMessage(run({

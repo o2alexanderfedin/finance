@@ -886,6 +886,51 @@ export const proof = {
             assert(message.includes('HY'), ['the refusal must quote the stored convention', message])
             assert(message.includes('MQ'), ['the refusal must quote the applicable one', message])
             assert(message.includes('40%'), ['the refusal must name the rule', message])
+            assert(
+                message.includes(
+                    'More than 40% of this year\'s depreciable bases were placed in service '
+                    + 'in the last three months, so the mid-quarter convention applies to '
+                    + 'every non-real asset added this year'),
+                ['and it must explain the aggregate it MEASURED, in so many words', message])
+        },
+        /**
+         * The SAME cross-check the other way round, which is the arm no
+         * fixture reached until 2026-09-03: a JUNE machine stored as
+         * mid-quarter, in a year with nothing in the last three months at all.
+         * The refusal has to explain the aggregate it actually measured, and
+         * that explanation — not the two three-letter codes — is the half a
+         * reader can act on.
+         *
+         * This direction costs money too, in the opposite sense to the leaf
+         * above: the mid-quarter convention puts a second-quarter asset's
+         * midpoint at 15 May, seven and a half months from year end against
+         * the half-year convention's six, so a register stored this way
+         * deducts MORE in the first year than the aggregate entitles it to.
+         */
+        aHalfYearRegisterStoredAsMidQuarterRefusesAndSaysWhy: () => {
+            const message = expectRefusal(formFortyFiveSixtyTwo(registerOf([
+                { ...bareAsset, description: 'june machine', costOrOtherBasisCents: 1000000n, convention: 'MQ' },
+            ])))
+            assert(message.includes('MQ'), ['the refusal must quote the stored convention', message])
+            assert(message.includes('HY'), ['the refusal must quote the applicable one', message])
+            assert(
+                message.includes(
+                    'Not more than 40% of this year\'s depreciable bases were placed in service '
+                    + 'in the last three months, so the half-year convention applies to every '
+                    + 'non-real asset added this year'),
+                ['the explanation must be the HALF-YEAR one', message])
+            assert(
+                !message.includes('the mid-quarter convention applies to'),
+                ['and never the other arm\'s, which would tell the reader the opposite', message])
+            // The CONTROL: the identical asset with the RIGHT convention
+            // computes, at Publication 946 Table A-1's 14.29% for 7-year
+            // property in its first year under the half-year convention —
+            // $1,429.00 of the $10,000.00 basis. Hand-typed from the page.
+            const lines = expectLines(formFortyFiveSixtyTwo(registerOf([
+                { ...bareAsset, description: 'june machine', costOrOtherBasisCents: 1000000n },
+            ])))
+            assertEq(lines.midQuarterConventionApplies, false, 'nothing in the last three months')
+            assertEq(lines.line19.c, 142900n, '14.29% of $10,000.00')
         },
         /**
          * The CONTROL: the same asset with the RIGHT convention computes, and

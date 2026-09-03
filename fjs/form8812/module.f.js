@@ -627,9 +627,26 @@ export const proof = {
         assertEq(result.line16b, 340000n, 'line 16b = $3,400.00 = $1,700 x 2 -- under $5,100')
         assertEq(result.line19, 5750000n, 'line 19 = $57,500.00 = $60,000 - $2,500')
         assertEq(result.line20, 862500n, 'line 20 = $8,625.00 -- 15% of line 19')
+        // Every figure below HAND-TYPED from the printed page rather than
+        // recomputed from the result. `line27` was asserted against
+        // `line17 < line20 ? line17 : line20` until 2026-09-03 -- the smaller-of
+        // rule copied out of the code under test, so it could only ever agree
+        // with itself, and its `line20` arm was reachable by no fixture.
+        //
+        // The arithmetic: $2,200 x 2 = $4,400.00 of credit (line 12), all of
+        // which fits inside the $1,000,000.00 of tax liability, so line 14
+        // takes the whole of it and line 16a -- line 12 minus line 14 -- is
+        // $0.00. Line 17 is the smaller of that and line 16b's $3,400.00, and
+        // line 27 the smaller of line 17 and line 20's $8,625.00. NOTHING is
+        // refundable when the non-refundable half has already absorbed the
+        // credit, which is the printed page's whole design.
+        assertEq(result.line12, 440000n, 'line 12 = $4,400.00 = $2,200 x 2, unphased')
+        assertEq(result.line14, 440000n, 'line 14 = all of it -- line 13 is $1,000,000.00')
+        assertEq(result.line16a, 0n, 'line 16a = $0.00 -- line 14 left nothing behind')
+        assertEq(result.line17, 0n, 'line 17 = smaller of line 16a ($0.00) and line 16b ($3,400.00)')
         assertEq(
-            result.line27, result.line17 < result.line20 ? result.line17 : result.line20,
-            'line 27 = smaller of line 17 or line 20 directly -- Part II-B never entered',
+            result.line27, 0n,
+            'line 27 = smaller of line 17 ($0.00) and line 20 ($8,625.00) -- Part II-B never entered',
         )
     },
 
@@ -791,7 +808,18 @@ export const proof = {
                 earnedIncomeCents: 6000000n, // $60,000.00
             })))
             const storedThresholdCents = centsFromString(taxParams2025.childTaxCredit.actcEarnedIncomeThreshold.amount)
-            const expectedLine19 = result.line18a > storedThresholdCents ? result.line18a - storedThresholdCents : 0n
+            // $60,000.00 of earned income is over the floor by construction, so
+            // line 19 is a plain subtraction here. Asserted rather than
+            // re-branched: a `? :` that repeats the printed page's "Is line 18a
+            // more than $2,500?" against a fixture chosen to answer yes has an
+            // arm nothing can reach. The floored arm of the PRODUCTION line 19
+            // is a different question and is covered by every leaf that leaves
+            // `baseInput`'s `earnedIncomeCents: 0n` in place.
+            assertEq(result.line18a, 6000000n, 'line 18a = $60,000.00 of earned income')
+            assert(
+                result.line18a > storedThresholdCents,
+                ['the fixture must clear the stored floor', result.line18a, storedThresholdCents])
+            const expectedLine19 = result.line18a - storedThresholdCents
             assertEq(result.line19, expectedLine19, 'line 19 must use the STORED actcEarnedIncomeThreshold')
             const expectedLine20 = halfUp(of(expectedLine19 * BigInt(taxParams2025.childTaxCredit.actcEarnedIncomeRatePercent))(100n))
             assertEq(result.line20, expectedLine20, 'line 20 must use the STORED actcEarnedIncomeRatePercent')
