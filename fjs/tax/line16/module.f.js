@@ -963,6 +963,80 @@ export const proof = {
             assert(outcome.kind === 'ok', ['expected a computed outcome', outcome])
             assertEq(outcome.cents, 1116300n, 'Form 1040 line 16 = $11,163.00')
         },
+        // Level 2d — "You don't have to file Schedule D and you reported
+        // capital gain distributions on Form 1040 or 1040-SR, line 7a." The
+        // one level-2 bullet with no leaf of its own until 2026-09-03: every
+        // QDCGT fixture above arrives via 2c (qualified dividends) or 2e
+        // (Schedule D gains), so `return qdcgtOutcome()` under 2d was
+        // unexecuted shipped code while three neighbouring bullets were
+        // proven.
+        //
+        // Line 3a is deliberately ZERO. With it non-zero 2c fires first and
+        // this leaf would pass while 2d was deleted — the same shape as the
+        // ordering hazard this module's docstring is about, one bullet down.
+        //
+        // MFJ, line 15 = $50,000.00, line 7a = $3,000.00, no Schedule D.
+        // Hand-derived from i1040gi p38 against the stored MFJ brackets and
+        // Rev. Proc. 2024-40 §2.03's $96,700.00 zero-rate ceiling:
+        //
+        //   QDCGT line 3 = line 7a = 3,000.00 (the routing this bullet is for)
+        //   line 4 = 3,000.00; line 5 = 50,000.00 - 3,000.00 = 47,000.00
+        //   line 7 = min(50,000.00, 96,700.00) = 50,000.00
+        //   line 8 = min(47,000.00, 50,000.00) = 47,000.00
+        //   line 9 = 3,000.00 — the whole distribution, taxed at 0%
+        //   lines 16-21 are all zero, so line 23 = line 22
+        //   line 22 prices line 5 by the Tax Table: the $47,000-$47,050 row
+        //     is the tax on its $47,025.00 midpoint,
+        //     10% x 23,850.00 + 12% x (47,025.00 - 23,850.00) = $5,166.00
+        //   line 24 prices line 1 the same way: the $50,000-$50,050 row is
+        //     10% x 23,850.00 + 12% x (50,025.00 - 23,850.00) = $5,526.00
+        //   line 25 = min(5,166.00, 5,526.00) = $5,166.00
+        //
+        // $5,166.00 is therefore also what makes this leaf load-bearing
+        // rather than a tag check: a dispatcher that dropped bullet 2d
+        // would fall through to level 3 and price the whole $50,000.00 by
+        // the Tax Table for $5,526.00 — the $360.00 difference is the 0%
+        // rate on the distribution, which is exactly the relief this bullet
+        // exists to deliver. The control below asserts that figure.
+        capitalGainDistributionsWithNoScheduleDAndNoDividendsSelectQdcgt: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 5000000n,
+                capitalGainDistributionsCents: 300000n,
+            })
+            assertEq(outcome.kind, 'ok', ['bullet 2d computes', outcome])
+            assertEq(
+                outcome.method, 'qdcgt',
+                ['line 7a alone must select the QDCGT worksheet', outcome])
+            assert(outcome.kind === 'ok', ['expected a computed outcome', outcome])
+            assertEq(outcome.cents, 516600n, 'Form 1040 line 16 = $5,166.00')
+            assertEq(outcome.preferential.kind, 'qdcgt', 'and it carries the worksheet it ran')
+            assert(outcome.preferential.kind === 'qdcgt', 'narrowing')
+            // The routing itself: bullet 2d exists because line 7a, not
+            // Schedule D, is where this filer's gain is written, and the
+            // worksheet's printed line 3 is where it has to land.
+            assertEq(
+                outcome.preferential.worksheet.line3, 300000n,
+                'QDCGT line 3 reads Form 1040 line 7a = $3,000.00')
+            assertEq(
+                outcome.preferential.worksheet.line9, 300000n,
+                'and the whole $3,000.00 falls in the 0%-taxed slice')
+        },
+        // The control bullet 2d needs: the SAME return with no capital gain
+        // distribution is an ordinary Tax Table return at $5,526.00. Without
+        // it, a dispatcher that routed everything to the QDCGT would pass the
+        // leaf above (AGENTS.md, "a gate needs a control").
+        controlTheSameReturnWithNoCapitalGainDistributionIsATaxTableReturn: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 5000000n,
+            })
+            assertEq(outcome.kind, 'ok', ['the control computes', outcome])
+            assertEq(outcome.method, 'taxTable', ['no preferential income, no worksheet', outcome])
+            assert(outcome.kind === 'ok', ['expected a computed outcome', outcome])
+            assertEq(outcome.cents, 552600n, 'the $50,000-$50,050 MFJ Tax Table row = $5,526.00')
+            assertEq(outcome.preferential.kind, 'none', 'and no worksheet was run at all')
+        },
         // Level 2a with Schedule D line 19 non-zero. Line 3a is
         // deliberately $300.00: that is what makes this leaf
         // DISCRIMINATING, because level 2c only competes when there are

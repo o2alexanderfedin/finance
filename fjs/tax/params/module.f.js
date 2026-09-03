@@ -3820,8 +3820,15 @@ export const proof = {
         for (let index = 1; index < longTermCarePremiumLimits.length; index += 1) {
             const previous = longTermCarePremiumLimits[index - 1]
             const current = longTermCarePremiumLimits[index]
+            // This is the ONLY pair guard the loop needs, and it is the one
+            // that narrows both bindings for the lines below. A second
+            // `assert(previous !== undefined || current === undefined, ...)`
+            // stood underneath it until 2026-09-03: a botched De Morgan of
+            // the `if (previous === undefined || current === undefined)
+            // { throw }` it was mechanically converted from (10f3edf), whose
+            // right operand no iteration could ever evaluate because its left
+            // one is what the line above has just asserted.
             assert(previous !== undefined && current !== undefined, ['a pair', index])
-            assert(previous !== undefined || current === undefined, 'expected a pair')
             assertEq(
                 current.minimumAgeExclusive, previous.maximumAge,
                 `band ${current.band} must start exactly where ${previous.band} ends`)
