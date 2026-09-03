@@ -84,10 +84,9 @@ import { financeSchemaTool } from './finance_schema/module.f.js'
 import { financeTaxParamsTool } from './finance_tax_params/module.f.js'
 import { financeDocumentsListTool } from './finance_documents_list/module.f.js'
 import { validatingWrites } from './write_validation/module.f.js'
-import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
+import { fjsRunTool } from './fjs_run/module.f.js'
 import { fjsCheck } from '../guest/check/module.f.js'
 import { detectFinance } from '../media/dialects/module.f.js'
-import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
 import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
@@ -104,7 +103,6 @@ import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
-/** @import { Report } from '../guest/module.f.js' */
 /** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 // ── cas_refresh (DOC-14) ────────────────────────────────────────────────────────
@@ -825,8 +823,17 @@ export const proof = {
             // the `status` field rather than the old bare-string body —
             // `dialectCounts.casRefreshReportsDialectCounts` (below) is what
             // pins the counts themselves.
+            // `assertNotNullish`, not `?? '{}'`. The default could not fire —
+            // a call that returned a `result` returned a content item with it —
+            // and if it ever had, it would have turned a structurally missing
+            // response into an empty document that fails on the NEXT line with
+            // `assertEq(undefined, 'refreshed')`, naming neither the missing
+            // item nor the response it came from. Same swap at
+            // `dialectCounts` and `weekOneConvergence` below.
             assertEq(
-                JSON.parse(asCallResult(refreshResponses[0]).result.content[0]?.text ?? '{}').status,
+                JSON.parse(assertNotNullish(
+                    asCallResult(refreshResponses[0]).result.content[0],
+                    ['expected a content item on the cas_refresh response', refreshResponses[0]]).text).status,
                 'refreshed')
             // AFTER cas_refresh: the same subject now resolves to the
             // seeded revision's own hash (its only, zero-parent head).
@@ -887,7 +894,9 @@ export const proof = {
             const [, refreshResponses] = runBatch(state5, [
                 { jsonrpc: '2.0', method: 'tools/call', id: 11, params: { name: 'cas_refresh', arguments: {} } },
             ])
-            const body = JSON.parse(asCallResult(refreshResponses[0]).result.content[0]?.text ?? '{}')
+            const body = JSON.parse(assertNotNullish(
+                asCallResult(refreshResponses[0]).result.content[0],
+                ['expected a content item on the cas_refresh response', refreshResponses[0]]).text)
             assertEq(body.status, 'refreshed')
             assertEq(body.dialectCounts['application/vnd.fjs.1099int+json'], 1)
             assertEq(body.dialectCounts['application/vnd.fjs.revision+json'], 1)
@@ -985,40 +994,27 @@ export const proof = {
 
             // Store the guest program's source via cas.write — the real
             // content-addressed write an agent would perform (that WRITE
-            // mechanism was already independently proven in Plan 05; `virtual`
-            // cannot execute freshly-written bytes as code, so the
-            // established JsModule stand-in below is the correct technique
-            // for the EXECUTION half — see fjs/guest/materialize/module.f.js's
-            // own header). Neither this source text nor the fixture body is
-            // ever executed by this leaf: the fixture collides with
-            // executeRun's own materialize-write and the run fails, which is
-            // what the leaf goes on to assert. Both are stubs, and saying so
-            // is the point — a fixture that looks like it computes something
-            // invites the reader to believe an assertion that is not made.
-            const [state6, programHash] = seedText(state5)(
+            // mechanism was already independently proven in Plan 05). The
+            // source text itself is a stub and is never executed: `virtual`
+            // cannot run freshly-written bytes as code, so the run below
+            // fails, which is what this leaf goes on to assert.
+            //
+            // **No `JsModule` fixture is placed at the program path, and
+            // that is a deletion, not an omission.** One used to be, to
+            // stand in for the execution `virtual` cannot perform, and it
+            // could never run: `executeRun` materializes and imports in ONE
+            // session at ONE path, and a pre-placed fixture makes the real
+            // materialize-WRITE fail before `loadProgram` is ever reached
+            // (see fjs/server/fjs_run/module.f.js's `runExecuteRunViaModuleFixture`,
+            // which exists precisely because those two representations
+            // cannot coexist). So the fixture's body was unreachable — the
+            // coverage report said so — and all it did was move WHICH of
+            // executeRun's steps surfaced the failure, from the import to
+            // the write. Both are this project's own vocabulary, both give
+            // the leaf a step to name, and one of them does not need a
+            // report function nothing calls.
+            const [state7, programHash] = seedText(state5)(
                 'export const report = ctx => args => ctx.pure("unused")')
-
-            /**
-             * A stub, deliberately. This leaf proves that `fjs_run` FAILS
-             * here — the fixture path collides with executeRun's own
-             * materialize-write — so nothing in this module is ever called.
-             * The genuine success path, summing interest across subjects
-             * through a real process and a real filesystem, is proven by
-             * `fjs-run-integration.test.js` and by
-             * `multiDocumentSumAcrossTwoStoredDocuments`
-             * (fjs/server/fjs_run/module.f.js) at the executeRun layer.
-             * @type {Report<string>}
-             */
-            const unreachedReport = ctx => () => ctx.pure('unused')
-
-            // 07-10: keyed at the FULL materialize path executeRun now
-            // imports from, not the bare hash-derived name — see the
-            // updated docstring above for why this fixture no longer lets
-            // the fjs_run call below succeed (it collides with executeRun's
-            // OWN real materialize-write at this SAME path), and why that
-            // is the correct, expected consequence.
-            const root = placeJsModuleFixture(state6.root)(programPath(materializeHome(home))(programHash))(() => ({ report: unreachedReport }))
-            const state7 = { ...state6, root }
 
             // Build the cache AFTER every document/revision/program above is
             // already in the store, so the subjects are visible from the
@@ -1052,9 +1048,12 @@ export const proof = {
                 { jsonrpc: '2.0', method: 'tools/call', id: 20, params: { name: 'finance_schema', arguments: { dialect: 'vnd.fjs.1099int' } } },
             ])
             const schemaResult = asCallResult(schemaResponses[0])
-            assertEq(schemaResult.result.content[0]?.type, 'text')
+            const schemaItem = assertNotNullish(
+                schemaResult.result.content[0],
+                ['expected a content item on the finance_schema response', schemaResult])
+            assertEq(schemaItem.type, 'text')
             assert(
-                (schemaResult.result.content[0]?.text ?? '').includes('box1InterestIncome'),
+                schemaItem.text.includes('box1InterestIncome'),
                 ['expected the schema response to name box1InterestIncome', schemaResult])
 
             // The run itself. 07-10: correctly surfaces as an error under
@@ -1071,18 +1070,27 @@ export const proof = {
             assertEq(runResult.result.isError, true)
             const runText = runResult.result.content[0]?.text
             assert(runText !== undefined, ['expected fjs_run to answer with text content', runResult])
-            // `materialize failed:` is this project's own words for the step,
-            // not the host's — see `fjs/guest/materialize`'s convention
-            // docstring. It replaced `invalid file`, which was `virtual`'s
-            // `writeFile` message reaching a protocol client verbatim through
-            // `errorMessage`; on a real filesystem that same slot carries the
-            // absolute path. The prefix is what keeps this leaf able to name
-            // WHICH of executeRun's five steps surfaced now that the host's
-            // own text is gone, since `errorSummary` alone renders `io error`
-            // under `virtual` (whose `fail` attaches no OS code).
+            // WHICH step surfaced, in this project's own words for it, not
+            // the host's — see `fjs/guest/materialize`'s convention
+            // docstring. Naming the step is the whole reason the prefix
+            // exists: `errorSummary` alone renders `io error` under
+            // `virtual` (whose `fail` attaches no OS code), so without the
+            // prefix the surfaced text says nothing a reader can act on.
+            //
+            // It is the IMPORT, and the second assertion is what says so.
+            // With no `JsModule` fixture at the program path (see the
+            // deletion note beside the seed above), `executeRun`'s own
+            // materialize-write genuinely SUCCEEDS — the bytes really are
+            // on the virtual filesystem — and it is `import_` that cannot
+            // execute freshly-written bytes there. So `materialize failed`
+            // must be ABSENT: its presence would mean the write never
+            // happened and this leaf never reached the step it names.
             assert(
-                runText.includes('materialize failed'),
-                ['expected the surfaced error to name the materialize-write collision (07-10)', runText])
+                runText.includes('import failed'),
+                ['expected the surfaced error to name the import step', runText])
+            assert(
+                !runText.includes('materialize failed'),
+                ['the materialize-write must have succeeded before the import was attempted', runText])
 
             const runHashMatch = /run record: (\S+)\)/.exec(runText)
             assert(runHashMatch !== null, ['expected the error text to name a run record hash', runText])

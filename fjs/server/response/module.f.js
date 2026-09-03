@@ -285,6 +285,40 @@ export const proof = {
         tooLargeMessageIsTheContractString: () => {
             assertEq(tooLargeMessage('ABC123'), 'result too large; stored at ABC123')
         },
+        /**
+         * The fourth band, and the only one that is not a threshold
+         * comparison at all: `content` too large for `tryUtf8` to encode
+         * (over the transport's own 128 KiB `Vec` cap), which `sizeGuard`'s
+         * docstring says degrades to the SAME "too large" answer rather
+         * than to a distinct failure mode.
+         *
+         * **`guardBytes` is set ABOVE the content's own byte length, and
+         * that is what makes the leaf bind to this arm.** At
+         * `guardBytes = 200000` a 131,073-byte content is comfortably UNDER
+         * the guard, so had `tryUtf8` answered a `Vec` the result would be a
+         * four-byte truncated preview (`'YYYY'`, `truncated: true`). The
+         * too-large message can therefore only have come from the
+         * `encoded === null` arm — with the ordinary tiny thresholds the
+         * three band leaves above use, this leaf would pass through the
+         * over-`guardBytes` arm and prove nothing new.
+         *
+         * This is the one leaf here that allocates a large string, and it
+         * does not allocate its own: `contrastRawContent` already exists at
+         * module scope for the contrast leaf below, and is exactly one byte
+         * over the cap it is named for.
+         */
+        overTheTransportCapDegradesToTooLargeEvenUnderTheGuard: () => {
+            assertEq(BigInt(contrastRawContent.length), maxLengthBytes + 1n)
+            assertEq(tryUtf8(contrastRawContent), null)
+            const guard = 200000
+            assert(BigInt(guard) > BigInt(contrastRawContent.length), 'the guard must be above the content, or this proves nothing')
+            const result = sizeGuard(guard)(4)(contrastRawContent, 'HASH')
+            assertEq(result.preview, tooLargeMessage('HASH'))
+            assertEq(result.truncated, true)
+            assert(
+                result.preview !== contrastRawContent.slice(0, 4),
+                'a truncated preview here would mean the encode succeeded and the guard band decided')
+        },
         // R1/R2 (09-07): the three band proofs above all use content
         // comfortably either side of a threshold, so `sizeGuard`'s `<=` at
         // both `previewBytes` and `guardBytes` can be mutated to `<`
