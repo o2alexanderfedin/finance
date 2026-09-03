@@ -87,7 +87,6 @@ import { validatingWrites } from './write_validation/module.f.js'
 import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
 import { fjsCheck } from '../guest/check/module.f.js'
 import { detectFinance } from '../media/dialects/module.f.js'
-import { guestCtx } from '../guest/module.f.js'
 import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
@@ -105,7 +104,7 @@ import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
-/** @import { Report, CasOp } from '../guest/module.f.js' */
+/** @import { Report } from '../guest/module.f.js' */
 /** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 // ── cas_refresh (DOC-14) ────────────────────────────────────────────────────────
@@ -990,47 +989,27 @@ export const proof = {
             // cannot execute freshly-written bytes as code, so the
             // established JsModule stand-in below is the correct technique
             // for the EXECUTION half — see fjs/guest/materialize/module.f.js's
-            // own header). The stored source text is otherwise irrelevant:
-            // the JsModule fixture below is what actually runs.
+            // own header). Neither this source text nor the fixture body is
+            // ever executed by this leaf: the fixture collides with
+            // executeRun's own materialize-write and the run fails, which is
+            // what the leaf goes on to assert. Both are stubs, and saying so
+            // is the point — a fixture that looks like it computes something
+            // invites the reader to believe an assertion that is not made.
             const [state6, programHash] = seedText(state5)(
                 'export const report = ctx => args => ctx.pure("unused")')
 
             /**
-             * Sums every PRESENT box1InterestIncome across `subjects`,
-             * skipping — never coercing to zero — a document where the key is
-             * absent. Enumerates each subject's head, resolves the revision,
-             * reads the snapshot, and recurses: the same evoHead ->
-             * evoRevision -> casRead chain
+             * A stub, deliberately. This leaf proves that `fjs_run` FAILS
+             * here — the fixture path collides with executeRun's own
+             * materialize-write — so nothing in this module is ever called.
+             * The genuine success path, summing interest across subjects
+             * through a real process and a real filesystem, is proven by
+             * `fjs-run-integration.test.js` and by
              * `multiDocumentSumAcrossTwoStoredDocuments`
-             * (fjs/server/fjs_run/module.f.js) already proves at the
-             * executeRun layer, extended here to actually skip an absent
-             * field rather than assuming every document has one.
-             * @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string, string>}
+             * (fjs/server/fjs_run/module.f.js) at the executeRun layer.
+             * @type {Report<string>}
              */
-            const sumInterestOverSubjects = subjects => acc => {
-                const [subject, ...rest] = subjects
-                if (subject === undefined) {
-                    return guestCtx.pure(guestCtx.centsToString(acc))
-                }
-                return guestCtx.step(guestCtx.evoHead(subject), headsJson => {
-                    const heads = /** @type {readonly string[]} */ (JSON.parse(headsJson))
-                    const headHash = assertNotNullish(heads[0], ['expected at least one head', subject])
-                    return guestCtx.step(guestCtx.evoRevision(headHash), revJson => {
-                        const rev = /** @type {{ readonly snapshot: string }} */ (JSON.parse(revJson))
-                        return guestCtx.step(guestCtx.casRead(rev.snapshot), docJson => {
-                            const doc = /** @type {{ readonly box1InterestIncome?: string }} */ (JSON.parse(docJson))
-                            const next = doc.box1InterestIncome === undefined
-                                ? acc
-                                : acc + guestCtx.centsFromString(doc.box1InterestIncome)
-                            return sumInterestOverSubjects(rest)(next)
-                        })
-                    })
-                })
-            }
-            /** @type {Report<string>} */
-            const sumInterestReport = ctx => () => ctx.step(
-                ctx.evoList('false'),
-                activeJson => sumInterestOverSubjects(/** @type {readonly string[]} */ (JSON.parse(activeJson)))(0n))
+            const unreachedReport = ctx => () => ctx.pure('unused')
 
             // 07-10: keyed at the FULL materialize path executeRun now
             // imports from, not the bare hash-derived name — see the
@@ -1038,7 +1017,7 @@ export const proof = {
             // the fjs_run call below succeed (it collides with executeRun's
             // OWN real materialize-write at this SAME path), and why that
             // is the correct, expected consequence.
-            const root = placeJsModuleFixture(state6.root)(programPath(materializeHome(home))(programHash))(() => ({ report: sumInterestReport }))
+            const root = placeJsModuleFixture(state6.root)(programPath(materializeHome(home))(programHash))(() => ({ report: unreachedReport }))
             const state7 = { ...state6, root }
 
             // Build the cache AFTER every document/revision/program above is
