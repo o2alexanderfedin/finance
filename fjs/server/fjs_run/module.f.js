@@ -1206,6 +1206,53 @@ export const proof = {
         },
     },
 
+    // ── placeJsModuleFixture's own contract ──────────────────────────────
+    //
+    // The helper is EXPORTED, and its docstring promises two things about
+    // the path walk: it peels one segment into one nested level, and it
+    // merges "into `root` without disturbing sibling entries at any level".
+    // Nothing asserted either. Every in-module caller reaches it AFTER
+    // `materializeProgram` has already created the directory chain, so the
+    // create-what-is-missing half of the walk had no exercise at all until
+    // this leaf -- and a sibling-clobbering regression would be invisible
+    // there too, because those callers place exactly one fixture.
+    fixturePlacement: {
+        /**
+         * Two fixtures placed into the SAME directory, into a root that
+         * starts empty. The first walk finds nothing at any level and must
+         * create it; the second finds the first walk's directories and must
+         * merge into them, leaving the first fixture loadable.
+         *
+         * Both are asserted by LOADING them through `loadProgram` -- the
+         * same `import_` a real run crosses -- rather than by reading the
+         * returned `Dir` back, which would be this proof re-implementing the
+         * path walk it is checking.
+         *
+         * The marker values are hand-typed and differ, so a merge that
+         * dropped the first fixture, or one that placed both at the same
+         * name, fails here rather than reading as a placement that worked.
+         */
+        aSecondFixtureMergesInWithoutDisplacingTheFirst: () => {
+            const dir = materializeHome('/place')
+            const pathA = programPath(dir)('aaaaaaaa')
+            const pathB = programPath(dir)('bbbbbbbb')
+            assert(pathA !== pathB, 'the two fixtures must not share a path')
+            // The source text is only what `checkSpecifiers` reads; the
+            // module that loads is the fixture, per this file's own
+            // write/JsModule split.
+            const source = 'export const marker = "unused"'
+            // `/place` and `/place/.materialize` do not exist yet.
+            const rootA = placeJsModuleFixture(emptyState.root)(pathA)(() => ({ marker: 'A' }))
+            // ... and now they do.
+            const rootAB = placeJsModuleFixture(rootA)(pathB)(() => ({ marker: 'B' }))
+            const state = { ...emptyState, root: rootAB }
+            const [, moduleA] = virtualOrPanic(state)(loadProgram([])(pathA)(source))
+            const [, moduleB] = virtualOrPanic(state)(loadProgram([])(pathB)(source))
+            assert(moduleA['marker'] === 'A', ['the first fixture must survive the second placement', moduleA])
+            assert(moduleB['marker'] === 'B', ['the second fixture must be placed', moduleB])
+        },
+    },
+
     // ── The CAS-write policy: a failed write is a panic, not a branch ─────
     //
     // {@link writeTextToCas}'s docstring states it as a policy: a failure
