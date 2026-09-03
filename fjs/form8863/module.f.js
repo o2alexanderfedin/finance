@@ -141,7 +141,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, halfUp } from '../types/rational/module.f.js'
 import { centsFromString } from '../exact/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
@@ -537,10 +537,17 @@ export const form8863 = taxParamSet => input => {
     const line13 = line2
     const line14 = line3
     // 15. "Subtract line 14 from line 13. If zero or less, skip lines 16 and
-    //     17, enter -0- on line 18." Unreachable as a zero here, because
-    //     line 4's own stop above already returned; kept as the printed
-    //     line's own arithmetic.
-    const line15 = line13 > line14 ? line13 - line14 : 0n
+    //     17, enter -0- on line 18." Lines 13 and 14 ARE lines 2 and 3, and
+    //     line 4's own stop above has already returned for every input where
+    //     this subtraction could be zero or less. The floor was written here
+    //     as a second `? :` whose zero arm no input could take; it is one
+    //     narrowing `assert` instead, so the invariant is STATED rather than
+    //     silently guarded by an arm nothing exercises.
+    assert(
+        line13 > line14,
+        ["Form 8863 line 4's stop already returned for a non-positive line 15", line13, line14],
+    )
+    const line15 = line13 - line14
     // 16/17. The same range and the same three-decimal ratio as lines 5/6.
     const line16 = line5
     const line17Thousandths = line15 >= line16 ? 1000n : halfUp(of(line15 * 1000n)(line16))
@@ -804,6 +811,47 @@ export const proof = {
             assertEq(withMaterials.line10, 150000n, '$1,500.00 -- the textbooks are excluded')
             assertEq(withMaterials.line10, without.line10, 'and they change nothing at all')
             assertEq(withMaterials.line12, 30000n, '20% of $1,500.00 = $300.00')
+        },
+        // **§25A(g)(2) CAN TAKE THE BASE BELOW ZERO**, and printed line 31's
+        // floor is what stops a scholarship larger than the tuition from
+        // becoming a NEGATIVE expense that would subtract another student's
+        // credit away on line 10. A $7,000 scholarship against $6,000 of
+        // tuition is a $0 base, never -$1,000.
+        //
+        // The pair is the point: a second student with a real $6,000 of
+        // tuition is present in both halves, so an unfloored -$1,000 would
+        // show up as $5,000 on line 10 and a $1,000 credit on line 12.
+        aScholarshipLargerThanTheTuitionFloorsTheBaseAtZero: () => {
+            const overfunded = okResult(compute(baseInput({
+                students: [
+                    student({
+                        studentName: 'A. Student',
+                        credit: 'lifetimeLearning',
+                        institutionalExpenseCents: 600000n,
+                        scholarshipsCents: 700000n,
+                    }),
+                    student({
+                        studentName: 'B. Student',
+                        credit: 'lifetimeLearning',
+                        institutionalExpenseCents: 600000n,
+                    }),
+                ],
+            })))
+            assertEq(overfunded.students[0]?.line31, 0n, 'printed line 31 is -0-, not -$1,000.00')
+            assertEq(overfunded.students[1]?.line31, 600000n, "the other student's base is intact")
+            assertEq(overfunded.line10, 600000n, 'line 10 = $6,000.00, never $5,000.00')
+            assertEq(overfunded.line12, 120000n, '20% of $6,000.00 = $1,200.00, never $1,000.00')
+            assertEq(overfunded.line19, 120000n, '-> Schedule 3 line 3')
+            // The control, one cent under the tuition: the base is a real
+            // $0.01 and the floor is NOT what produced the zero above.
+            const justFunded = okResult(compute(baseInput({
+                students: [student({
+                    credit: 'lifetimeLearning',
+                    institutionalExpenseCents: 600000n,
+                    scholarshipsCents: 599999n,
+                })],
+            })))
+            assertEq(justFunded.students[0]?.line31, 1n, '$0.01 of base survives')
         },
         // The two credits on one return, one student each: the American
         // Opportunity half splits across two 1040 destinations and the
@@ -1187,9 +1235,11 @@ export const proof = {
             22,
             'kind, students, printed lines 1-19 (lines 6 and 17 as thousandths), the worksheet',
         )
-        const s = result.students[0]
-        assert(s !== undefined, ['expected one student', result.students])
-        assertEq(Object.keys(s ?? {}).length, 7, 'the name and election plus printed lines 27-31')
+        // `assertNotNullish`, not `assert` plus `?? {}`: the fallback object
+        // could never be built once the assertion above had passed, so the
+        // count had never been taken over that shape.
+        const s = assertNotNullish(result.students[0], ['expected one student', result.students])
+        assertEq(Object.keys(s).length, 7, 'the name and election plus printed lines 27-31')
         assertEq(Object.keys(result.creditLimitWorksheet).length, 7, 'the worksheet has seven lines')
     },
 }
