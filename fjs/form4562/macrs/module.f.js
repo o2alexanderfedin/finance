@@ -295,9 +295,23 @@ export const macrsColumn = classification => method => month => convention => {
         /** @type {Rational} */
         const yearFraction = year === 1 ? of(first24)(24n) : ofInt(1n)
         const raw = halfUp(multiply(multiply(ofInt(balance))(rate))(yearFraction))
-        const taken = raw > balance ? balance : raw
-        out.push(taken)
-        balance -= taken
+        // i4562 p9: *"Prior years' depreciation, plus current year's
+        // depreciation, can never exceed the depreciable basis of the
+        // property."* ASSERTED rather than clamped, because no input can
+        // overspend the balance and a `min` here would be an arm nothing could
+        // ever reach: `rate` is at most 1 (its straight-line arm is
+        // `24/straightLine24` with `straightLine24 >= 24`, its declining arm
+        // `48/recovery24` or `36/recovery24` with `recovery24 >= 72`),
+        // `yearFraction` is at most 1, and `balance` is an integer — so
+        // `halfUp` of a product that cannot exceed it cannot round past it
+        // either. Swept over all 450 legal (classification, method, month,
+        // convention) triples this module admits: a clamp would have fired
+        // zero times and removing it changed no column by a single unit.
+        assert(
+            raw <= balance,
+            ['a recovery year cannot overspend the remaining balance', raw, balance])
+        out.push(raw)
+        balance -= raw
         elapsed24 += year === 1 ? first24 : 24n
     }
     return out
@@ -371,6 +385,35 @@ const printed = classification => column => {
         const frac = v % unit
         return `${whole}.${String(frac).padStart(spec.printedDecimals, '0')}`
     })
+}
+
+/**
+ * ONE derived column against ONE hand-typed printed row: the printed cell
+ * count, and the cells that disagree, labelled so a reader can find the cell on
+ * the page.
+ *
+ * Written once because it was written TWICE — the Appendix A sweep and the
+ * Table A-6 sweep each carried their own copy of the same three lines. All four
+ * recorded {@link printedTableExceptions} live in A-2 and A-3, so the A-6
+ * copy's disagreement arm was reachable by no cell either fixture carries: a
+ * check that could only ever sit unexercised while the identical check six
+ * lines above it did all the work. One comparison used by both callers is the
+ * same claim with nothing left unproven.
+ * @type {(label: string) => (printedRow: string) => (derived: readonly string[]) => {
+ *   readonly cells: number, readonly mismatches: readonly string[] }}
+ */
+const comparedWithPrintedRow = label => printedRow => derived => {
+    const expected = printedRow.split(' ')
+    assertEq(derived.length, expected.length,
+        `${label}: the derived column must have the printed column's length`)
+    /** @type {string[]} */
+    const mismatches = []
+    for (let i = 0; i < expected.length; i += 1) {
+        if (derived[i] !== expected[i]) {
+            mismatches.push(`${label} year ${i + 1}: printed ${expected[i]}, derived ${derived[i]}`)
+        }
+    }
+    return { cells: expected.length, mismatches }
 }
 
 /**
@@ -708,34 +751,22 @@ export const proof = {
                 assert(conv !== undefined, ['every table names its convention', table])
                 assert(conv !== undefined, ['every table names its convention', table])
                 for (const [classification, row] of Object.entries(columns)) {
-                    const expected = row.split(' ')
                     const method = classification === 'fifteenYear' || classification === 'twentyYear'
                         ? '150DB'
                         : '200DB'
-                    const derived = printed(classification)(
-                        macrsColumn(classification)(method)(conv.month)(conv.convention))
-                    assertEq(derived.length, expected.length,
-                        `${table} ${classification}: the derived column must have the printed column's length`)
-                    cells += expected.length
-                    for (let i = 0; i < expected.length; i += 1) {
-                        if (derived[i] !== expected[i]) {
-                            mismatches.push(`${table} ${classification} year ${i + 1}: printed ${expected[i]}, derived ${derived[i]}`)
-                        }
-                    }
+                    const compared = comparedWithPrintedRow(`${table} ${classification}`)(row)(
+                        printed(classification)(
+                            macrsColumn(classification)(method)(conv.month)(conv.convention)))
+                    cells += compared.cells
+                    mismatches.push(...compared.mismatches)
                 }
             }
             for (const [month, row] of Object.entries(publication946TableA6)) {
-                const expected = row.split(' ')
-                const derived = printed('residentialRental')(
-                    macrsColumn('residentialRental')('SL')(Number(month))('MM'))
-                assertEq(derived.length, expected.length,
-                    `Table A-6 month ${month}: the derived column must have the printed column's length`)
-                cells += expected.length
-                for (let i = 0; i < expected.length; i += 1) {
-                    if (derived[i] !== expected[i]) {
-                        mismatches.push(`A-6 month ${month} year ${i + 1}: printed ${expected[i]}, derived ${derived[i]}`)
-                    }
-                }
+                const compared = comparedWithPrintedRow(`A-6 month ${month}`)(row)(
+                    printed('residentialRental')(
+                        macrsColumn('residentialRental')('SL')(Number(month))('MM')))
+                cells += compared.cells
+                mismatches.push(...compared.mismatches)
             }
             assertEq(cells, expectedPrintedCellCount, 'the hand-typed printed cell count')
             assertEq(cells - mismatches.length, expectedReproducedCellCount,
@@ -851,6 +882,33 @@ export const proof = {
             assertEq(total, basis, 'the eight deductions spend the whole basis')
             // A ninth year deducts nothing: the column has ended.
             assertEq(macrsDeductionCents(basis)('sevenYear')('200DB')(6)('HY')(9), 0n)
+        },
+        /**
+         * The column has a START as well as an end, and only the end was
+         * proved. `recoveryYear` reaches here as
+         * `taxYear − placedInServiceYear + 1` (`fjs/form4562`), so a register
+         * carrying an asset dated AFTER the return's own tax year arrives as
+         * year zero or less — and it must deduct nothing rather than read the
+         * column from the wrong end.
+         *
+         * A bare `column[recoveryYear − 1]` would answer `undefined` for a
+         * negative index in JavaScript too, and so would give the same zero;
+         * the `>= 1` test is written anyway because it says what the zero
+         * MEANS, and this leaf is what keeps it from being a claim nobody
+         * checks. The control is year 1 of the identical asset at $1,429.00,
+         * so what is proved is a boundary and not a function that returns zero.
+         */
+        aRecoveryYearBeforeTheFirstDeductsNothing: () => {
+            /** @type {(year: number) => bigint} */
+            const at = year => macrsDeductionCents(1000000n)('sevenYear')('200DB')(6)('HY')(year)
+            assertEq(at(1), 142900n, 'year 1 is Table A-1\'s 14.29% of $10,000.00')
+            assertEq(at(0), 0n, 'a 2026 asset on a 2025 return takes no deduction, not year 1\'s')
+            assertEq(at(-3), 0n, 'and further before the start is the same zero')
+            // At a basis a hundred times larger, so a zero product could not
+            // be what made the two above zero: the RATE is what is zero.
+            assertEq(
+                macrsDeductionCents(100000000n)('sevenYear')('200DB')(6)('HY')(0), 0n,
+                '$1,000,000.00 of basis in year zero is still $0.00')
         },
         /**
          * A residential rental building: $275,000 of basis placed in service

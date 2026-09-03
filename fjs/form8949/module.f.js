@@ -609,13 +609,17 @@ const absentBasisRefusal = documentHash => ({
  * Used by the two refusals below so each names the SAME reason the disposition
  * table carries — one rule, one place, rather than a refusal message and a
  * table row free to drift into disagreeing about why a code is refused.
+ *
+ * `assertNotNullish` chains off the `find` rather than an `assert` followed by
+ * an `=== undefined` ternary, which is what stood here: the ternary repeated a
+ * condition the `assert` one line above had already established, so its `''`
+ * arm was reachable by no input at all and no proof could ever cover it. One
+ * narrowing call is the whole check.
  * @type {(code: string) => string}
  */
-const dispositionReason = code => {
-    const entry = adjustmentCodeDispositions.find(candidate => candidate.code === code)
-    assert(entry !== undefined, ['no disposition for printed adjustment code', code])
-    return entry === undefined ? '' : entry.reason
-}
+const dispositionReason = code => assertNotNullish(
+    adjustmentCodeDispositions.find(candidate => candidate.code === code),
+    ['no disposition for printed adjustment code', code]).reason
 
 /**
  * The refusal a stored Form 3922 forces on any return that also reports a

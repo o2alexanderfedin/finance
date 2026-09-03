@@ -645,21 +645,31 @@ export const form2441DependentCareBenefits = taxParamSet => input => {
         min(line20Cents)(line21ExclusionLimitCents))(line22SoleProprietorshipOrPartnershipCents)
     // Line 25 — "Excluded benefits. If you checked 'No' on line 22, enter the
     // smaller of line 20 or line 21. Otherwise, subtract line 24 from the
-    // smaller of line 20 or line 21. If zero or less, enter -0-." The two
-    // branches coincide while line 24 is zero; both are written because the
-    // printed page has both.
+    // smaller of line 20 or line 21. If zero or less, enter -0-."
     //
-    // **The SECOND equivalent mutant here, and it is the same one twice.**
-    // Collapsing this ternary to its `Otherwise` arm alone also stays green,
-    // for the identical reason: line 24 above is zero, so `smaller - 0` is
-    // `smaller`. The two are one property of line 22, not two of line 25 —
-    // and the day the business schedules compute, BOTH mutations start
-    // biting together.
+    // **Only the "No" arm is written, and the assert is why.** R6 above
+    // RETURNS before this line whenever line 22 is positive, so every input
+    // that reaches here checked "No"; the `Otherwise` arm was a branch no
+    // legal input could take, and a branch nothing can take is one no proof
+    // can ever cover. The condition R6 established is asserted here instead —
+    // exactly the original guard's `<= 0n`, so no input changes answer, and a
+    // future phase that deletes R6 finds this assert firing rather than a
+    // silent arm nobody had exercised.
+    //
+    // **This was the SECOND equivalent mutant recorded at this site**, and the
+    // record is kept because it says what a future phase must restore: while
+    // line 24 is zero, `smaller - 0` is `smaller`, so the two printed arms
+    // COINCIDE and neither collapsing this expression nor multiplying line 24
+    // by `0n` could turn the suite red. The day the business schedules
+    // compute, the `Otherwise` arm — `smallerOfTwentyAndTwentyOne -
+    // line24DeductibleBenefitsCents` — has to come back here together with
+    // the deletion of R6, and both mutations start biting together.
+    assert(
+        line22SoleProprietorshipOrPartnershipCents <= 0n,
+        ['Form 2441 line 22 is refused above when positive, so line 25 takes the "No" arm',
+            line22SoleProprietorshipOrPartnershipCents])
     const smallerOfTwentyAndTwentyOne = min(line20Cents)(line21ExclusionLimitCents)
-    const line25ExcludedBenefitsCents = atLeastZero(
-        line22SoleProprietorshipOrPartnershipCents <= 0n
-            ? smallerOfTwentyAndTwentyOne
-            : smallerOfTwentyAndTwentyOne - line24DeductibleBenefitsCents)
+    const line25ExcludedBenefitsCents = atLeastZero(smallerOfTwentyAndTwentyOne)
     // Line 26 — "Taxable benefits. Subtract line 25 from line 23. If zero or
     // less, enter -0-. Also, enter this amount on Form 1040 ... line 1e."
     const line26TaxableBenefitsCents = atLeastZero(line23Cents - line25ExcludedBenefitsCents)

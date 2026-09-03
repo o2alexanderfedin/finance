@@ -242,8 +242,17 @@ export const form8889PartI = taxParamSet => input => {
     // 4. Archer MSA contributions -- a documented zero; see this module's own
     //    docstring, "Line 4 (Archer MSA) is a documented zero".
     const line4 = 0n
-    // 5. "Subtract line 4 from line 3. If zero or less, enter -0-."
-    const line5 = line3 > line4 ? line3 - line4 : 0n
+    // 5. "Subtract line 4 from line 3. If zero or less, enter -0-." The
+    //    printed floor is asserted rather than branched: line 4 is the
+    //    documented zero above and line 3 is a stored §223(b) limit plus a
+    //    non-negative catch-up, so no §223 parameter set makes line 3 the
+    //    smaller and the "-0-" arm was reachable by nothing. A branch nothing
+    //    can reach is a branch no proof can ever cover; the assert is the same
+    //    claim in a form that FIRES if a future parameter set falsifies it.
+    assert(
+        line3 > line4,
+        ['Form 8889 line 3 is a positive statutory limit and line 4 a documented zero', line3, line4])
+    const line5 = line3 - line4
     // 6. "Enter the amount from line 5." The spouse-allocation branch is
     //    refused above, so this line is the copy the printed page's first
     //    sentence describes.

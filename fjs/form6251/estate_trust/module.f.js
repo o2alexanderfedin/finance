@@ -418,6 +418,36 @@ export const proof = {
             'a code this line does not route is not this refusal')
     },
     /**
+     * The CITATION half of the leaf above, in its own leaf as
+     * {@link oneCodeARowCitesItsOwnEntry} is: an amount-less code A row cites
+     * NOTHING, because a `Source` carries the printed value and this row has
+     * none to carry. Its sibling row on the same document still cites, so what
+     * is proved here is one row dropped rather than a reader gone blank.
+     *
+     * The two readers walk the same rows, and only one of them refuses. A
+     * caller that asked for citations WITHOUT asking for the figure — the
+     * order `fjs/form1040/core` does not use today and could tomorrow — would
+     * otherwise be handed a source whose `value` was `undefined`, and the
+     * absent amount would reach a provenance report as an empty box.
+     */
+    aCodeARowWithNoAmountCitesNothingWhileItsSiblingStillDoes: () => {
+        /** @type {NonNullable<K1EstateTrust['box12AlternativeMinimumTaxItems']>} */
+        const twoRowsOneAmount = [{ code: 'A' }, { code: 'A', amount: '750.00' }]
+        const sources = estateTrustAmtAdjustmentSources(
+            [k1('sha256-k1-stmt-pair')(twoRowsOneAmount)])
+        assertEq(sources.length, 1, 'two code A rows, one amount, one citation')
+        const [source] = sources
+        assert(source !== undefined, 'expected the source')
+        assertEq(source.documentHash, 'sha256-k1-stmt-pair')
+        assertEq(source.boxPath, 'k1_1041.box12[code=A]')
+        assertEq(source.value, '750.00', 'the row that HAD an amount is the one cited')
+        // ...and the figure itself still refuses, so nothing files on a
+        // citation list this short.
+        const message = expectRefusal(
+            estateTrustAmtAdjustment([k1('sha256-k1-stmt-pair')(twoRowsOneAmount)]))
+        assert(message.includes('with NO amount'), ['the amount-less row still refuses', message])
+    },
+    /**
      * `line2jCodes` is what `fjs/schedule/e`'s gate opens for, so its CONTENTS
      * are a contract and not an implementation detail. Hand-typed, per
      * AGENTS.md: a list derived from the code under test cannot notice itself

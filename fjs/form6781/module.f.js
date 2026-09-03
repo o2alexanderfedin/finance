@@ -133,7 +133,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 import { of, halfUp } from '../types/rational/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
@@ -391,10 +391,19 @@ export const form6781 = taxParamSet => inputs => {
         // The citation is box 11 — the box the printed line actually takes.
         // The three components are cited nowhere, because nothing they touch
         // reaches a line; their only reader is the refusal above.
+        //
+        // `assertNotNullish` rather than `?? ''`: R1 above has already RETURNED
+        // for every document whose box 11 is absent, so the `''` arm was
+        // reachable by no input and no proof could cover it — and an empty
+        // string is the wrong thing to reach a provenance report anyway, since
+        // it reads as a box that printed nothing rather than as a bug here.
         sources.push({
             documentHash: document.documentHash,
             boxPath: 'box11AggregateProfitOrLoss',
-            value: box.box11AggregateProfitOrLoss ?? '',
+            value: assertNotNullish(
+                box.box11AggregateProfitOrLoss,
+                ['R1 above refuses an absent box 11, so the citation always has one',
+                    document.documentHash]),
         })
     }
 
@@ -781,11 +790,44 @@ export const proof = {
             assert(message.includes('2000.00'), ['the STORED figure', message])
             assert(message.includes('4000.00'), ['the COMPUTED figure', message])
             assert(
-                message.includes('box9UnrealizedProfitOrLossPriorYearEnd'),
-                ['and WHICH box was blank — the part a reader can act on', message])
+                message.includes('box9UnrealizedProfitOrLossPriorYearEnd is ABSENT'),
+                ['and WHICH box was blank — the part a reader can act on, in the SINGULAR', message])
             assert(
                 message.includes('§1256(a)(2)'),
                 ['the statute that puts the minus sign on box 9', message])
+            assertNamesTheDestination(message)
+        },
+        /**
+         * The same refusal with TWO blanks, which is the message's other
+         * number: `is` becomes `are` and both names are joined. A transcriber
+         * who lost the whole unrealized half of the page — boxes 9 and 10
+         * together — leaves box 8 and box 11 disagreeing by exactly the
+         * open positions.
+         *
+         *   stored box 11   $ 5,000.00
+         *   8 - 9 + 10      3,000 - 0 + 0 = $ 3,000.00
+         *
+         * The plural is asserted as the WHOLE segment, names and verb
+         * together, because that is what a reader acts on: a message reading
+         * "box9… and box10… is ABSENT" would still contain both names and
+         * still pass a two-`includes` check.
+         */
+        twoBlankComponentsAreNamedInThePlural: () => {
+            const message = expectRefusal(run([brokerageDocument('sha256-twoblanks')({
+                box8ProfitOrLossRealized: '3000.00',
+                box11AggregateProfitOrLoss: '5000.00',
+            })]))
+            assert(message.includes('sha256-twoblanks'), ['the document at issue', message])
+            assert(message.includes('5000.00'), ['the STORED figure', message])
+            assert(message.includes('3000.00'), ['the COMPUTED figure', message])
+            assert(
+                message.includes(
+                    'box9UnrealizedProfitOrLossPriorYearEnd and '
+                    + 'box10UnrealizedProfitOrLossCurrentYearEnd are ABSENT'),
+                ['both blanks, joined, and the PLURAL verb', message])
+            assert(
+                !message.includes('box8ProfitOrLossRealized'),
+                ['and not the component that was printed', message])
             assertNamesTheDestination(message)
         },
         /**
