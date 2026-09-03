@@ -700,6 +700,29 @@ export const proof = {
             assertEq(result.line2.sources.length, 1)
             assertEq(result.line2.sources[0].boxPath, 'declaredKinds')
         },
+        // Box 1 is OPTIONAL on the printed 1099-INT, and a statement whose
+        // only entry is box 3 is the ordinary case for a U.S. savings bond
+        // or Treasury holding: the payer had no other interest to report.
+        // The row still exists — the interest is taxable and belongs on the
+        // Part I listing — and it cites box 3 ALONE, never a $0 box 1.
+        // DOC-11 at the row level, the mirror of the leaf above: that one
+        // proves an absent box makes no row when it is the only box, this
+        // one proves it makes no SOURCE when a sibling box carries the row.
+        aNineteenNinetyNineIntWithOnlyBoxThreeIsARowCitingBoxThreeAlone: () => {
+            const result = scheduleB({
+                interestForms: [interestForm(undefined)('812.40')('int-doc-bond')],
+                dividendForms: [],
+                ...noScheduleK1s,
+                profile: profileNoForeign,
+            })
+            assertEq(result.line1.length, 1, 'one statement, one Part I row')
+            assertEq(result.line1[0]?.sources.length, 1, 'box 1 is absent, so it is not cited')
+            assertEq(result.line1[0]?.sources[0].boxPath, 'box3UsSavingsBondsAndTreasuryInterest')
+            // $812.40, hand-typed.
+            assertEq(result.line1[0]?.value, 81240n)
+            assertEq(result.line2.value, 81240n)
+            assertEq(result.line4.value, 81240n)
+        },
     },
     partTwo: {
         k1DividendsAreOneRowPerDocumentNamedByTheIssuingEntity: () => {
@@ -726,6 +749,31 @@ export const proof = {
             assertEq(result.line5[2]?.sources[0].boxPath, 'k1_1041.box2aOrdinaryDividends')
             // $9.00 + $8.00 + $7.00 = $24.00, in hundreds of cents.
             assertEq(result.line6.value, 240000n)
+        },
+        // Box 1a is OPTIONAL on the printed 1099-DIV — a fund that
+        // distributed only tax-exempt interest dividends, or only a
+        // liquidating distribution, files a statement with it blank. Part
+        // II has no line for a payer who paid no ordinary dividend, so that
+        // statement contributes NO row and NO citation, while the payer
+        // beside it in the same return still does. Paired that way on
+        // purpose: with the absent-box statement alone the listing would be
+        // empty for two different reasons and the leaf could not tell them
+        // apart.
+        aNineteenNinetyNineDivWithNoBoxOneAContributesNeitherRowNorCitation: () => {
+            const result = scheduleB({
+                interestForms: [],
+                dividendForms: [
+                    dividendForm('250.00')('div-doc-ordinary'),
+                    dividendForm(undefined)('div-doc-no-box-one-a'),
+                ],
+                ...noScheduleK1s,
+                profile: profileNoForeign,
+            })
+            assertEq(result.line5.length, 1, 'two statements, one Part II row')
+            assertEq(result.line5[0]?.sources[0].documentHash, 'div-doc-ordinary')
+            // $250.00, hand-typed: the second statement adds nothing.
+            assertEq(result.line6.value, 25000n)
+            assertEq(result.line6.sources.length, 1, 'an absent box is ABSENT, never a zero citation')
         },
         rowsSumToLineSix: () => {
             const result = scheduleB({

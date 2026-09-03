@@ -33,7 +33,7 @@
  *
  * @module
  */
-import { step, catchStep, pureError, mapStep, history, historyStep, unwrapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, catchStep, pureError, mapStep, history, historyStep, unwrapStep, runPure } from 'functionalscript/fjs/effects/module.f.mjs'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
@@ -43,7 +43,7 @@ import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
 import { parse } from 'functionalscript/fjs/path/module.f.mjs'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertStructurallySame } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../materialize/module.f.js'
 import { guestCtx } from '../module.f.js'
@@ -185,6 +185,39 @@ const runFjsCheckViaFixture = home => hash => source => fixture => state => {
 /** A program written the way a real report is: ctx only, zero imports. */
 const cleanSource = 'export const report = ctx => args => ctx.pure("x")'
 
+/**
+ * A `report` that records its own invocation, paired with the flag it sets —
+ * the runtime twin of {@link cleanSource}, which is likewise `ctx.pure("x")`
+ * and nothing else.
+ *
+ * **One construction, called twice, because the pair of leaves below only
+ * means anything if it is the SAME report in both.** Each leaf used to build
+ * its own textually identical copy, which made the control's claim to flip
+ * "the SAME spy" false as written — it flipped a second spy that merely
+ * resembled the first, so an edit to one side would have left the gate leaf
+ * asserting the absence of a call to a function the control no longer
+ * resembled. That is AGENTS.md's "one rule, one place" at proof scale: a
+ * check duplicated between two callers binds to whichever is exercised, and
+ * the other rots.
+ *
+ * It also means this body is REACHED — by the control, never by the gate.
+ * A spy whose body no proof ever executes is indistinguishable from a spy
+ * that cannot fire at all, which is exactly the reading a gate asserting
+ * `reportCalled === false` must rule out.
+ * @type {() => { readonly spy: { reportCalled: boolean }, readonly report: Report<string> }}
+ */
+const spiedReport = () => {
+    /** @type {{ reportCalled: boolean }} */
+    const spy = { reportCalled: false }
+    return {
+        spy,
+        report: ctx => () => {
+            spy.reportCalled = true
+            return ctx.pure('x')
+        },
+    }
+}
+
 export const proof = {
     // ── Error paths: no representational collision, call fjsCheck directly ──
     errors: {
@@ -229,6 +262,54 @@ export const proof = {
         },
     },
 
+    // ── The test fixture placer's own missing-level case ────────────────────
+    //
+    // `runFjsCheckViaFixture` above always hands `placeJsModuleFixture` a root
+    // that the REAL materialize write has already populated, so every
+    // intermediate level of the path exists by the time the fixture is placed
+    // and the "nothing is here yet, start a directory" half of the placer is
+    // never taken there. That half is what the FIRST placement into a given
+    // root depends on, and it is also the half the placer's docstring claims
+    // twice over — one nested level per segment, merged in without disturbing
+    // siblings. Neither claim was pinned by anything until this leaf.
+    fixturePlacement: {
+        placesAFixtureAtEveryMissingLevelWithoutDisturbingASibling: () => {
+            /** @type {JsModule} */
+            const fixture = () => ({ report: 'placed' })
+            /** @type {JsModule} */
+            const sibling = () => ({ report: 'untouched' })
+            /** @type {Dir} */
+            const before = { sibling }
+            const after = placeJsModuleFixture(before)('/a/b/c.mjs')(fixture)
+            // The whole result, against a hand-written expectation rather
+            // than a walk down the levels the placer just built: a walk
+            // would only ever confirm the levels it was told to look for,
+            // and would say nothing about an extra one. `structurallySame`
+            // decides functions by `Object.is`, so both entries below assert
+            // the SAME function object arrived, not merely a function.
+            assertStructurallySame(after, { sibling, a: { b: { 'c.mjs': fixture } } })
+            // ...and the placer is not a mutator: `before` still reads as it
+            // did, so a caller holding the old state keeps it.
+            assertStructurallySame(before, { sibling })
+            // The nesting is only RIGHT if `virtual`'s own path recursion
+            // finds it, and that is the claim the docstring above actually
+            // makes — one which no structural comparison can settle, since
+            // it compares this helper against a shape hand-copied from the
+            // same reading of `virtual` that the helper was written from.
+            // So both entries are imported for real, through the same
+            // `loadProgram` every leaf above uses: the placed fixture from
+            // three segments down, the sibling from where it already was.
+            // A `JsModule` is a function `import_` INVOKES, so this is also
+            // the only thing that shows either entry is usable as one.
+            const [, placed] = virtual({ ...emptyState, root: after })(loadProgram([])('/a/b/c.mjs')(cleanSource))
+            assert(placed[0] === 'ok', ['expected the placed fixture to import', placed])
+            assertEq(placed[1]['report'], 'placed')
+            const [, kept] = virtual({ ...emptyState, root: after })(loadProgram([])('sibling')(cleanSource))
+            assert(kept[0] === 'ok', ['expected the untouched sibling to import too', kept])
+            assertEq(kept[1]['report'], 'untouched')
+        },
+    },
+
     // ── The decisive proof: import happens, report is never invoked ─────────
     neverExecutes: {
         // A program whose report IS a function: fjsCheck resolves
@@ -239,14 +320,8 @@ export const proof = {
         exportsReportTrueAndReportNeverCalled: () => {
             const home = '/check-success'
             const hash = 'CONTENTHASH'
-            /** @type {{ reportCalled: boolean }} */
-            const spy = { reportCalled: false }
-            /** @type {Report<string>} */
-            const spiedReport = ctx => () => {
-                spy.reportCalled = true
-                return ctx.pure('x')
-            }
-            const fixture = () => ({ report: spiedReport })
+            const { spy, report } = spiedReport()
+            const fixture = () => ({ report })
             const [, result] = runFjsCheckViaFixture(home)(hash)(cleanSource)(fixture)(emptyState)
             assert(result[0] === 'ok', ['expected fjsCheck to succeed', result])
             if (result[0] === 'ok') {
@@ -257,24 +332,30 @@ export const proof = {
             // read the fixture's own shape) but never called report.
             assertEq(spy.reportCalled, false)
         },
-        // The control: the SAME fixture's report function DOES flip the spy
-        // when actually invoked — proving the spy is capable of detecting
-        // invocation, so its staying false above is meaningful evidence, not
-        // a spy that never fires (AGENTS.md: "a gate needs a control").
+        // The control: the SAME report — one construction, shared with the
+        // leaf above rather than copied — DOES flip the spy when actually
+        // invoked, proving the spy is capable of detecting invocation, so its
+        // staying false above is meaningful evidence, not a spy that never
+        // fires (AGENTS.md: "a gate needs a control").
         controlDirectInvocationFlipsTheSameSpy: () => {
-            /** @type {{ reportCalled: boolean }} */
-            const spy = { reportCalled: false }
-            /** @type {Report<string>} */
-            const spiedReport = ctx => () => {
-                spy.reportCalled = true
-                return ctx.pure('x')
-            }
-            const loaded = { report: spiedReport }
+            const { spy, report } = spiedReport()
+            const loaded = { report }
             // The SAME call shape executeRun's own interpreter would make
             // (interpret(hostMap)(loaded.report(guestCtx)(args))) — fjsCheck
             // itself must never reach this line.
-            loaded.report(guestCtx)([])
+            const [produced] = runPure(loaded.report(guestCtx)([]))
             assertEq(spy.reportCalled, true)
+            // ...and the flag is only half of it. The report also RETURNS
+            // something, and a control that dropped the return would pass
+            // for a spy that sets its flag and then answers anything at all
+            // — including a refusal, which is what a report that had been
+            // tampered with would most plausibly answer. `runPure` rather
+            // than `interpret`: this report issues no command, so there is
+            // no host map to write, and an empty Option back from it would
+            // itself mean the report stopped at one.
+            assert(produced !== undefined, ['the report resolves via pure, never a command', produced])
+            assertEq(produced[0], 'ok')
+            assertEq(produced[1], 'x')
         },
         // A program with no report export at all, or one whose report is not
         // a function, resolves ok({ exportsReport: false }) — a successful

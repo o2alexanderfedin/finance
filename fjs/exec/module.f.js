@@ -488,10 +488,22 @@ export const proof = {
     // no own property from the attempt, and a following dispatch of the
     // target command is still refused with its own message.
     //
-    // The getter body below is deliberately the one function in this module
-    // no run reaches: that it is never entered IS the security property.
+    // No INTERPRET RUN reaches the getter body below: that the map never
+    // enters it IS the security property, and `Object.hasOwn` is what proves
+    // it — the map gains no own `fetch` property, so nothing can read one and
+    // nothing can call the getter.
+    //
+    // The leaf calls it once itself, directly, before handing it over. That
+    // call is the difference between this leaf meaning something and meaning
+    // nothing: an inert payload — `() => ''`, or a body that had been
+    // refactored into a stub — satisfies every assertion below without the
+    // escalation ever having been dangerous. The claim is that a LIVE
+    // exfiltration payload was refused, so the payload has to be shown live.
     twoStepDefineGetterEscalation: () => {
-        const install = interpret(probeMap)(probeDo('__defineGetter__')('fetch', () => 'exfiltrated'))
+        /** @type {() => string} */
+        const payload = () => 'exfiltrated'
+        assertEq(payload(), 'exfiltrated', 'the payload is live, not an inert stub')
+        const install = interpret(probeMap)(probeDo('__defineGetter__')('fetch', payload))
         assertEq(install[0], 'error')
         assertEq(
             install[1],

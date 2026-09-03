@@ -115,7 +115,7 @@
 import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
-import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
 import { initEvo, evo, syncRevision } from 'functionalscript/fjs/cas/evo/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
@@ -417,6 +417,39 @@ const twoBlobSnapshot = {
     revisions: {},
 }
 
+// ── A blob `cas.list()` reports and `cas.read` cannot deliver ───────────────
+//
+// `fileCas` shards a hash three levels deep (`fjs/cas`'s `toPath`: two
+// characters, two characters, the rest), but `list()` does NOT check the
+// depth — it recursively reads `.cas`, strips the store prefix from each
+// FILE's parent path, removes the slashes and appends the file's own name.
+// So a blob written one level too shallow is reported by `list()` under a
+// hash whose `toPath` names a place nothing is: the store is inconsistent,
+// exactly as a half-finished copy or a hand-edited store would be.
+//
+// Every value below is hand-typed, and `list()`'s concatenation rule is
+// asserted rather than reproduced: the leaf reads the hash back out of
+// `cas.list()` and checks it against {@link misshardedHash}, so a change to
+// how `list()` spells a hash fails the leaf instead of silently moving the
+// expectation with it.
+
+/** The single `.cas` sub-directory the mis-sharded blob sits in. */
+const misshardedShard = 'aa'
+
+/** The mis-sharded blob's file name inside {@link misshardedShard}. */
+const misshardedLeaf = 'aaaaaaaaaa'
+
+/**
+ * The hash `cas.list()` therefore reports for it: `'aa' + 'aaaaaaaaaa'`,
+ * twelve cBase32 characters, written out rather than concatenated.
+ * `toPath` of it is `.cas/aa/aa/aaaaaaaa` — three levels, and NOT where the
+ * file is — so `cas.read` on it answers `ENOENT`.
+ */
+const misshardedHash = 'aaaaaaaaaaaa'
+
+/** The mis-sharded blob's bytes. Nothing can address them; that is the point. */
+const misshardedText = 'these bytes are listed and cannot be read'
+
 export const proof = {
     // ── buildHostMap: the synchronous OperationMap<CasOp, string> ───────────
     hostMap: {
@@ -494,6 +527,35 @@ export const proof = {
             assertEq(typeof v, 'string')
             assert(v.includes('absent-hash'), v)
         },
+        /**
+         * A subject the snapshot has never heard of answers with an EMPTY
+         * head list rather than a refusal — `evoHead`'s `?? []`, which
+         * nothing else here reaches.
+         *
+         * **It is a different path from the archived-only subject**, and
+         * that is why this leaf exists rather than being folded into
+         * `archivedRevisionUnreachable` below. There, `withHeads` has put a
+         * PRESENT `heads['subjectS'] = []` into the snapshot (that leaf
+         * asserts exactly that), so the lookup succeeds and the fallback
+         * never runs; here the key is ABSENT. Both must answer `[]`, and
+         * DOC-15's guarantee is precisely that a guest cannot tell
+         * "archived away" from "never existed" — which only holds while the
+         * two paths agree, so both need to be measured.
+         *
+         * The control is the `casRead` row on the SAME hand-built snapshot:
+         * an absent BLOB is refused by message. So answering empty is
+         * `evoHead`'s own decision about subjects, not a blanket "unknown
+         * means empty" across the host map.
+         */
+        evoHeadOnASubjectTheSnapshotNeverSawAnswersEmpty: () => {
+            assertEq(Object.keys(twoBlobSnapshot.heads).length, 0)
+            const map = buildHostMap(twoBlobSnapshot)
+            const [t, v] = map.evoHead('subjectNobodyEverStored')
+            assertEq(t, 'ok')
+            assertEq(v, '[]')
+            const [controlT] = map.casRead('absent-hash')
+            assertEq(controlT, 'error', 'an absent blob must still be refused, not answered empty')
+        },
     },
 
     // ── buildRunSnapshot: resolving a real store, under virtual ─────────────
@@ -565,6 +627,75 @@ export const proof = {
             assert(
                 JSON.stringify(pinned.heads['subjectS']) !== JSON.stringify(unpinned.heads['subjectS']),
                 'the pin must actually change what the snapshot reports')
+        },
+        /**
+         * The OTHER per-item skip, and the one this module's own header
+         * insists must stay per-item: a hash `cas.list()` reported that
+         * `cas.read` cannot deliver. The store is seeded inconsistent on
+         * purpose — see the {@link misshardedHash} block above for the
+         * mechanism, a blob one shard level too shallow.
+         *
+         * `undecodableHeadStaysObservable` below measures the INNER skip (a
+         * blob that reads and does not decode as a revision, whose bytes
+         * still reach `blobs`). This measures the OUTER one, and the two are
+         * deliberately not merged: this hash contributes NOTHING, not even
+         * bytes, which is the difference asserted here.
+         *
+         * The surviving control is the load-bearing half. `foldStep`
+         * short-circuits on the first `error` since 0.46.0, so a failure
+         * escaping this recovery would not lose one blob — it would abandon
+         * every remaining item and answer a snapshot with no subjects at
+         * all. Asserting only that the bad hash is absent cannot tell those
+         * apart; asserting that the control document, its head and its
+         * revision all still resolve can.
+         */
+        aListedButUnreadableBlobIsSkippedAndTheRestSurvive: () => {
+            const cas = fileCas(sha256)('/')
+            const misshardedBytes = tryUtf8(misshardedText)
+            assert(misshardedBytes !== null, 'expected the mis-sharded bytes to encode as UTF-8')
+            /** @type {State} */
+            const seeded = {
+                ...emptyState,
+                root: { '.cas': { [misshardedShard]: { [misshardedLeaf]: [misshardedBytes] } } },
+            }
+            const [state0, cacheKey] = virtualOrPanic(seeded)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+
+            // Control: a wholly consistent subject in the SAME store.
+            const controlText = '{"dialect":"vnd.fjs.w2"}'
+            const controlBytes = tryUtf8(controlText)
+            assert(controlBytes !== null, 'expected the control document to encode as UTF-8')
+            const [state1, controlWrite] = virtual(state0)(cas.write(oneChunk(controlBytes)))
+            assert(controlWrite[0] === 'ok', ['expected the control document write to succeed', controlWrite])
+            const controlDocHash = vecToCBase32(controlWrite[1])
+            const [state2, controlAdd] = virtual(state1)(
+                e.add({ parents: [], subject: 'subjectConsistent', snapshot: controlDocHash }))
+            assert(controlAdd[0] === 'ok', ['expected the control add to succeed', controlAdd])
+            const controlHead = controlAdd[1]
+
+            // The premise, stated rather than assumed: `cas.list()` DOES
+            // report the mis-sharded hash, spelled exactly as hand-typed
+            // above, and `cas.read` on that same hash DOES fail.
+            const [, listed] = virtual(state2)(cas.list())
+            assert(listed[0] === 'ok', ['expected the store to list', listed])
+            assert(
+                listed[1].map(vecToCBase32).includes(misshardedHash),
+                ['expected cas.list to report the mis-sharded hash', listed[1].map(vecToCBase32)])
+            const misshardedVec = cBase32ToVec(misshardedHash)
+            assert(misshardedVec !== null, 'expected the mis-sharded hash to decode as cBase32')
+            const [, misshardedRead] = virtual(state2)(collectRead(cas.read(misshardedVec)))
+            assertEq(misshardedRead[0], 'error', 'the mis-sharded blob must be unreadable, or this proves nothing')
+
+            const [, snapshot] = virtualOrPanic(state2)(buildRunSnapshot(cas)(e)(undefined))
+            // Skipped entirely: no bytes, no revision — unlike the
+            // decode-failure skip, which keeps the bytes.
+            assertEq(snapshot.blobs[misshardedHash], undefined)
+            assertEq(snapshot.revisions[misshardedHash], undefined)
+            // And the rest of the store survives the skip.
+            assertEq(snapshot.blobs[controlDocHash], controlText)
+            assert(snapshot.activeSubjects.includes('subjectConsistent'), snapshot.activeSubjects)
+            assertEq(JSON.stringify(snapshot.heads['subjectConsistent']), JSON.stringify([controlHead]))
+            assert(snapshot.revisions[controlHead] !== undefined, 'expected the control revision to resolve')
         },
     },
 

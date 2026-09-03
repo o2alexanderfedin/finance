@@ -84,7 +84,7 @@
  */
 import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
-import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, catchStep, mapStep, foldStep, pureOk, pureError, notImplemented } from 'functionalscript/fjs/effects/module.f.mjs'
 import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
@@ -104,8 +104,8 @@ import { parse, stringify as jsonText } from '../../json/module.f.js'
 /** @import { IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
 /** @import { Cas, FileCas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
-/** @import { ToolEntry } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { Evo, RevisionData } from 'functionalscript/fjs/cas/evo/types.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
 /** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 /**
@@ -297,6 +297,21 @@ const listThrough = state => cas => e => args => {
 const findSubject = entries => subject => entries.find(entry => entry.subject === subject)
 
 /**
+ * Writes `text` to `cas` and returns its cBase32 hash, threading `state`.
+ * Shared by both fixtures below — {@link buildFixture}'s seven writes and
+ * {@link buildStubbedRevisionFixture}'s single one.
+ * @type {(cas: FileCas) => (state: State) => (text: string) => readonly [State, string]}
+ */
+const writeDocTo = cas => state => text => {
+    const bytes = tryUtf8(text)
+    assert(bytes !== null, ['expected the sample document to encode as UTF-8', text])
+    const [nextState, writeResult] = virtual(state)(
+        cas.write(oneChunk(bytes)))
+    assert(writeResult[0] === 'ok', ['expected the document write to succeed', writeResult])
+    return /** @type {const} */ ([nextState, vecToCBase32(writeResult[1])])
+}
+
+/**
  * Seeds a fresh, `virtual`-backed store with every document shape this
  * module's proof needs, and returns the active/archived lists
  * `finance_documents_list` itself computes over that store. Called fresh by
@@ -331,18 +346,7 @@ const buildFixture = () => {
     const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
     const e = evoOf(cas)(cacheKey)
 
-    /**
-     * Writes `text` to CAS and returns its cBase32 hash, threading `state`.
-     * @type {(state: State) => (text: string) => readonly [State, string]}
-     */
-    const writeDoc = state => text => {
-        const bytes = tryUtf8(text)
-        assert(bytes !== null, ['expected the sample document to encode as UTF-8', text])
-        const [nextState, writeResult] = virtual(state)(
-            cas.write(oneChunk(bytes)))
-        assert(writeResult[0] === 'ok', ['expected the document write to succeed', writeResult])
-        return /** @type {const} */ ([nextState, vecToCBase32(writeResult[1])])
-    }
+    const writeDoc = writeDocTo(cas)
 
     // (1) An active document with a KNOWN dialect.
     const [state1, knownHash] = writeDoc(state0)(
@@ -420,6 +424,130 @@ const buildFixture = () => {
     return {
         active: listThrough(state17)(cas)(e)({}),
         archived: listThrough(state17)(cas)(e)({ archived: true }),
+    }
+}
+
+// ── The two "should not happen" narrows in `entryFor`, and how to reach them ──
+//
+// `entryFor` narrows twice on a `RevisionData` it has just read: `snapshot`
+// absent, and `snapshot` present but not decodable as cBase32. Neither can
+// be reached by seeding the STORE, and it is worth writing down why rather
+// than leaving the next reader to rediscover it. `evo.revision` is
+// upstream's `readRevision`, which decodes the blob through
+// `fjs/media/revision`'s `validate` -- where `snapshot` is a REQUIRED field
+// and `checkReferences` rejects one that fails `isHash` -- and then projects
+// it through `toRevisionData`, which re-spells the field as
+// `canonicalHash(snapshot)`. So a hand-written revision blob missing
+// `snapshot`, or carrying an undecodable one, does not produce a
+// snapshot-less `RevisionData`: it fails to decode at all, and the row is
+// skipped by the `catchStep` that `absentSnapshotSkippedAndTheRestSurvive`
+// already covers. Verified against upstream 0.48.0 directly.
+//
+// What CAN produce it is the tool's own parameter. `financeDocumentsListTool`
+// is generic over `Evo<O>`, whose `revision` is declared to answer a
+// `RevisionData` -- and `RevisionData.snapshot` is `Hash | undefined`,
+// because that one type is the shared input/output vocabulary of `add` and
+// `revision` alike (the narrows' own comment says exactly this). A conforming
+// `Evo` may therefore answer without a `snapshot`, and the tool's documented
+// contract is that such a row is SKIPPED rather than crashing the MCP
+// transport (T-11-03-01). That contract is stated at the parameter, so it is
+// proven at the parameter.
+//
+// The fabrication is kept to one method: `list`, `head` and `add` are the
+// real store's, the store itself is really seeded, and only the ONE
+// `revision` answer for a hash the fixture names is swapped. Each leaf below
+// pairs the stubbed listing against the SAME store listed through the
+// unmodified `Evo`, so "absent because skipped" is told apart from "absent
+// because the fixture never stored it".
+
+/**
+ * `real`, with `revision` answering from `answers` for the hashes it names
+ * and delegating every other hash — and every other method — unchanged.
+ * @type {(real: Evo<FileCasOperation>) => (answers: Readonly<Record<string, RevisionData>>) => Evo<FileCasOperation>}
+ */
+const evoAnsweringRevisions = real => answers => ({
+    ...real,
+    revision: hash => {
+        const answer = answers[hash]
+        return answer === undefined ? real.revision(hash) : pureOk(answer)
+    },
+})
+
+/**
+ * `real`, with `list` failing on the channel `Evo` declares for it.
+ *
+ * `notImplemented` rather than an `evoError`, and the choice is forced:
+ * `Evo.list`'s channel is `EvoChannel = EvoError | NotImplemented`, this
+ * tool renders its failures with `errorSummary` (an `IoChannel` renderer),
+ * and `EvoError` is not an `IoChannel` — so `NotImplemented` is the only
+ * value that both a conforming `Evo` may raise and this tool's own renderer
+ * can be handed. It is also the realistic one: the shipped `evo.list` is a
+ * memory-cache read, whose only failure is a runner that cannot dispatch it.
+ * @type {(real: Evo<FileCasOperation>) => (command: string) => Evo<FileCasOperation>}
+ */
+const evoWhoseListCannotBeDispatched = real => command => ({
+    ...real,
+    list: () => pureError(notImplemented(command)),
+})
+
+/** The `snapshot` reference the stubbed revision carries: not cBase32, so `cBase32ToVec` answers `null`. */
+const undecodableSnapshotRef = '!!! not a cbase32 hash !!!'
+
+/**
+ * A small store — one ordinary subject and two whose single head is answered
+ * by {@link evoAnsweringRevisions} — listed BOTH ways: through the real
+ * `Evo` and through the stub. See the block comment above for why the stub
+ * is the only route to `entryFor`'s two narrows.
+ *
+ * All three subjects are added through the real `evo.add`, so every one of
+ * them genuinely exists, genuinely has a head, and genuinely resolves — the
+ * `real` listing below asserts that, and it is what makes the stubbed
+ * listing's omissions mean something.
+ * @type {() => {
+ *   readonly real: readonly DocumentListEntry[],
+ *   readonly stubbed: readonly DocumentListEntry[],
+ *   readonly listFailure: ToolsCallResult,
+ * }}
+ */
+const buildStubbedRevisionFixture = () => {
+    const home = '/'
+    const cas = fileCas(sha256)(home)
+    const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
+    const real = evoOf(cas)(cacheKey)
+    const writeDoc = writeDocTo(cas)
+
+    // One document, three subjects pointing at it. The subjects differ, so
+    // the three revisions differ, so their head hashes differ — which is
+    // what lets the stub answer for two of them and not the third.
+    const [state1, docHash] = writeDoc(state0)(
+        JSON.stringify({ dialect: 'vnd.fjs.1099int', taxYear: 2025, box1InterestIncome: '3.00' }))
+    const [state2, controlAdd] = virtual(state1)(
+        real.add({ parents: [], subject: 'subjectControl', snapshot: docHash }))
+    assert(controlAdd[0] === 'ok', ['expected the control add to succeed', controlAdd])
+    const [state3, snapshotlessAdd] = virtual(state2)(
+        real.add({ parents: [], subject: 'subjectSnapshotlessRevision', snapshot: docHash }))
+    assert(snapshotlessAdd[0] === 'ok', ['expected the snapshotless-subject add to succeed', snapshotlessAdd])
+    const [state4, undecodableAdd] = virtual(state3)(
+        real.add({ parents: [], subject: 'subjectUndecodableSnapshotRef', snapshot: docHash }))
+    assert(undecodableAdd[0] === 'ok', ['expected the undecodable-ref-subject add to succeed', undecodableAdd])
+
+    const stub = evoAnsweringRevisions(real)({
+        // No `snapshot` at all — legal `RevisionData`, and the field the
+        // first narrow is about.
+        [snapshotlessAdd[1]]: { parents: [], subject: 'subjectSnapshotlessRevision', generation: 0 },
+        // A `snapshot` that is present and does not decode — the second.
+        [undecodableAdd[1]]: {
+            parents: [],
+            subject: 'subjectUndecodableSnapshotRef',
+            snapshot: undecodableSnapshotRef,
+            generation: 0,
+        },
+    })
+    const failing = financeDocumentsListTool(evoWhoseListCannotBeDispatched(real)('evo.list'))(cas)
+    return {
+        real: listThrough(state4)(cas)(real)({}),
+        stubbed: listThrough(state4)(cas)(stub)({}),
+        listFailure: virtualOrPanic(state4)(failing.handle({}))[1],
     }
 }
 
@@ -546,6 +674,71 @@ export const proof = {
             const [first, second] = concurrentEntries
             assert(first !== undefined && second !== undefined, concurrentEntries)
             assert(first.hash !== second.hash, concurrentEntries)
+        },
+        /**
+         * The `Evo` the tool is handed answers a `RevisionData` carrying NO
+         * `snapshot` — legal under the type `Evo.revision` declares, and the
+         * first of `entryFor`'s two "should not happen" narrows. The row is
+         * SKIPPED, not crashed on: the module header's failure-mode contract
+         * (T-11-03-01) says a `RevisionData` with no resolvable snapshot is a
+         * skip, and this is that sentence measured.
+         *
+         * **The control is the same store listed through the unmodified
+         * `Evo`**, where the subject IS present. Without it this leaf would
+         * pass just as happily against a fixture that never stored the
+         * subject at all.
+         *
+         * The survivors matter for a second reason: `foldStep` short-circuits
+         * on the first `error` since 0.46.0, so a narrow that let the failure
+         * out instead of answering `pureOk(undefined)` would drop every
+         * remaining document, not just this row.
+         */
+        aRevisionWithNoSnapshotIsSkippedNotCrashedOn: () => {
+            const { real, stubbed } = buildStubbedRevisionFixture()
+            assert(
+                findSubject(real)('subjectSnapshotlessRevision') !== undefined,
+                ['the subject must really be listed when its revision resolves', real])
+            assertEq(findSubject(stubbed)('subjectSnapshotlessRevision'), undefined)
+            assert(findSubject(stubbed)('subjectControl') !== undefined, stubbed)
+            assert(findSubject(stubbed)('subjectUndecodableSnapshotRef') === undefined, stubbed)
+        },
+        /**
+         * The second narrow: a `snapshot` that is PRESENT and does not decode
+         * as cBase32 ({@link undecodableSnapshotRef}). A distinct case from
+         * the one above and from `absentSnapshotSkippedAndTheRestSurvive`,
+         * whose reference decodes fine and names a blob nothing wrote — three
+         * different points on the same path, each skipping the row.
+         *
+         * Same control shape: the subject is listed through the real `Evo`,
+         * and `subjectControl` survives the skip.
+         */
+        anUndecodableSnapshotReferenceIsSkippedNotCrashedOn: () => {
+            const { real, stubbed } = buildStubbedRevisionFixture()
+            assert(
+                findSubject(real)('subjectUndecodableSnapshotRef') !== undefined,
+                ['the subject must really be listed when its revision resolves', real])
+            assertEq(findSubject(stubbed)('subjectUndecodableSnapshotRef'), undefined)
+            assert(findSubject(stubbed)('subjectControl') !== undefined, stubbed)
+        },
+        /**
+         * The handler's own error renderer. `entryFor` recovers per (subject,
+         * head) pair, so nothing a single document does can reach it — only a
+         * failure of `evo.list`/`evo.head` themselves, which the shipped
+         * `Evo` serves from a memory cache and so cannot fail against a
+         * working runner.
+         *
+         * What the leaf pins is the module header's transport claim: such a
+         * failure becomes an `isError: true` RESULT naming the tool, never a
+         * failure the JSON-RPC transport has to carry. Both halves are
+         * asserted — the tool's own prefix, and upstream's rendering of the
+         * channel value, which is the part that tells a caller WHAT failed.
+         */
+        aListFailureBecomesAnErrorResultNamingTheTool: () => {
+            const { listFailure } = buildStubbedRevisionFixture()
+            assertEq(listFailure.isError, true)
+            const item = listFailure.content[0]
+            assert(item !== undefined && item.type === 'text', ['expected a text content item', listFailure])
+            assertEq(item.text, 'finance_documents_list failed: operation not implemented: evo.list')
         },
     },
 }

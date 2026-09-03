@@ -283,8 +283,18 @@ export const form8959PartIII = taxParamSet => input => {
     const line14 = 0n
     // 15. The SAME per-status threshold as lines 5 and 9.
     const line15 = additionalMedicareTaxThresholdCents(taxParamSet)(status)
-    // 16. "Subtract line 15 from line 14. If zero or less, enter -0-."
-    const line16 = line14 > line15 ? line14 - line15 : 0n
+    // 16. "Subtract line 15 from line 14. If zero or less, enter -0-." The
+    //     printed subtraction is asserted rather than branched. Line 14 above
+    //     is structurally zero -- no stored W-2 has a box 14 to read -- and
+    //     line 15 is a positive §3101(b)(2) threshold, so "zero or less" is
+    //     the only answer the page can give here and the subtracting arm was
+    //     reachable by nothing. The day `fjs/document/w2` grows a box 14, this
+    //     assert fires and says exactly which line stopped being a zero.
+    assert(
+        line14 <= line15,
+        ['Form 8959 line 14 is structurally zero, so it cannot exceed the line 15 threshold',
+            line14, line15])
+    const line16 = 0n
     // 17. "Additional Medicare Tax on railroad retirement (RRTA)
     //     compensation. Multiply line 16 by 0.9% (0.009)."
     const line17 = basisPointsOfCents(line16)(taxParamSet.additionalMedicareTaxRates.additionalRateBasisPoints)
@@ -581,10 +591,14 @@ export const proof = {
             }
         },
         // The per-status threshold really is per status, against hand-typed
-        // cents. Same wages, five statuses, five different line 6s -- so a
+        // cents. Same wages, five statuses, THREE distinct line 6s -- so a
         // lookup that read one status's figure for another cannot pass.
-        // $260,000.00 is above three thresholds and below MFJ's, which is
-        // what makes the row values differ rather than merely exist.
+        // $260,000.00 is above ALL FIVE thresholds, MFJ's $250,000 included
+        // (which is why line 6 below is a plain subtraction and not a floored
+        // one), and it is above them by three different amounts, which is what
+        // makes the rows differ rather than merely exist. This comment said
+        // "above three thresholds and below MFJ's" until 2026-09-03, which the
+        // $10,000.00 of MFJ excess hand-typed eight lines down contradicts.
         everyStatusReadsItsOwnThreshold: () => {
             for (const status of everyStatus) {
                 const result = run(status)(26000000n)(0n)
@@ -593,9 +607,15 @@ export const proof = {
                     thresholdCents[status],
                     ['line 5 must be this status\'s own §3101(b)(2) threshold', status, result.line5],
                 )
+                // Asserted, not branched: a `? :` repeating the printed "if
+                // zero or less" against a fixture chosen to clear every
+                // threshold has an arm no row of this loop can reach.
+                assert(
+                    26000000n > thresholdCents[status],
+                    ['the fixture must exceed every threshold', status, thresholdCents[status]])
                 assertEq(
                     result.line6,
-                    26000000n > thresholdCents[status] ? 26000000n - thresholdCents[status] : 0n,
+                    26000000n - thresholdCents[status],
                     ['line 6 must be the excess over this status\'s own threshold', status],
                 )
             }

@@ -106,7 +106,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 import { of, halfUp } from '../types/rational/module.f.js'
 
@@ -619,8 +619,16 @@ export const form8829 = input => {
                 + `prints. Nothing reaches ${destination}`,
         }
     }
+    // ONE narrowing, not two. This read `monthPercent ?? laterYear…`, and that
+    // fallback was unreachable: the `if` directly above returns for exactly the
+    // case it covered, so a home first used THIS year could never silently take
+    // the flat 39-year rate. Stated as an `assert` instead, so the invariant is
+    // written down rather than guarded by an arm no input can take — and so a
+    // month row deleted from the table cannot quietly become 2.564%.
     const line41PercentThousandths = firstYear === taxYear
-        ? monthPercent ?? laterYearDepreciationPercentageThousandths
+        ? assertNotNullish(
+            monthPercent,
+            ['the twelfth-row check above already returned for an unknown month', first])
         : laterYearDepreciationPercentageThousandths
     // Lines 37 through 40. i8829: line 37 is "the cost or other basis of your
     // home (including land), or, if less, the fair market value of your home
@@ -1314,6 +1322,31 @@ export const proof = {
             assert(
                 message.includes('YYYY-MM') && message.includes('mid-month'),
                 ['the refusal must name the shape and the convention that explains it', message])
+        },
+        // `YYYY-MM` is a SHAPE, not a calendar: the regex matches any two
+        // digits, so `2025-13` reaches the table lookup and misses it. This is
+        // the only path that can miss it — a home first used in an EARLIER
+        // year takes the flat row and never reads a month at all — which is
+        // why the check is written with `firstYear === taxYear` beside it.
+        aThirteenthMonthIsRefusedNamingTheTwelvePrintedRows: () => {
+            const message = expectRefusal(form8829(inputOf({
+                ...tenPercentHome, firstUsedForBusiness: '2025-13',
+            })(6000000n)))
+            assert(
+                message.includes('"13"') && message.includes('twelve rows'),
+                ['the refusal must quote the month it could not find and say how many exist',
+                    message])
+            assertNamesTheDestination(message)
+        },
+        // THE CONTROL: the same impossible month in an EARLIER year computes,
+        // because the flat row does not read the month. Without this, a check
+        // widened to refuse every unrecognised month would look identical.
+        aThirteenthMonthInAnEarlierYearStillTakesTheFlatRow: () => {
+            const result = expectOk(form8829(inputOf({
+                ...tenPercentHome, firstUsedForBusiness: '2019-13',
+            })(6000000n)))
+            assertEq(result.line41PercentThousandths, 2564n, 'the flat 2.564% row')
+            assertEq(result.line42Cents, 51280n, '$512.80')
         },
         aHomeFirstUsedAfterTheTaxYearIsRefused: () => {
             const message = expectRefusal(form8829(inputOf({

@@ -501,7 +501,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { kindVocabulary } from '../profile/module.f.js'
 import { refuses } from '../../refuses/module.f.js'
 
@@ -2557,47 +2557,66 @@ export const proof = {
                 'Schedule 1 line 7 has no row in this block because its kind is modeled',
             )
             // ★ **A kind that MOVED to `modeledKinds` is looked up in the
-            // OTHER table rather than skipped**, and where it has no row in
-            // either it must be NAMED here, by hand, and counted.
+            // OTHER table rather than skipped**, and a kind with no row in
+            // either table fails this leaf on the spot.
             //
             // This loop read `if (row === undefined) { assert(modeled); continue }`
-            // until this commit — the coverage-shrinks-with-the-list shape
+            // until 2026-08-18 — the coverage-shrinks-with-the-list shape
             // AGENTS.md names. Every kind that started computing silently
             // stopped having its printed line checked, so the leaf's coverage
             // was a function of how much of Schedule 1 Part I the engine had
-            // got round to modelling. FIVE of these thirty-eight are modeled
-            // today; four more reclassifications and this leaf would have been
-            // checking thirty rows while still claiming thirty-eight.
+            // got round to modelling. SIX of these thirty-eight are modeled
+            // today, and every reclassification takes another one out of the
+            // refusal table.
             //
             // The treatment is `theFiveScheduleEKindsNameTheirOwnPrintedPart`'s
             // below, which the Schedule E Part I wiring rewrote for exactly
-            // this reason, plus AGENTS.md's hand-typed-count idiom for the
-            // case that leaf does not have: a modeled kind with no remedy row
-            // at all, which cannot be checked and must therefore be listed.
-            /** Modeled kinds in this block carrying NO row in either table.
-             * Empty today: all five of Part I's modeled kinds carry a
-             * {@link modeledKindDeclarationRemedies} row, so all thirty-eight
-             * printed-line claims are checked. A fifth reclassification
-             * without a remedy row fails the `assert` inside the loop rather
-             * than quietly reducing `checkedRows`.
-             * @type {readonly string[]} */
-            const modeledWithNoRow = []
-            assertEq(modeledWithNoRow.length, 0, 'every modeled Schedule 1 Part I kind still carries a row')
-            for (const kind of modeledWithNoRow) {
-                assert(modeledKindNames.includes(kind), ['listed as modeled but is not', kind])
-            }
+            // this reason: two lookups, then one narrowing `assert`.
+            //
+            // That fix arrived here carrying a hand-typed `modeledWithNoRow`
+            // escape hatch — a list of modeled kinds with no remedy row at
+            // all, which could be NAMED rather than checked — and the list
+            // was born empty, asserted empty on the line below itself, and
+            // stayed empty. Its `for` and the `if (row === undefined)` arm it
+            // guarded were therefore both unreachable by construction, which
+            // is how this leaf held eight uncovered lines while every printed
+            // line it claims to check was in fact checked.
+            //
+            // Deleted on 2026-09-03 rather than exercised, and the claim it
+            // carried in its docstring — "all FIVE of Part I's modeled kinds
+            // carry a `modeledKindDeclarationRemedies` row" — moved from a
+            // comment into the loop, where `modeledRows` now CHECKS it
+            // against the two tables instead of asserting the length of a
+            // literal `[]` against `0`.
+            //
+            // **The count was already wrong when it moved.** Six of these
+            // thirty-eight are modeled, not five: `otherGainsOrLosses`
+            // (Schedule 1 line 4, Form 4797) started computing and neither
+            // this paragraph nor the hatch's docstring noticed, because
+            // `assertEq([].length, 0)` cannot notice anything. That is the
+            // whole argument for turning a described invariant into a
+            // checked one — and the honest statement the hatch obscured is
+            // that a modeled Part I kind with no remedy row is a defect
+            // rather than a case to wave through, which is what both
+            // asserts below now say. The ESCAPE HATCH is gone; the ★ rule
+            // it hung off has not moved.
             let checkedRows = 0
+            let modeledRows = 0
             for (const [kind, line] of expected) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
                     ?? modeledKindDeclarationRemedies.find(r => r.kind === kind)
-                if (row === undefined) {
-                    assert(
-                        modeledWithNoRow.includes(kind) && modeledKindNames.includes(kind),
-                        ['a Schedule 1 Part I kind is neither refused, described, nor named here as modeled', kind],
-                    )
-                    continue
-                }
+                assert(
+                    row !== undefined,
+                    ['a Schedule 1 Part I kind is neither refused nor described', kind],
+                )
                 checkedRows += 1
+                if (modeledKindNames.includes(kind)) {
+                    assert(
+                        modeledKindDeclarationRemedies.some(r => r.kind === kind),
+                        ['a modeled Schedule 1 Part I kind carries no declaration remedy', kind],
+                    )
+                    modeledRows += 1
+                }
                 // The trailing space is what stops `Schedule 1 line 1` from
                 // matching `Schedule 1 line 12`, and `line 8` from matching
                 // `line 8a-8z`.
@@ -2627,13 +2646,34 @@ export const proof = {
                     ['a Schedule 1 Part I row names Part II\'s destination', kind, row.line],
                 )
             }
-            // HAND-TYPED, and the whole point of the rewrite above: the number
-            // of printed-line claims this leaf actually checked. `38 - 0`.
-            // A kind quietly leaving `unmodeledKindRefusals` for
-            // `modeledKinds` without a remedy row moves this number, and the
-            // count is what says so — the loop alone would happily iterate one
-            // row fewer.
+            // HAND-TYPED: the number of printed-line claims this leaf
+            // actually checked.
+            //
+            // A missing remedy row is the `assert` above's job now, not this
+            // count's — that is what deleting the escape hatch bought, and
+            // the sentence that used to stand here ("the count is what says
+            // so — the loop alone would happily iterate one row fewer")
+            // stopped being true when the loop lost its `continue`. What the
+            // count still says, and the loop cannot, is that the body ran
+            // once per row: a `continue`, a `filter`, or an early `break`
+            // reintroduced above this line moves the number and fails here
+            // rather than quietly checking a shorter list, which is the
+            // regression this leaf has already had once.
             assertEq(checkedRows, 38, 'all thirty-eight printed-line claims must be checked, not skipped')
+            // HAND-TYPED, and hand-counted off `modeledKinds`:
+            // `businessIncomeOrLoss` (line 3), `otherGainsOrLosses` (line 4),
+            // the three Schedule E kinds that reach line 5, and
+            // `farmIncomeOrLoss` (line 6).
+            //
+            // This is the half of the deleted escape hatch worth keeping,
+            // and it is load-bearing in both directions: a reclassification
+            // arriving WITHOUT a remedy row trips the `assert` inside the
+            // loop, and one arriving WITH a remedy row trips this number —
+            // which is the moment the paragraph above goes stale. It was
+            // stale, at five, when this line was written.
+            assertEq(modeledRows, 6,
+                'six of Part I\'s thirty-eight kinds compute today, and every one of them '
+                + 'must carry a declaration remedy rather than be skipped')
         },
         // TAX-35's split, stated INDEPENDENTLY of the table it split, and it
         // is the half the leaf above cannot state: five kinds share ONE
@@ -4878,13 +4918,22 @@ export const proof = {
             ]
             assertEq(expectations.length, 3, 'three rows, hand-typed')
             for (const [kind, mustSay, mustNotSay] of expectations) {
-                const unmodeled = unmodeledKindRefusals.find(row => row.kind === kind)
-                const modeled = modeledKindDeclarationRemedies.find(row => row.kind === kind)
-                const remedy = unmodeled !== undefined
-                    ? unmodeled.remedy
-                    : modeled !== undefined ? modeled.remedy : undefined
-                assert(remedy !== undefined, ['every named kind must still have a row', kind])
-                assert(remedy !== undefined, ['no row', kind])
+                // Both tables, then ONE narrowing assert — the shape
+                // `theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine`
+                // and `theFiveScheduleEKindsNameTheirOwnPrintedPart` use.
+                //
+                // This read as a two-level ternary falling through to
+                // `undefined`, followed by the SAME `assert(remedy !==
+                // undefined, ...)` written out twice. The fall-through was
+                // dead — the assert on the next line refused it — and it was
+                // the last uncovered branch in this file that the coverage
+                // summary's `uncovered lines` column could not show, because
+                // the line it lives on is reached on every iteration.
+                const remedy = assertNotNullish(
+                    unmodeledKindRefusals.find(row => row.kind === kind)
+                        ?? modeledKindDeclarationRemedies.find(row => row.kind === kind),
+                    ['every named kind must still have a row', kind],
+                ).remedy
                 for (const phrase of mustSay) {
                     assert(remedy.includes(phrase), ['the remedy must say this', kind, phrase])
                 }

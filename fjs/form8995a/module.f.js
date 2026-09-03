@@ -796,9 +796,21 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
             assertedPriorYearLossCarryforward, taxableIncomeBeforeQbiCents, netCapitalGainCents,
             qualifiedReitDividendsCents,
         })
-        if (outcome.kind === 'error') {
-            return outcome
-        }
+        // ONE narrowing, and an `assert` rather than a second refusal path,
+        // because that path CANNOT be taken. `simplifiedComputation` refuses
+        // for exactly two reasons and this router has already ruled out both:
+        // its §199A(c)(2) carryforward guard is the very check run at the top
+        // of this function, with the same two arguments, and its threshold
+        // guard cannot fire inside the branch that IS the at-or-below case.
+        // `tsc` still demands the union be narrowed before `.form` is read, so
+        // the narrowing states the invariant instead of returning through an
+        // arm no legal input reaches. The delegate's own guards stay live —
+        // one rule, one place — and if either ever does fire, this says so
+        // loudly rather than quietly forwarding a message about Form 8995 to a
+        // reader who asked for Form 8995-A.
+        assert(
+            outcome.kind === 'ok',
+            ['Form 8995 refused a return the router had already cleared', outcome])
         return {
             kind: 'ok',
             deductionCents: outcome.form.line15,
@@ -1861,6 +1873,61 @@ export const proof = {
         assertEq(form.line39, form.line37 + form.line38, 'line 39 adds the DPAD')
         assertEq(form.line15, form.line13 - form.line14, 'line 15 subtracts the patron reduction')
         assert(form.line27 > 0n, 'the control: line 27 is a real amount, so the sums are observable')
+        // …and the OTHER side of both floors, which the zeros above cannot
+        // distinguish from unreachable lines. Nothing in the product path can
+        // make line 28 negative today — line 29 is a structural zero and box 5
+        // is a dividend — so the printed-form function is called DIRECTLY with
+        // the hand-built figure, exactly as `fjs/form8995`'s own line 17 leaf
+        // is, and for the same reason: the arithmetic asserted is the page's,
+        // not a claim about what the engine can produce.
+        const loss = directly({
+            qualifiedBusinessIncomeCents: 5000000n,
+            taxableIncomeBeforeQbiCents: 12000000n,
+            qualifiedReitDividendsCents: -250000n,
+        })
+        assertEq(loss.line28, -250000n, 'printed line 28 carries the -$2,500.00')
+        assertEq(loss.line30, 0n, 'line 30 floors it at -0-')
+        assertEq(loss.line31, 0n, 'so the REIT component is zero, never negative')
+        assertEq(loss.line40, -250000n, 'and line 40 hands the whole -$2,500.00 to next year')
+        // The two components are ADDED on line 32, never netted, so the REIT
+        // loss must leave the business deduction exactly where it was.
+        const noLoss = directly({
+            qualifiedBusinessIncomeCents: 5000000n,
+            taxableIncomeBeforeQbiCents: 12000000n,
+        })
+        assert(noLoss.line39 > 0n, ['the control must have a real deduction', noLoss.line39])
+        assertEq(loss.line39, noLoss.line39, 'the REIT loss does not reduce line 39')
+    },
+    // ── Line 35's floor: net capital gain can swallow the whole limitation ───
+    //
+    // §199A(a)'s income limitation is 20% of taxable income MINUS net capital
+    // gain, and a taxpayer whose income is mostly long-term gain can have a
+    // line 34 larger than line 33. The printed floor ("if zero or less, enter
+    // -0-") is what stops line 36 from going negative and line 37 — "the
+    // SMALLER of line 32 or line 36" — from handing back a NEGATIVE deduction
+    // that would raise the tax.
+    theIncomeLimitationFloorsAtZeroWhenNetCapitalGainExceedsTaxableIncome: () => {
+        const swallowed = directly({
+            qualifiedBusinessIncomeCents: 5000000n,
+            taxableIncomeBeforeQbiCents: 12000000n,
+            netCapitalGainCents: 15000000n,
+        })
+        assertEq(swallowed.line33, 12000000n, 'line 33 = $120,000.00')
+        assertEq(swallowed.line34, 15000000n, 'line 34 = $150,000.00, the larger of the two')
+        assertEq(swallowed.line35, 0n, 'line 35 = -0-, never -$30,000.00')
+        assertEq(swallowed.line36, 0n, 'line 36 = $0.00, never -$6,000.00')
+        assertEq(swallowed.line37, 0n, 'line 37 = $0.00, never -$6,000.00')
+        assertEq(swallowed.line39, 0n, 'and 1040 line 13a is $0.00, never a negative deduction')
+        // THE CONTROL, the same return with no capital gain at all: the
+        // limitation does not bind and a real deduction survives, so the zeros
+        // above are the floor rather than a page that computes nothing.
+        const ordinary = directly({
+            qualifiedBusinessIncomeCents: 5000000n,
+            taxableIncomeBeforeQbiCents: 12000000n,
+        })
+        assertEq(ordinary.line35, 12000000n, 'line 35 = the whole $120,000.00')
+        assertEq(ordinary.line36, 2400000n, 'line 36 = $24,000.00 = 20% of it')
+        assertEq(ordinary.line39, 1000000n, 'line 39 = $10,000.00 = 20% of the $50,000.00 of QBI')
     },
     // Hand-typed field-count guard, this project's mutation-gate idiom: a line
     // dropped from the returned record fails here even though every leaf above

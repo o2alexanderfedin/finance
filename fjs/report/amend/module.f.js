@@ -485,9 +485,17 @@ const decodableButAbsent = 'aaaaaaaa'
  * `'not-a-hash'` is outside the cBase32 alphabet and does not decode;
  * `'aaaaaaaa'` decodes perfectly well and simply addresses nothing, which
  * are two different failures and reach two different messages.
+ *
+ * `semanticallyInvalidRun` is the one blob here that passes rtti and fails
+ * `fjs/run`'s own `checkReferences` — a whitespace-only `programHash`. That
+ * is the SECOND shape of `RunError`: `validateRun`'s error arm is
+ * `ValidationError | string`, and every other row below produces the
+ * structural half. It is what makes {@link runErrorMessage}'s two arms two
+ * arms rather than one.
  * @type {(cas: Cas<FileCasOperation>) => Effect<FileCasOperation, {
  *   readonly goodRun: string,
  *   readonly notARunRecord: string,
+ *   readonly semanticallyInvalidRun: string,
  *   readonly runToUndecodableResult: string,
  *   readonly runToAbsentResult: string,
  *   readonly runToUnshapedResult: string,
@@ -500,12 +508,16 @@ const seedUnreadableFixtures = cas => {
         step(seedText(cas)(JSON.stringify(run(resultHash))), goodRun =>
             // Schema-shaped enough to be JSON, not enough to be a `Run`.
             step(seedText(cas)('{"dialect":"vnd.fjs.run"}'), notARunRecord =>
-                step(seedText(cas)(JSON.stringify(run(notAnAddress))), runToUndecodableResult =>
-                    step(seedText(cas)(JSON.stringify(run(decodableButAbsent))), runToAbsentResult =>
-                        // `value` is a number here, so rtti refuses the record.
-                        step(seedText(cas)('{"interest":{"value":1000,"sources":[],"rule":"r"}}'), unshaped =>
-                            step(seedText(cas)(JSON.stringify(run(unshaped))), runToUnshapedResult =>
-                                pure(ok({ goodRun, notARunRecord, runToUndecodableResult, runToAbsentResult, runToUnshapedResult })))))))))
+                // Every field rtti asks for, and a `programHash` no run
+                // could have had: `checkReferences` refuses it with a plain
+                // string rather than a `ValidationError`.
+                step(seedText(cas)(JSON.stringify(okRun('   ')([])(resultHash))), semanticallyInvalidRun =>
+                    step(seedText(cas)(JSON.stringify(run(notAnAddress))), runToUndecodableResult =>
+                        step(seedText(cas)(JSON.stringify(run(decodableButAbsent))), runToAbsentResult =>
+                            // `value` is a number here, so rtti refuses the record.
+                            step(seedText(cas)('{"interest":{"value":1000,"sources":[],"rule":"r"}}'), unshaped =>
+                                step(seedText(cas)(JSON.stringify(run(unshaped))), runToUnshapedResult =>
+                                    pure(ok({ goodRun, notARunRecord, semanticallyInvalidRun, runToUndecodableResult, runToAbsentResult, runToUnshapedResult }))))))))))
 }
 
 export const proof = {
@@ -720,32 +732,83 @@ export const proof = {
         const [seeded, seedResult] = virtual(emptyState)(seedUnreadableFixtures(cas))
         assert(seedResult[0] === 'ok', ['fixture seeding must succeed', seedResult])
         const h = seedResult[1]
-        /** @type {readonly (readonly [string, string, string, readonly string[]])[]} */
+        // `mustSay`/`mustNotSay`, the fifth column being what tells the two
+        // SIDES apart: every message here shares a tail, so a row that only
+        // asserted the tail would pass against a handler that named the
+        // wrong side. `[]` where a row has nothing the message must not say.
+        /** @type {readonly (readonly [string, string, string, readonly string[], readonly string[]])[]} */
         const cases = [
             ['run A’s hash is not an address',
-                notAnAddress, h.goodRun, ['could not read run A', 'not a decodable run hash', notAnAddress]],
+                notAnAddress, h.goodRun,
+                ['could not read run A', 'not a decodable run hash', notAnAddress],
+                ['could not read run B']],
             ['run B’s hash is not an address',
-                h.goodRun, notAnAddress, ['could not read run B', 'not a decodable run hash', notAnAddress]],
+                h.goodRun, notAnAddress,
+                ['could not read run B', 'not a decodable run hash', notAnAddress],
+                ['could not read run A']],
             ['run A’s hash addresses nothing',
-                decodableButAbsent, h.goodRun, ['could not read run A', 'run record not found', decodableButAbsent]],
+                decodableButAbsent, h.goodRun,
+                ['could not read run A', 'run record not found', decodableButAbsent],
+                ['could not read run B']],
             ['run B’s hash addresses nothing',
-                h.goodRun, decodableButAbsent, ['could not read run B', 'run record not found', decodableButAbsent]],
+                h.goodRun, decodableButAbsent,
+                ['could not read run B', 'run record not found', decodableButAbsent],
+                ['could not read run A']],
             ['the blob at run A’s hash is not a run record',
-                h.notARunRecord, h.goodRun, ['could not read run A', 'programHash']],
-            ['the result hash inside a run record is not an address',
-                h.runToUndecodableResult, h.goodRun, ['stored result is invalid', 'not a decodable result hash']],
-            ['the result hash inside a run record addresses nothing',
-                h.runToAbsentResult, h.goodRun, ['stored result is invalid', 'result blob not found']],
-            ['the blob at a run’s result hash is not ReportLine-shaped',
-                h.runToUnshapedResult, h.goodRun, ['stored result is invalid', 'not a ReportLine-shaped record']],
+                h.notARunRecord, h.goodRun, ['could not read run A', 'programHash'], []],
+            // The `RunError` string arm. Every other run-record row here
+            // fails rtti and reaches `runErrorMessage`'s `ValidationError`
+            // arm, which appends `(at <path>)`; a `checkReferences` refusal
+            // is already a finished sentence and must arrive VERBATIM, not
+            // wrapped in a path it does not have. `at ` is asserted absent
+            // for exactly that reason.
+            ['the blob at run A’s hash is a run record no run could have produced',
+                h.semanticallyInvalidRun, h.goodRun,
+                ['could not read run A', 'programHash must not be empty or whitespace-only'],
+                ['(at ']],
+            ['the result hash inside run A’s record is not an address',
+                h.runToUndecodableResult, h.goodRun,
+                ['run A\'s (', 'stored result is invalid', 'not a decodable result hash'], []],
+            ['the result hash inside run A’s record addresses nothing',
+                h.runToAbsentResult, h.goodRun,
+                ['run A\'s (', 'stored result is invalid', 'result blob not found'], []],
+            ['the blob at run A’s result hash is not ReportLine-shaped',
+                h.runToUnshapedResult, h.goodRun,
+                ['run A\'s (', 'stored result is invalid', 'not a ReportLine-shaped record'], []],
+            // The three rows above, mirrored onto side B. Reading the second
+            // result blob is a SEPARATE `catchStep` with its own message, and
+            // none of the rows above ever entered it: a diff that read side A
+            // strictly and side B loosely would have carried a corrupted
+            // amended return into Column C without saying so. Each row
+            // asserts the `run B's (` prefix, so a handler that named the
+            // wrong side would fail here rather than pass on the shared
+            // `stored result is invalid` tail.
+            ['the result hash inside run B’s record is not an address',
+                h.goodRun, h.runToUndecodableResult,
+                ['run B\'s (', 'stored result is invalid', 'not a decodable result hash'],
+                ['run A\'s (']],
+            ['the result hash inside run B’s record addresses nothing',
+                h.goodRun, h.runToAbsentResult,
+                ['run B\'s (', 'stored result is invalid', 'result blob not found'],
+                ['run A\'s (']],
+            ['the blob at run B’s result hash is not ReportLine-shaped',
+                h.goodRun, h.runToUnshapedResult,
+                ['run B\'s (', 'stored result is invalid', 'not a ReportLine-shaped record'],
+                ['run A\'s (']],
         ]
-        assertEq(cases.length, 8, 'both hash positions, both failure kinds, at both levels')
-        for (const [label, runHashA, runHashB, fragments] of cases) {
+        assertEq(cases.length, 12,
+            'both hash positions, both failure kinds, at both levels — plus the '
+            + 'semantic run-record refusal, and the result-blob level mirrored onto side B')
+        for (const [label, runHashA, runHashB, mustSay, mustNotSay] of cases) {
             const [, result] = virtual(seeded)(amendmentDiff(cas)(false)(runHashA)(runHashB))
             assertEq(result[0], 'error', label)
             assert(result[0] === 'error', [label, result])
-            for (const fragment of fragments) {
+            for (const fragment of mustSay) {
                 assert(result[1].includes(fragment), [label, fragment, result[1]])
+            }
+            for (const fragment of mustNotSay) {
+                assertEq(result[1].includes(fragment), false,
+                    ['the refusal must NOT say this', label, fragment, result[1]])
             }
         }
     },

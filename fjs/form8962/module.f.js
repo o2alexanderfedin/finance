@@ -403,13 +403,14 @@ export const form8962 = taxParamSet => input => {
         socialSecurityBenefitsCents, taxableSocialSecurityBenefitsCents,
         marketplaceStatements,
     } = input
-    const first = marketplaceStatements[0]
-    assert(
-        first !== undefined,
+    // ONE narrowing, not two. The `assert` here was followed by an
+    // `if (first === undefined) throw`, which repeated the condition the
+    // assertion had just established and could therefore never run — a second
+    // refusal message that no reader would ever see. `assertNotNullish` is the
+    // shipped idiom for narrowing an indexed lookup to its value.
+    const first = assertNotNullish(
+        marketplaceStatements[0],
         'form8962 is called only for a return holding a Form 1095-A; see its own docstring')
-    if (first === undefined) {
-        throw 'form8962 requires at least one Form 1095-A'
-    }
     // R1 — i8962's rules for combining several Forms 1095-A are per-situation
     // and contradictory across situations: for two policies in the SAME state
     // the column B premium is taken from ONE form and NOT added, while for
@@ -1033,6 +1034,30 @@ export const proof = {
                 }))),
                 false)
         },
+        // **THE MONTH COUNT ITSELF**, at the exported boundary rather than
+        // through `form8962`, which always hands over twelve rows because it
+        // builds them from `everyMonth`. i8962's "fewer than 12 months ...
+        // check 'No'" is the rule, and a caller that passes a truncated list
+        // must get `false` from the COUNT even when every row it did pass is
+        // uniform — otherwise eleven identical months would take the annual
+        // path and claim a twelfth month's premium that was never enrolled.
+        //
+        // All three arrays are built from the SAME uniform statement, so the
+        // only thing that differs between the answers is the length.
+        fewerThanTwelveRowsIsNotTheAnnualPathEvenWhenEveryRowMatches: () => {
+            const uniform = everyMonth.map(monthlyAmountsOf(
+                uniformStatement('1000.00')('900.00')('400.00')))
+            assertEq(uniform.length, 12, 'the control set really is the full twelve')
+            assertEq(annualCalculationApplies(uniform), true, 'twelve uniform months: "Yes"')
+            assertEq(
+                annualCalculationApplies(uniform.slice(0, 11)),
+                false,
+                'eleven of the very same months: "No", on the count alone')
+            assertEq(
+                annualCalculationApplies([]),
+                false,
+                'and no months at all is "No", never a vacuous "every"')
+        },
     },
     // ── The two arms, worked end to end ─────────────────────────────────────
     //
@@ -1358,6 +1383,27 @@ export const proof = {
                 ...base, socialSecurityBenefitsCents: 100000n, taxableSocialSecurityBenefitsCents: 500000n,
             }))
             assertEq(result.line3HouseholdIncomeCents, 3000000n, 'the AGI, unreduced')
+        },
+        // **LINE 3'S OWN FLOOR**, which the add-back floor above cannot reach:
+        // "If the total is less than zero, enter -0-." A Schedule C loss makes
+        // adjusted gross income negative, and household income then floors at
+        // zero rather than carrying the loss into the poverty-line ratio.
+        //
+        // The refusal message is what makes the produced figure readable: it
+        // PRINTS line 3 and line 5. Unfloored, a -$5,000.00 household income
+        // would print as `-5000.00` at `-33%`, and the assertions below are
+        // written so that either would fail.
+        aNegativeModifiedAdjustedGrossIncomeFloorsHouseholdIncomeAtZero: () => {
+            const base = singleFilerWith('0.00')(uniformStatement('800.00')('850.00')('400.00'))
+            const message = expectRefusal(form8962(taxParams2025)({
+                ...base, adjustedGrossIncomeCents: -500000n,
+            }))
+            assert(
+                message.includes('household income of 0.00 is 0% of the'),
+                ['line 3 must print as -0- and line 5 as 0%', message])
+            assert(
+                !message.includes('-5000.00') && !message.includes('-33%'),
+                ['the loss must not reach line 3 or the ratio', message])
         },
         // The tax family size drives line 4, and one more dependent moves the
         // poverty line by a whole increment. Proven WITH the line 2b

@@ -163,7 +163,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, halfUp } from '../types/rational/module.f.js'
 import { centsFromString } from '../exact/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
@@ -314,13 +314,18 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  */
 export const saversCreditRatePercent = taxParamSet => status => agiCents => {
     const bands = taxParamSet.retirementSavingsContributionsCredit.rateBands[status]
-    const band = bands.find(candidate =>
-        candidate.ceiling === undefined || agiCents <= centsFromString(candidate.ceiling))
-    assert(
-        band !== undefined,
+    // ONE narrowing, not two. This was an `assert` followed by
+    // `band === undefined ? 0 : band.ratePercent`, and that `0` was a second
+    // fallback rate written in the very function whose docstring says none is
+    // written anywhere — unreachable, because the `assert` above it had
+    // already established the negation. `assertNotNullish` is the shipped
+    // idiom for narrowing a possibly-absent lookup to its value.
+    const band = assertNotNullish(
+        bands.find(candidate =>
+            candidate.ceiling === undefined || agiCents <= centsFromString(candidate.ceiling)),
         ['every stored rate band list must end with an open-topped band', status, agiCents],
     )
-    return band === undefined ? 0 : band.ratePercent
+    return band.ratePercent
 }
 
 // ── Form 8880 itself ─────────────────────────────────────────────────────────
@@ -944,9 +949,11 @@ export const proof = {
             9,
             'kind, columns, lines 7/8/9/10/11/12, and the credit limit worksheet',
         )
-        const column = result.columns[0]
-        assert(column !== undefined, ['expected one column', result.columns])
-        assertEq(Object.keys(column ?? {}).length, 7, 'the individual plus printed lines 1 through 6')
+        // `assertNotNullish`, not `assert` plus `?? {}`: the fallback object
+        // could never be built once the assertion above had passed, so it was
+        // a shape this count had never actually been taken over.
+        const column = assertNotNullish(result.columns[0], ['expected one column', result.columns])
+        assertEq(Object.keys(column).length, 7, 'the individual plus printed lines 1 through 6')
         assertEq(Object.keys(result.creditLimitWorksheet).length, 3, 'the worksheet has three lines')
     },
 }

@@ -107,8 +107,14 @@ export const casAddRefusal = args => {
     if (typeof content !== 'string') { return undefined }
     const bytes = storedBytes(content, args['type'])
     if (bytes === undefined) { return undefined }
+    // `utf8ToString` is total — `(msbV: Utf8) => string`, never `null` — so
+    // bytes that are not valid UTF-8 are decoded lossily rather than
+    // rejected here. A `if (text === null) { return undefined }` used to sit
+    // on this line and could not fire: it read as the guard for the
+    // not-text case, and the not-text case is actually declined one line
+    // below, where the lossy text fails to parse as JSON. See
+    // `whatThisCheckDeclinesToJudge`'s own not-UTF-8 row, which pins that.
     const text = utf8ToString(bytes)
-    if (text === null) { return undefined }
     const parsed = jsonParse(text)
     if (parsed[0] === 'error') { return undefined }
     const entry = claimedEntry(parsed[1])
@@ -177,6 +183,21 @@ const asBase64 = value => assertNotNullish(
 /** Base64 for the two bytes `FF FE`, which no UTF-8 decoder accepts. */
 const base64OfNonUtf8Bytes = '//4='
 
+/**
+ * Base64 for the 35 bytes
+ * `{"dialect":"vnd.fjs.w2","note":"<FF>"}` — a document that CLAIMS
+ * `vnd.fjs.w2` and does not satisfy it (every required box is missing),
+ * carrying a raw `FF` byte inside the `note` string so the payload as a
+ * whole is **not valid UTF-8**.
+ *
+ * Hand-typed rather than built by {@link asBase64}, and that is the point:
+ * `tryUtf8` takes a JS string and can only ever produce well-formed bytes,
+ * so a byte sequence no encoder would emit has to be written down. The
+ * literal is the transcription of those 35 bytes and nothing reads it back
+ * from the code under test.
+ */
+const base64OfNonUtf8W2Claim = 'eyJkaWFsZWN0Ijoidm5kLmZqcy53MiIsIm5vdGUiOiL/In0='
+
 export const proof = {
     /**
      * `cas_add` accepts `type: "base64"`, so the check has to decode the same
@@ -198,6 +219,34 @@ export const proof = {
         }
     },
     /**
+     * Bytes that are **not valid UTF-8** buy no exemption from the dialect
+     * check: {@link base64OfNonUtf8W2Claim} still claims `vnd.fjs.w2`, still
+     * fails it, and is still refused — naming the dialect, exactly as a
+     * well-encoded claim is.
+     *
+     * This is the row the deleted `if (text === null) { return undefined }`
+     * in {@link casAddRefusal} would have inverted. That line read as the
+     * guard for "these bytes are not text", and if `utf8ToString` had ever
+     * answered `null` it would have SKIPPED the check for precisely the
+     * payloads a client controls byte-for-byte — a malformed W2 stored by
+     * appending one illegal byte. It could not fire (`utf8ToString` is
+     * `(msbV: Utf8) => string`, total), so what actually happens is the
+     * lossy decode below, and this leaf pins that: the not-text case is
+     * declined one line further on, at `jsonParse`, and only when the lossy
+     * text is not JSON at all.
+     *
+     * The control is `whatThisCheckDeclinesToJudge`'s own not-UTF-8 row —
+     * `FF FE`, whose lossy decode is not JSON — which is declined. A check
+     * that refused every non-UTF-8 payload would pass this leaf and fail
+     * that one.
+     */
+    nonUtf8BytesBuyNoExemptionFromTheDialectCheck: () => {
+        const refusal = casAddRefusal({ content: base64OfNonUtf8W2Claim, type: 'base64' })
+        assert(refusal !== undefined, 'a non-UTF-8 payload claiming a dialect must still be held to it')
+        assert(refusal.includes('vnd.fjs.w2'), [refusal])
+        assert(refusal.includes('Nothing was stored'), [refusal])
+    },
+    /**
      * Everything this check declines to judge, so the write reaches upstream's
      * handler with its own answer intact.
      *
@@ -205,6 +254,12 @@ export const proof = {
      * that decodes to bytes that are not UTF-8, are upstream's "too large or
      * malformed" and "not text" cases. Answering them here would put a second,
      * differently-worded refusal in front of one that already exists.
+     *
+     * The second row is declined at `jsonParse`, NOT by a not-text guard:
+     * `FF FE` decodes lossily to `ÿþ`, which is not JSON. See
+     * `nonUtf8BytesBuyNoExemptionFromTheDialectCheck` above for the other
+     * half — non-UTF-8 bytes whose lossy text IS a dialect claim are judged
+     * like any other.
      */
     whatThisCheckDeclinesToJudge: () => {
         /** @type {readonly (readonly [string, Unknown])[]} */

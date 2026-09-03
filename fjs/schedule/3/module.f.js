@@ -2135,6 +2135,74 @@ export const proof = {
             assert(result.message.includes('rothConversion'), ['must quote the tag', result.message])
             assert(result.message.includes('a Roth conversion'), ['must name the entry', result.message])
         },
+        // The SECOND check on the same entry, and the one `individualNamed`
+        // exists for: the tag says which Form 8880 line, this says whose
+        // column. `vnd.fjs.credits`' own `checkReferences` already refuses a
+        // misspelled `individual` at storage, so this is defence in depth --
+        // but `scheduleThree` takes a `Stored<Credits>` whose `individual` is
+        // a plain `string`, nothing in its own signature says the document was
+        // validated, and a schedule that silently DROPPED a contribution it
+        // could not attribute would understate the credit rather than refuse.
+        anUnattributableContributionIsRefusedNamingTheValue: () => {
+            const result = refusal(compute(baseInput({
+                creditForms: [creditsDocument({
+                    retirementContributions: [{
+                        contributionTag: 'iraContribution',
+                        datePaid: '2025-07-15',
+                        description: 'traditional IRA contribution',
+                        amount: '2000.00',
+                        individual: 'child',
+                    }],
+                })],
+            })))
+            assert(result.message.includes("'child'"), ['must quote the value', result.message])
+            assert(
+                result.message.includes('traditional IRA contribution'),
+                ['must name WHICH entry, so a reader can find it', result.message])
+            assert(
+                result.message.includes('neither the taxpayer nor the spouse'),
+                ['must say what the two acceptable answers are', result.message])
+        },
+        // The SPOUSE's column, which nothing on this schedule had filled:
+        // every earlier leaf attributes its contribution to the taxpayer, so
+        // `individualNamed`'s `'spouse'` arm had never been taken. Form 8880
+        // has a second column with its OWN $2,000 cap, and a return that put
+        // a spouse's contribution in the taxpayer's column would credit the
+        // identical total -- invisible in line 4. The two columns are
+        // therefore asserted individually, and so is the citation.
+        aSpousesIraContributionFillsTheSpousesOwnColumn: () => {
+            const result = okResult(compute(baseInput({
+                status: 'marriedFilingJointly',
+                creditForms: [creditsDocument({
+                    retirementContributions: [{
+                        contributionTag: 'iraContribution',
+                        datePaid: '2025-07-15',
+                        description: 'traditional IRA contribution',
+                        amount: '2000.00',
+                        individual: 'spouse',
+                    }],
+                    saversCreditEligibility: [{
+                        individual: 'spouse',
+                        attainedAgeEighteen: true,
+                        noTestingPeriodDistributions: true,
+                    }],
+                })],
+            })))
+            assertEq(result.form8880.columns[0]?.individual, 'taxpayer')
+            assertEq(result.form8880.columns[0]?.line1, 0n, 'the taxpayer contributed nothing')
+            assertEq(result.form8880.columns[1]?.individual, 'spouse')
+            assertEq(result.form8880.columns[1]?.line1, 200000n, "$2,000.00, in the spouse's own column")
+            // $20,000.00 of joint income is inside the 50% band, so $2,000.00
+            // credits $1,000.00 -- the same figure the taxpayer's own
+            // contribution earns two leaves up, which is exactly why the
+            // columns above are the assertion that tells them apart.
+            assertEq(result.line4.value, 100000n, '50% of $2,000.00 = $1,000.00')
+            assert(
+                result.line4.sources.some(
+                    s => s.boxPath === 'retirementContributions[tag=iraContribution,individual=spouse]'),
+                ['the citation must name WHOSE contribution it was', result.line4.sources],
+            )
+        },
     },
 
     // ── Line 3: the education credits ─────────────────────────────────────
@@ -2213,6 +2281,116 @@ export const proof = {
                 result.line3.sources.some(s => s.boxPath === 'box5ScholarshipsOrGrants'),
                 ['line 3 must cite the scholarship box it subtracted', result.line3.sources],
             )
+        },
+        // Box 1 is OPTIONAL on the stored 1098-T -- `fjs/document/1098t`
+        // proves an absent one stays absent -- and the same statement can
+        // still carry box 5. The absent box contributes NO citation and NO
+        // expense, while box 5 on that very form still reduces the base, so
+        // the two halves of one document are read independently.
+        //
+        // $3,000.00 asserted outside the statement, less the $1,000.00
+        // scholarship the school reported, is $2,000.00 of adjusted qualified
+        // expenses: 100% of the first $2,000.00 is a $2,000.00 credit, 40% of
+        // it ($800.00) is refundable and never touches this schedule, and the
+        // remaining $1,200.00 lands on line 3.
+        aTuitionStatementWithNoBoxOneStillHasItsBoxFiveSubtracted: () => {
+            const result = okResult(compute(baseInput({
+                agiCents: 4000000n,
+                tuitionForms: [tuitionDocument({
+                    box5ScholarshipsOrGrants: '1000.00',
+                })],
+                creditForms: [creditsDocument({
+                    educationStudents: [{
+                        studentTin: '333-33-3333',
+                        studentName: 'A. Student',
+                        credit: 'americanOpportunity',
+                        qualifiedExpensesNotReportedOnForm1098T: '3000.00',
+                        enrolledAtLeastHalfTimeInADegreeProgram: true,
+                    }],
+                    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+                })],
+            })))
+            assertEq(
+                result.form8863.students[0]?.line27, 200000n,
+                '$3,000.00 asserted - $1,000.00 of box 5 = $2,000.00')
+            assertEq(result.form8863.line8, 80000n, '40% of $2,000.00 = $800.00, refundable')
+            assertEq(result.line3.value, 120000n, '$2,000.00 - $800.00 = $1,200.00 nonrefundable')
+            // The pair that says the absent box was skipped rather than read
+            // as a zero: no box 1 citation, and the box 5 citation on the SAME
+            // document is there all the same.
+            assert(
+                result.line3.sources.every(
+                    s => s.boxPath !== 'box1PaymentsReceivedForQualifiedTuition'),
+                ['an absent box is ABSENT, never a zero citation', result.line3.sources],
+            )
+            assert(
+                result.line3.sources.some(s => s.boxPath === 'box5ScholarshipsOrGrants'),
+                ['…and the box the same statement DOES carry is still cited', result.line3.sources],
+            )
+        },
+        // An election that is neither of the two credits §25A(c)(2) allows is
+        // refused by name. `vnd.fjs.credits` refuses it at storage too, for
+        // the same reason the `individual` pair one group down is checked
+        // twice: this module's input types the field as a plain `string`, and
+        // an unrecognised election that fell through would silently claim
+        // NEITHER credit for a student the taxpayer did claim.
+        anUnrecognizedEducationCreditElectionIsRefusedNamingTheStudent: () => {
+            const result = refusal(compute(baseInput({
+                agiCents: 4000000n,
+                creditForms: [creditsDocument({
+                    educationStudents: [{
+                        studentTin: '333-33-3333',
+                        studentName: 'A. Student',
+                        credit: 'hopeScholarship',
+                        enrolledAtLeastHalfTimeInADegreeProgram: true,
+                    }],
+                    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+                })],
+            })))
+            assert(result.message.includes("'hopeScholarship'"), ['must quote the election', result.message])
+            assert(
+                result.message.includes('A. Student'),
+                ['must name WHICH student, so a return with two can be fixed', result.message])
+            assert(
+                result.message.includes('neither of the two education credits'),
+                ['must say what is wrong with it', result.message])
+        },
+        // **The OTHER election**, which no leaf on this schedule had ever
+        // made -- so `educationCreditElectionNamed`'s `'lifetimeLearning'`
+        // arm had never been taken and the two elections could have been one
+        // computation under two names without anything noticing.
+        //
+        // §25A(c)'s Lifetime Learning Credit is 20% of up to $10,000.00 of
+        // expenses PER RETURN, it demands no half-time enrolment in a degree
+        // programme (none is declared here), and it is wholly nonrefundable
+        // -- so the entire credit lands on line 3 and Form 8863 line 8 stays
+        // zero. Printed Part III routes such a student to line 31 and leaves
+        // lines 27-30 blank, which is asserted beside the amount.
+        //
+        // $5,000.00 of box 1 at 20% is $1,000.00.
+        // `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` is deliberately
+        // NOT declared: §25A(i)'s question is asked only when a refundable
+        // American Opportunity half could be non-zero, and this leaf is what
+        // pins that it is not asked of a filer who claimed no such credit.
+        aLifetimeLearningElectionTakesTwentyPercentAndIsWhollyNonrefundable: () => {
+            const result = okResult(compute(baseInput({
+                agiCents: 4000000n,
+                tuitionForms: [tuitionDocument({
+                    box1PaymentsReceivedForQualifiedTuition: '5000.00',
+                })],
+                creditForms: [creditsDocument({
+                    educationStudents: [{
+                        studentTin: '333-33-3333',
+                        studentName: 'A. Student',
+                        credit: 'lifetimeLearning',
+                    }],
+                })],
+            })))
+            assertEq(result.form8863.students[0]?.line31, 500000n, '$5,000.00 of adjusted expenses')
+            assertEq(result.form8863.students[0]?.line27, 0n, 'lines 27-30 stay blank for this election')
+            assertEq(result.form8863.line12, 100000n, '20% of $5,000.00 = $1,000.00')
+            assertEq(result.form8863.line8, 0n, 'and there is no refundable half at all')
+            assertEq(result.line3.value, 100000n, 'so the whole $1,000.00 is nonrefundable -> line 3')
         },
         // **The student is matched by TIN, never assumed to be the filer.**
         // A 1098-T for a DIFFERENT student contributes nothing to this

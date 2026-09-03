@@ -962,11 +962,19 @@ export const proof = {
             assertEq(
                 preferentiallyTaxed, 17000000n,
                 'the four preferential bands total $170,000.00 -- line 15, and no more')
-            // The $30,000.00 of collectibles gain is NOT among them.
+            // The $30,000.00 of collectibles gain is NOT among them. The
+            // fixture's worksheet arm is narrowed by ONE assert rather than by
+            // a ternary: `scheduleDArmInput` is a `const` declared above with
+            // `kind: 'scheduleDTaxWorksheet'` written out, so a `: 0n` arm was
+            // reachable by nothing and could only ever sit uncovered, and an
+            // expectation that quietly falls back to `0n` when the narrow
+            // fails is an expectation that stops testing without saying so.
+            const regularWorksheet = scheduleDArmInput.regularWorksheet
+            assert(
+                regularWorksheet.kind === 'scheduleDTaxWorksheet',
+                ['this fixture is the Schedule D Tax Worksheet arm', regularWorksheet.kind])
             assertEq(
-                scheduleDArmInput.regularWorksheet.kind === 'scheduleDTaxWorksheet'
-                    ? scheduleDArmInput.regularWorksheet.sdtwLine10Cents - preferentiallyTaxed
-                    : 0n,
+                regularWorksheet.sdtwLine10Cents - preferentiallyTaxed,
                 3000000n,
                 'the $30,000.00 of collectibles gain sits outside every preferential band')
             assert(

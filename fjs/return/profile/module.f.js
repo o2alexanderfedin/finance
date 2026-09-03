@@ -2139,6 +2139,29 @@ export const proof = {
                 const [t] = validate({ ...minimal, taxYear: 2024 })
                 assertEq(t, 'error')
             },
+            /**
+             * The OTHER half of check 2, and the half no leaf reached until
+             * now: `taxYear` is a plain `number` on the schema, so `2025.5`
+             * is structurally valid and only the `Number.isInteger` guard
+             * stands between it and `taxParamsByYear[2025.5]`. That lookup
+             * answers `undefined` and the year would have been refused one
+             * line later anyway — but by the WRONG sentence, "no stored tax
+             * parameters for taxYear 2025.5", which tells a filer to go and
+             * find a parameter set for half a year. The refusal asserted
+             * here names the field and quotes the offending value, which is
+             * what the `dependentAge` leaves above ask of every range check.
+             */
+            fractionalYearRefused: () => {
+                const [t, v] = validate({ ...minimal, taxYear: 2025.5 })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('taxYear'), ['expected the field named', v])
+                assert(v.includes('2025.5'), ['expected the offending VALUE quoted', v])
+                assert(
+                    !v.includes('no stored tax parameters'),
+                    ['a fractional year must be refused as a non-year, not as an unstocked one', v],
+                )
+            },
         },
         dependentCount: {
             negativeRefused: () => {

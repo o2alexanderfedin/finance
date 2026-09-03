@@ -78,7 +78,7 @@
 import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
@@ -511,6 +511,32 @@ export const proof = {
             const [t] = validate({ ...minimal, stateLocal: [{ state: 'CA', stateTaxWithheld: '1,000.00' }] })
             assertEq(t, 'error')
         },
+        // DOC-11 inside a `stateLocal` row, which is where it is easiest to
+        // lose: a state that withheld nothing still files its box 14 identity
+        // and leaves box 16 blank, and the exactness loop must SKIP the absent
+        // field rather than read it as a zero. The skip is the arm the
+        // fully-populated rows above never take, and the difference is not
+        // cosmetic — a defaulted `'0.00'` here would be an amount the payer
+        // never reported, on the line a state return credits against its own
+        // tax.
+        //
+        // Both halves are asserted: that the row validates, and that the
+        // absent field is STILL absent after the round trip. The first alone
+        // would stay green if the loop had started defaulting.
+        aRowThatWithheldNothingIsSkippedRatherThanDefaulted: () => {
+            const [t, v] = validate({
+                ...minimal, stateLocal: [{ state: 'CA', stateIdNumber: '987-6543' }],
+            })
+            assert(t === 'ok', ['a state row with no withholding is a real row', t, v])
+            const rows = v.stateLocal
+            assert(rows !== undefined, ['expected the row to round-trip', v])
+            assertEq(rows.length, 1)
+            const [row] = rows
+            assert(row !== undefined, ['expected exactly one row', rows])
+            assertEq(row.state, 'CA')
+            assertEq(row.stateIdNumber, '987-6543')
+            assertEq(row.stateTaxWithheld, undefined)
+        },
     },
     // DOC-06's shape proof: box 1b's converted value has exactly the type
     // and numeric shape QdcgtInput.line2Cents expects — zero runtime
@@ -520,8 +546,15 @@ export const proof = {
     qdcgtInputShape: () => {
         const [t, v] = validate({ ...minimal, box1bQualifiedDividends: '500.00' })
         assert(t === 'ok', ['expected ok', t, v])
+        // `assertNotNullish` rather than `?? '0.00'`. Box 1b is set two lines
+        // up, so the fallback was unreachable — and the value it fell back to
+        // was the ONE value DOC-11 says this dialect never invents: an absent
+        // box is skipped, never defaulted to zero. A shape proof that quietly
+        // defaulted would have kept passing if `validate` began dropping box
+        // 1b, and would have asserted the shape of a number nobody reported.
         /** @type {QdcgtInput['line2Cents']} */
-        const line2Cents = centsFromString(v.box1bQualifiedDividends ?? '0.00')
+        const line2Cents = centsFromString(
+            assertNotNullish(v.box1bQualifiedDividends, ['box 1b was stored above', v]))
         assertEq(line2Cents, 50000n)
     },
 }

@@ -67,6 +67,7 @@ import { interpret } from '../../exec/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
 /** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { JsModule } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { CasOp, Report } from '../module.f.js' */
 
@@ -405,6 +406,34 @@ const hostMap = {
     evoRevision: a => ok(`evoRevision:${a}`),
 }
 
+/**
+ * The `JsModule` fixture the SEC-02 gate and its control share, paired with
+ * the flag its body sets. `virtual` invokes a `JsModule` on import, and
+ * upstream's own docstring notes the fixture may close over state for exactly
+ * this purpose — so "was the module body evaluated?" is an observed side
+ * effect rather than an inference.
+ *
+ * **One construction, called twice**, for the reason `fjs/guest/check`'s own
+ * `spiedReport` states: a gate leaf asserting `evaluated === false` and a
+ * control asserting `evaluated === true` are evidence about one another only
+ * if the thing being watched is literally the same. These two leaves each
+ * built their own textually identical copy until now, so the gate's copy was
+ * a body no proof ever executed — indistinguishable, from the coverage the
+ * suite actually has, from a fixture that could not fire at all.
+ * @type {() => { readonly spy: { evaluated: boolean }, readonly module_: JsModule }}
+ */
+const spiedModule = () => {
+    /** @type {{ evaluated: boolean }} */
+    const spy = { evaluated: false }
+    return {
+        spy,
+        module_: () => {
+            spy.evaluated = true
+            return { report: guestReport }
+        },
+    }
+}
+
 export const proof = {
     // ── Success Criterion 3 ─────────────────────────────────────────────
     specifiers: {
@@ -634,14 +663,8 @@ export const proof = {
         // the blob wanted to do on load has already happened.
         dirtySourceIsRefusedWithoutEvaluatingTheModuleBody: () => {
             const name = programFileName('CONTENTHASH')
-            /** @type {{ evaluated: boolean }} */
-            const spy = { evaluated: false }
-            const root = {
-                [name]: () => {
-                    spy.evaluated = true
-                    return { report: guestReport }
-                },
-            }
+            const { spy, module_ } = spiedModule()
+            const root = { [name]: module_ }
             const dirty = `import fs from 'node:fs'\n${cleanSource}`
             const [, result] = virtual({ ...emptyState, root })(loadProgram([])(name)(dirty))
             const [t, v] = result
@@ -650,22 +673,29 @@ export const proof = {
             // The point of SEC-02, in one assertion.
             assertEq(spy.evaluated, false)
         },
-        // The control: the same fixture DOES evaluate for a clean source,
+        // The control: the SAME fixture — one construction, shared with the
+        // gate above rather than copied — DOES evaluate for a clean source,
         // so the assertion above is about the gate, not about a spy that
         // never fires.
         cleanSourceDoesEvaluateTheModuleBody: () => {
             const name = programFileName('CONTENTHASH')
-            /** @type {{ evaluated: boolean }} */
-            const spy = { evaluated: false }
-            const root = {
-                [name]: () => {
-                    spy.evaluated = true
-                    return { report: guestReport }
-                },
-            }
+            const { spy, module_ } = spiedModule()
+            const root = { [name]: module_ }
             const [, result] = virtual({ ...emptyState, root })(loadProgram([])(name)(cleanSource))
-            assertEq(result[0], 'ok')
+            const [t, v] = result
+            assert(t === 'ok', ['expected the module to load', t, v])
             assertEq(spy.evaluated, true)
+            // ...and the flag is only half of what the body did. It also
+            // RETURNS the module value, and that return is what `import_`
+            // hands back — so the control asserts the returned entry point
+            // actually runs and reaches the host. Without this, the leaf
+            // would pass for a fixture that set its flag and then answered
+            // anything at all, which is precisely the fixture a gate proof
+            // must not be resting on.
+            const loaded = /** @type {{ readonly report: Report<string> }} */ (v)
+            const [rt, rv] = interpret(hostMap)(loaded.report(guestCtx)(['abc']))
+            assert(rt === 'ok', ['expected the evaluated body\'s own report to run', rt, rv])
+            assertEq(rv[0], 'casRead:abc')
         },
         // A missing module is an error value, not a throw — the same
         // discipline Phase 3 locked for refusals.
@@ -694,6 +724,52 @@ export const proof = {
         assertEq(cases.length, 4, 'line comment, block comment, and a quote after each keyword')
         for (const [label, source] of cases) {
             assertEq(checkSpecifiers([])(source)[0], 'error', label)
+        }
+    },
+    // `unterminatedTriviaAndQuotesAreRefusedNotPassed` above covers the trivia
+    // skip running off the end from INSIDE a comment. These are its other two
+    // exits, and nothing above produces either: a `/` that opens neither a
+    // line nor a block comment is not trivia at all, so the skip stops ON it
+    // and hands the reader a character that cannot start a quoted specifier;
+    // and a source that simply STOPS at the keyword leaves the skip with
+    // nothing to walk over — either because it never enters its loop (the
+    // keyword is the last thing in the source) or because the loop consumes
+    // the last of the whitespace and ends.
+    //
+    // Each must refuse with the STATICALLY-UNCHECKABLE message, not the
+    // not-permitted one, and that distinction is the whole assertion: there
+    // is no specifier here to name, so `import specifier not permitted:
+    // node:fs` would be the gate claiming to have read something it did not.
+    // Asserting only the `error` tag would not tell the two refusals apart —
+    // and a gate that refused everything would satisfy it.
+    //
+    // **The INDEX `skipTrivia` returns from the slash exit is an equivalent
+    // mutant, and that is a property of the gate worth writing down.**
+    // Mutating that `return i` to `return source.length` — or to skipping the
+    // slash and carrying on — leaves this leaf and the whole suite green,
+    // because every one of those positions is equally unreadable: none is a
+    // quote, so `quotedAt` answers `null` either way, and the fail-closed
+    // refusal below absorbs the difference. Only REACHING that exit is
+    // observable, which is exactly what these rows pin. Mutating the refusal
+    // itself does bite: weakening its message reddens this leaf alone, and
+    // letting an exhausted source read as a binding reddens this leaf and
+    // `unterminatedTriviaAndQuotesAreRefusedNotPassed` together.
+    unreadableSlashAndExhaustedSourceRefuseWithoutNamingASpecifier: () => {
+        /** @type {readonly (readonly [string, string])[]} */
+        const cases = [
+            ['a regex where a dynamic import\'s specifier belongs', `await import(/node:fs/.source)`],
+            ['a regex where a static import\'s specifier belongs', `import fs from /node:fs/.source`],
+            ['a source that stops at the keyword itself', `import`],
+            ['a source that stops in the whitespace after it', `import `],
+            ['a source that stops at a trailing `from`', `export { x } from`],
+        ]
+        assertEq(cases.length, 5, 'two unreadable slashes and three ways to run out of source')
+        for (const [label, source] of cases) {
+            const [t, v] = checkSpecifiers([])(source)
+            assertEq(t, 'error', label)
+            assert(
+                String(v).includes('is not followed by a quoted specifier'),
+                [label, 'the refusal must say the specifier could not be READ, not that it was not permitted', v])
         }
     },
     // An `import` followed by a BINDING names no specifier — the `from`
