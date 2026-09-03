@@ -1202,6 +1202,89 @@ export const proof = {
                 )
             }
         },
+        /**
+         * **THE LIMITATION'S OWN FLOOR — and a finding about it.**
+         *
+         * `limitation`'s `scaled <= reduction` arm is unreachable at TY2025's
+         * eight printed figures. Every band of every tier in both columns was
+         * enumerated (8,111 of them) and none reaches it; the closest is the
+         * childless/other asterisked cell listed above, which clears it by
+         * $0.127. The reason is arithmetic rather than luck, and it is worth
+         * writing down because nothing else here says it:
+         *
+         *   The floor can only bite in the TRUNCATED last band, where the
+         *   midpoint is `completedPhaseout - gap/2`. `completedPhaseout` is
+         *   rounded to a whole DOLLAR, so it sits at most $0.505 above the
+         *   exact amount at which the reduction reaches the maximum credit.
+         *   The gap is a whole number of dollars (the completed amount is,
+         *   and so is every band boundary at a $50 band width), so it is at
+         *   least $1 and half of it is at least $0.50. $0.50 wins — except on
+         *   a knife edge where the gap is exactly $1 AND the rounding pushed
+         *   a full half-dollar. TY2025's six asterisked cells have gaps of
+         *   $4, $14, $34, $10, $30 and $25; none is near it.
+         *
+         * So the arm is proved through the exported lookup at a HYPOTHETICAL
+         * parameter set rather than through a return — `earnedIncomeCredit\
+         * TableLookup` takes the band width, the tier and the phaseout amount
+         * as arguments and is a generic table generator. The figures below
+         * are NOT law and no stored parameter is touched: the printed $50
+         * band width and the childless tier's real 7.65% rates, with a
+         * hypothetical $146.00 maximum credit ($1,908.00 x 7.65% = $145.962,
+         * so the tier is internally consistent the way a real one is) and a
+         * hypothetical $1,142.00 phaseout amount. Those land the completed
+         * phaseout at $3,051.00 — one dollar above a band boundary, which is
+         * the knife edge above.
+         *
+         * Hand-derived, in full:
+         *   completed phaseout: $1,142.00 + $146.00 / 7.65% = $3,050.4967,
+         *                       to the nearest dollar = $3,051.00
+         *   band $3,000-$3,050: midpoint $3,025.00, excess $1,883.00,
+         *                       7.65% x = $144.0495, $146 - = $1.9505 -> $2
+         *   band $3,050-$3,051: TRUNCATED, midpoint $3,050.50,
+         *                       excess $1,908.50, 7.65% x = $146.00025,
+         *                       which EXCEEDS the $146.00 maximum      -> $0
+         *
+         * **And the property the floor turns out NOT to have**, found by
+         * deleting it: the else arm computes `halfUp` of $-0.00025, which is
+         * zero, so both arms return the same figure here and removing the
+         * guard is an equivalent mutant in AGENTS.md's sense. At the printed
+         * $50 band width the overshoot is at most the phaseout rate times
+         * half a cent — $0.0004 at 7.65% — so it can never round to a whole
+         * cent, whichever arm computes it. The
+         * guard is protecting `halfUp`'s DOMAIN — which is what its own
+         * comment says — and not any printed amount. That is a fact about
+         * this code nobody had written down, and it is why the leaf asserts
+         * the produced figures on both sides of the boundary rather than
+         * claiming the guard changes one.
+         */
+        theLimitationFloorAtTheKnifeEdgeOfTheTruncatedBand: () => {
+            /** @type {EarnedIncomeCreditTier} */
+            const hypotheticalTier = {
+                ...taxParams2025.earnedIncomeCredit.tiers.none,
+                earnedIncomeAmount: {
+                    ...taxParams2025.earnedIncomeCredit.tiers.none.earnedIncomeAmount,
+                    amount: '1908.00',
+                },
+                maximumCredit: {
+                    ...taxParams2025.earnedIncomeCredit.tiers.none.maximumCredit,
+                    amount: '146.00',
+                },
+            }
+            const lookup = earnedIncomeCreditTableLookup(5000n)(hypotheticalTier)(114200n)
+            assertEq(lookup(300000n), 200n, 'the band below: $2.00 of credit left')
+            assertEq(
+                lookup(305000n), 0n,
+                'the truncated last band: the reduction passes the maximum, so the floor holds at $0')
+            assertEq(
+                lookup(305100n), 0n,
+                'and at the completed phaseout amount itself the early return has it')
+            // The rates are the childless tier's REAL ones, untouched — only
+            // the two amounts are hypothetical. Asserted so a future edit that
+            // "tidied" this fixture into something with invented percentages
+            // would fail rather than quietly stop resembling a printed tier.
+            assertEq(hypotheticalTier.creditPercentBasisPoints, 765)
+            assertEq(hypotheticalTier.phaseoutPercentBasisPoints, 765)
+        },
         // The PHASE-IN TOP for the two tiers the straddle leaves above do not
         // cover, so all four child counts are pinned at their own earned
         // income amount. Both rows are in the printed table.
@@ -1237,6 +1320,40 @@ export const proof = {
             // fired would pass the one above.
             const below = { ...wageEarner(oneChildProfile)(1272500n), adjustedGrossIncomeCents: 2000000n }
             assertEq(creditOf(below), 432800n)
+        },
+        // **THE OTHER SIDE of "enter the SMALLER".** Every fixture above puts
+        // adjusted gross income at or ABOVE earned income, so the second
+        // lookup always returned the smaller figure and the comparison's
+        // earned-income arm had never been taken. Adjusted gross income can
+        // be BELOW earned income — every above-the-line adjustment does it
+        // (educator expenses, the HSA deduction, half the self-employment
+        // tax, student loan interest) -- and above the phaseout amount the
+        // table falls as income rises, so the AGI lookup is then the LARGER
+        // of the two and line 6 must reject it.
+        //
+        // One child, earned income $40,000 and adjusted gross income $30,000,
+        // both above the $23,350 phaseout amount. Each cell hand-derived from
+        // the table's own arithmetic:
+        //   earned income: band $40,000-$40,050, midpoint $40,025, excess
+        //     $16,675, 15.98% x $16,675 = $2,664.665,
+        //     $4,328 - $2,664.665 = $1,663.335 -> $1,663
+        //   adjusted gross income: band $30,000-$30,050, midpoint $30,025,
+        //     excess $6,675, 15.98% x $6,675 = $1,066.665,
+        //     $4,328 - $1,066.665 = $3,261.335 -> $3,261
+        // $1,663 is the smaller, so that is the credit — NOT the $3,261 the
+        // printed worksheet's line 5 would carry.
+        adjustedGrossIncomeBelowEarnedIncomeStillTakesTheSmallerLookup: () => {
+            const input = { ...wageEarner(oneChildProfile)(4000000n), adjustedGrossIncomeCents: 3000000n }
+            assertEq(creditOf(input), 166300n, 'the EARNED-income cell, which is the smaller here')
+            // The pair for it, at the SAME earned income: adjusted gross
+            // income ABOVE it makes the other arm the smaller one, and the
+            // credit is that other cell. Without the pair a comparison
+            // hard-wired to either arm would pass one leaf or the other.
+            const above = { ...wageEarner(oneChildProfile)(4000000n), adjustedGrossIncomeCents: 5000000n }
+            //   band $50,000-$50,050, midpoint $50,025, excess $26,675,
+            //   15.98% x $26,675 = $4,262.665, which is under the $4,328
+            //   maximum by $65.335 -> $65
+            assertEq(creditOf(above), 6500n, 'the ADJUSTED-GROSS-income cell, which is the smaller there')
         },
     },
     // ── §32(i), the disqualified-income test ────────────────────────────────
