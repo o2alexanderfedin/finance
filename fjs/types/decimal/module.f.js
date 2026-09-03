@@ -31,7 +31,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { error, ok, unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
@@ -73,15 +73,26 @@ export const parse = scale => s => unwrap(tryParse(scale)(s))
 export const tryParse = scale => s => {
     const m = decimalPattern.exec(s)
     if (m === null) { return error('not a decimal number: ' + s) }
-    const [, sign, intPart, fracPart] = m
-    // Unreachable, and deliberately kept: `(\d+)` is not optional, so a
-    // match always carries an integer part. It is here because
-    // `noUncheckedIndexedAccess` types every destructured group as
-    // `string | undefined` and both ways out — a cast and a non-null
-    // assertion — are banned outright (AGENTS.md). No input can walk
-    // its taken side, so it is the one branch in this module a proof
-    // cannot reach.
-    if (intPart === undefined) { return error('not a decimal number: ' + s) }
+    const sign = m[1]
+    // `(\d+)` is not optional, so a match ALWAYS carries an integer part —
+    // yet `noUncheckedIndexedAccess` types the group `string | undefined`,
+    // and both ways out of that, a cast and a non-null assertion, are banned
+    // outright (AGENTS.md). `assertNotNullish` is the third way and the one
+    // this repo already ships for exactly this shape: `fjs/server`'s run-hash
+    // capture reads `assertNotNullish(runHashMatch[1], ...)` off a group its
+    // own pattern guarantees.
+    //
+    // It replaces an `if (intPart === undefined) { return error(...) }` that
+    // stood here until 2026-09-03 and was the one branch in this module no
+    // proof could reach. The distinction that makes the swap right rather
+    // than merely convenient: `tryParse`'s error channel exists for INPUT it
+    // refuses, and a caller reads those errors as messages about the string
+    // it passed. A capture group missing from a successful match is not bad
+    // input, it is a broken regexp engine — a panic, which is what an
+    // `assert` raises and what the `Result` channel must never be used to
+    // describe.
+    const intPart = assertNotNullish(m[2], ['a decimal match always carries an integer part', s])
+    const fracPart = m[3]
     const frac = fracPart ?? ''
     if (frac.length > scale) { return error('more than ' + scale + ' fractional digits: ' + s) }
     const padded = frac.padEnd(scale, '0')

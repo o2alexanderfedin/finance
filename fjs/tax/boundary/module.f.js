@@ -37,6 +37,7 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { cmp } from 'functionalscript/fjs/types/function/compare/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear, allFilingStatuses } from '../params/module.f.js'
 import { taxTableBandStructure } from '../table/module.f.js'
@@ -265,11 +266,33 @@ export const expectedThresholdCount = 70
  * thresholds may legitimately share the same cents value (e.g. the $103,350.00 ceiling appears
  * for both `single` and `headOfHousehold`). This is the full boundary list `segmentIndex` counts
  * against.
+ *
+ * The comparator is upstream's `cmp`, not a local ternary chain. Until
+ * 2026-09-03 this line read `(a, b) => a < b ? -1 : a > b ? 1 : 0`, which is
+ * `fjs/types/function/compare`'s `cmp` character for character — a
+ * re-implementation of a shipped primitive, which AGENTS.md's "use
+ * FunctionalScript itself as much as possible" rule is about. Its `: 0` arm
+ * was also the one branch in this file no proof reached, and could not be:
+ * the input is `Set`-deduplicated, so no two elements are ever equal and
+ * `sort` never compares an element with itself. Delegating does not export an
+ * untested branch — upstream's own `compare/proof.f.mjs` walks the equal arm
+ * directly, with `cmp("hello")("hello")`.
+ *
+ * A property found while checking that substitution and written down because
+ * nobody had (AGENTS.md, "the equivalent mutant"): **the ORDER this line
+ * produces is unobservable through `segmentIndex`.** Reversing the comparator
+ * to `cmp(b)(a)` leaves the entire suite green — 3,279 leaves, zero failures —
+ * because `segmentIndex` is `filter(boundary <= value).length`, a COUNT, and a
+ * count does not care what order it counts in. The sort stays regardless: it
+ * is what makes this list satisfy the sorted-ascending precondition
+ * `segmentIndex`'s own docstring states, and a later implementation of that
+ * counter — a `bsearch`, say — would depend on it the moment it stopped being
+ * a linear scan. What the observation rules out is treating a green suite as
+ * evidence that this comparator is right.
  * @type {readonly bigint[]}
  */
-const sortedCents = [...new Set(allThresholds.map(threshold => threshold.cents))].sort((a, b) =>
-    a < b ? -1 : a > b ? 1 : 0,
-)
+const sortedCents = [...new Set(allThresholds.map(threshold => threshold.cents))]
+    .sort((a, b) => cmp(a)(b))
 
 /**
  * One generated proof leaf per stored threshold -- built by mapping `allThresholds` into

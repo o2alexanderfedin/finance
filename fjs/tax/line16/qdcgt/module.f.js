@@ -206,7 +206,44 @@ export const qdcgt = taxParamSet => input => {
     //     The page's other floor.
     const line16 = line14 - line15 > 0n ? line14 - line15 : 0n
     // 17. "Enter the smaller of line 12 or line 16."
-    const line17 = line12 < line16 ? line12 : line16
+    //     LINE 16 IS ALWAYS THE SMALLER, at every input, so the printed
+    //     `min` never binds and is written here as the copy it provably
+    //     is — the same shape line 11 above already takes for "Enter the
+    //     amount from line 9", one derivation deeper. Subtracting the two
+    //     definitions, and using line 15 = line 5 + line 9:
+    //
+    //       line12 - (line14 - line15)
+    //         = (line10 - line9) - line14 + line5 + line9
+    //         = min(line1, line4) + max(line1 - line4, 0) - min(line1, line13)
+    //         = line1 - min(line1, line13)            [either sign of line1 - line4]
+    //         = max(line1 - line13, 0)                 >= 0
+    //
+    //     so `line14 - line15 <= line12` unconditionally; and where the
+    //     page's floor clamps, line 16 is 0, which line 12 already cannot
+    //     go under (the assert above it). The gap between them is exactly
+    //     the taxable income above the 15% breakpoint, which is why the
+    //     two are EQUAL on every ordinary return and differ only above
+    //     $600,050 (MFJ) — see
+    //     `lineSeventeenIsAlwaysLineSixteenBecauseLineTwelveCannotBeSmaller`,
+    //     which pins both cases on hand-typed cents. Confirmed by sweep
+    //     over 68,590 inputs (5 statuses x 19 line-1 amounts x 19 line-2
+    //     x 19 line-3, Schedule D both ways): `line12 < line16` was true
+    //     zero times.
+    //
+    //     Property 2 above is the precedent for the form: where the page
+    //     prints an operation that cannot discriminate, this module keeps
+    //     the printed line and states the invariant as an `assert`, so a
+    //     transcription error two lines up becomes a loud refusal instead
+    //     of being quietly absorbed. The counter-precedent to answer is
+    //     line 3, whose `<= 0n` guard is kept although weakening it
+    //     changes no answer — but line 3's arms are all REACHABLE, and it
+    //     is only the OUTPUT that a neighbouring `min` makes equivalent.
+    //     A ternary arm no input can reach is a different thing: it is
+    //     unreachable shipped code, which this project deletes.
+    const line17 = line16
+    assert(
+        line16 <= line12,
+        ['QDCGT line 17: line 16 can never exceed line 12', line12, line16])
     // 18. "Multiply line 17 by 15% (0.15)."
     //     The rate is written HERE, at the line that prints it, and is
     //     deliberately NOT added to `fjs/tax/params`: 10-RESEARCH.md
@@ -281,7 +318,85 @@ const splitDispatchInput = {
     line7aCents: 0n,
 }
 
+/**
+ * The return that separates line 12 from line 16: MFJ, Form 1040 line 15
+ * = $700,000.00, line 3a = $100,000.00, not filing Schedule D. Line 1 is
+ * $99,950.00 ABOVE the MFJ 15%-rate breakpoint of $600,050.00, and that
+ * excess is precisely the gap the derivation at printed line 17 predicts
+ * between the two lines. `splitDispatchInput` above is the other half of
+ * the pair — its line 1 sits below the breakpoint, so there the gap is
+ * zero and the two lines are equal.
+ * @type {QdcgtInput}
+ */
+const aboveTheFifteenRateBreakpointInput = {
+    status: 'marriedFilingJointly',
+    line1Cents: 70000000n,
+    line2Cents: 10000000n,
+    filingScheduleD: false,
+    scheduleD15Cents: 0n,
+    scheduleD16Cents: 0n,
+    line7aCents: 0n,
+}
+
 export const proof = {
+    // Printed line 17 says "Enter the smaller of line 12 or line 16" and
+    // line 16 is ALWAYS the smaller — the property that let this module
+    // drop a ternary arm no input could reach. This leaf is what makes
+    // that deletion checkable rather than asserted, and it has to pin
+    // CENTS: a leaf that only re-checked `line17 <= line12` would agree
+    // with any implementation that returned zero.
+    //
+    // Both sides of the derivation are exercised, because a one-sided
+    // leaf could not tell "line 16 is smaller" from "the two are always
+    // equal and the min is decorative":
+    //
+    //   - `splitDispatchInput`, line 1 = $120,000.00, BELOW the MFJ
+    //     $600,050.00 breakpoint: lines 12 and 16 are EQUAL, both
+    //     $23,300.00, which is the case every ordinary return lands in.
+    //   - `aboveTheFifteenRateBreakpointInput`, line 1 = $700,000.00,
+    //     ABOVE it: line 12 is $100,000.00 and line 16 is $50.00 — a
+    //     STRICT difference, so the copy is not a copy by coincidence.
+    //
+    // Every figure below is hand-derived from the printed page against
+    // Rev. Proc. 2024-40 §2.03's MFJ breakpoints ($96,700.00 zero-rate,
+    // $600,050.00 fifteen-rate), never read back out of a run:
+    //
+    //   line 4 = 100,000.00; line 5 = 700,000.00 - 100,000.00 = 600,000.00
+    //   line 7 = min(700,000.00, 96,700.00) = 96,700.00
+    //   line 8 = min(600,000.00, 96,700.00) = 96,700.00; line 9 = 0.00
+    //   line 10 = min(700,000.00, 100,000.00) = 100,000.00; line 12 = 100,000.00
+    //   line 14 = min(700,000.00, 600,050.00) = 600,050.00; line 15 = 600,000.00
+    //   line 16 = 600,050.00 - 600,000.00 = 50.00
+    //
+    // and the gap, 100,000.00 - 50.00 = 99,950.00, is exactly
+    // 700,000.00 - 600,050.00: line 1's excess over the breakpoint, which
+    // is what the derivation at printed line 17 says it must be.
+    lineSeventeenIsAlwaysLineSixteenBecauseLineTwelveCannotBeSmaller: () => {
+        const equalCase = qdcgt(taxParams2025)(splitDispatchInput)
+        assertEq(equalCase.line12, 2330000n, 'below the breakpoint, line 12 is $23,300.00')
+        assertEq(equalCase.line16, 2330000n, 'and line 16 is the same $23,300.00')
+        assertEq(equalCase.line17, 2330000n, 'so line 17 is $23,300.00')
+        const strictCase = qdcgt(taxParams2025)(aboveTheFifteenRateBreakpointInput)
+        assertEq(strictCase.line12, 10000000n, 'above the breakpoint, line 12 is $100,000.00')
+        assertEq(strictCase.line16, 5000n, 'while line 16 is only $50.00')
+        assertEq(strictCase.line17, 5000n, 'and line 17 takes the $50.00, not the $100,000.00')
+        // The two lines that carry line 17 into the tax, so this leaf is
+        // load-bearing on an AMOUNT A FILER OWES rather than on an
+        // intermediate: line 18 is 15% of line 17 ($7.50), and line 20 is
+        // line 10 - (line 9 + line 17) = 100,000.00 - 50.00 = 99,950.00,
+        // taxed at 20% on line 21 ($19,990.00).
+        assertEq(strictCase.line18, 750n, '15% of $50.00 is $7.50')
+        assertEq(strictCase.line20, 9995000n, 'leaving $99,950.00 for the 20% line')
+        assertEq(strictCase.line21, 1999000n, '20% of $99,950.00 is $19,990.00')
+        // The derivation itself, stated as the arithmetic it is: the gap
+        // between the two lines is line 1's excess over the 15%-rate
+        // breakpoint. Hand-typed on both sides, so a breakpoint that
+        // moved would fail here as well as in `fjs/tax/params`.
+        assertEq(equalCase.line12 - equalCase.line16, 0n, '$120,000.00 is under $600,050.00')
+        assertEq(
+            strictCase.line12 - strictCase.line16, 9995000n,
+            '$700,000.00 - $600,050.00 = $99,950.00')
+    },
     // T-10-06-03. Lines 22 and 24 price DIFFERENT amounts and each picks
     // its own method: $90,000.00 is below the Tax Table's $100,000.00
     // bound and $120,000.00 is above it, in ONE execution of ONE
