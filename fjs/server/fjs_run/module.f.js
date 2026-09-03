@@ -115,7 +115,7 @@
  *
  * @module
  */
-import { step, catchStep, pureOk, pureError, mapStep, do_, history, historyStep, unwrapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, catchStep, pureOk, pureError, mapStep, do_, history, historyStep, unwrapStep, ioError } from 'functionalscript/fjs/effects/module.f.mjs'
 import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
@@ -131,6 +131,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/mod
 import { stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
 import { unknown as jsonUnknown } from 'functionalscript/fjs/media/json/rtti/module.f.mjs'
 import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
+import { refuses } from '../../refuses/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
@@ -1026,8 +1027,15 @@ export const proof = {
 
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
             const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(programSource))
+            // `assertNotNullish`, not `?? ''`: `noUncheckedIndexedAccess`
+            // makes `runArgs[0]` a `string | undefined`, and this leaf always
+            // passes exactly one argument -- so a default would be a branch
+            // no run can take, standing where the codebase's own rule
+            // ("bind the lookup to a local and narrow it with `assert` /
+            // `assertNotNullish`", AGENTS.md) says an assertion belongs. An
+            // absent argument here is a broken fixture, and should say so.
             /** @type {Report<string>} */
-            const pinReport = ctx => runArgs => ctx.evoHead(runArgs[0] ?? '')
+            const pinReport = ctx => runArgs => ctx.evoHead(assertNotNullish(runArgs[0], ['expected a subject argument', runArgs]))
 
             const [, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(pinReport)(['subjectS'])(
                 { subject: 'subjectS', parents: ['PINNED_INSTEAD'] })(state3)
@@ -1076,7 +1084,9 @@ export const proof = {
             const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(programSource))
 
             /** @type {TaxReport<string>} */
-            const engineReport = ctx => runArgs => ctx.step(ctx.evoHead(runArgs[0] ?? ''), headsJson => {
+            // `assertNotNullish` rather than a `?? ''` default, for the
+            // reason given at `pinReport` above.
+            const engineReport = ctx => runArgs => ctx.step(ctx.evoHead(assertNotNullish(runArgs[0], ['expected a subject argument', runArgs])), headsJson => {
                 /** @type {readonly string[]} */
                 const heads = JSON.parse(headsJson)
                 const headHash = assertNotNullish(heads[0], 'expected at least one head')
@@ -1129,6 +1139,140 @@ export const proof = {
                 // 1040 assembled without touching the store would show none.
                 assertEq(outcome.reads.length, 3)
             }
+        },
+        /**
+         * A store the snapshot step cannot LIST becomes an error OUTCOME,
+         * carried on `runProgramTail`'s own channel — the `catchStep` that
+         * re-tags `buildRunSnapshot`'s `IoChannel` into this module's plain
+         * message channel, which no leaf reached.
+         *
+         * The re-tag is the thing being measured. `buildRunSnapshot` reports
+         * an unlistable store on the node `IoChannel`; this module's channel
+         * is a plain string. Without that one recovery the two channels
+         * never meet and the failure has nowhere to go but out of the
+         * effect, past `asRunOutcome` — so there would be no `status:
+         * 'error'` run record for a run that certainly failed.
+         *
+         * The store is broken exactly where `fjs/cas`'s `list` documents the
+         * distinction: `.cas` PRESENT but not a directory. A missing `.cas`
+         * is a fresh store and answers `ok([])` — which would make the run
+         * succeed against an empty snapshot and prove nothing.
+         *
+         * Ordering is load-bearing and is why the seeding happens first:
+         * `runProgramTail` loads the program BEFORE taking the snapshot, so
+         * the program must be materializable and loadable for the failure to
+         * be the snapshot's. The control run — the identical call against
+         * the same store before it is broken — is what says so: it answers
+         * `kind: 'ok'`.
+         */
+        anUnlistableStoreBecomesAnErrorOutcomeNotAThrow: () => {
+            const home = '/unlistable'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const [state1, docHash] = virtualOrPanic(state0)(seedText(cas)('{"amount":"1.00"}'))
+            const [state2, addResult] = virtual(state1)(
+                e.add({ parents: [], subject: 'subjectS', snapshot: docHash }))
+            assert(addResult[0] === 'ok', ['expected the revision add to succeed', addResult])
+            const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(goodProgramSource))
+            /** @type {Report<string>} */
+            const report = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('ok'))
+
+            // Control: the identical call, against the store as seeded.
+            const [, okOutcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(
+                goodProgramSource)(report)([])(undefined)(state3)
+            assertEq(okOutcome.kind, 'ok')
+
+            // `.cas` present and NOT a directory — `fjs/cas`'s own
+            // "exists but cannot be read" case, as distinct from absent.
+            const unlistable = { ...state3, root: { ...state3.root, unlistable: { '.cas': [] } } }
+            const [, errorOutcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(
+                goodProgramSource)(report)([])(undefined)(unlistable)
+            assertEq(errorOutcome.kind, 'error')
+            if (errorOutcome.kind === 'error') {
+                // `errorSummary`'s whole rendering of the store failure, and
+                // this is what a run record's `error` field would carry.
+                // Bare `io error` because `virtual`'s `fail` attaches no OS
+                // code -- the same rendering `fjs/server/module.f.js`'s
+                // weekOne leaf records for the same reason.
+                assertEq(errorOutcome.message, 'io error')
+                assertEq(errorOutcome.reads.length, 0)
+                // Which STEP failed, said by exclusion: the earlier two
+                // steps have their own vocabulary, so a message that is
+                // neither of theirs is the snapshot's.
+                assert(!errorOutcome.message.includes('materialize'), errorOutcome.message)
+                assert(!errorOutcome.message.includes('JsModule'), errorOutcome.message)
+            }
+        },
+    },
+
+    // ── The CAS-write policy: a failed write is a panic, not a branch ─────
+    //
+    // {@link writeTextToCas}'s docstring states it as a policy: a failure
+    // writing a moderately-sized in-memory string is not a normal-operation
+    // failure this module's error taxonomy covers, so it panics rather than
+    // becoming another arm of the taxonomy. Nothing measured that, which
+    // left the `unwrapStep` summary — the only thing that says WHICH step
+    // could not write — uncalled.
+    casWritePolicy: {
+        /**
+         * A store that cannot be WRITTEN panics, naming the step, rather
+         * than answering an error result whose run record was never stored.
+         *
+         * This is the failure the policy exists to make loud. The call under
+         * test is `handleRunOutcome`'s ERROR arm — `fjsRunTool`'s own
+         * post-outcome logic for a run that already failed — whose whole
+         * job is to persist a `status: 'error'` record and return its hash
+         * (PROV-03). If the write failure were absorbed into an error
+         * result, the caller would be handed a message naming a run record
+         * that does not exist, and the provenance chain this repository's
+         * traceability claim rests on would have a hole in it that reads as
+         * an ordinary refusal.
+         *
+         * `refuses` (the one `try` under `fjs/`) is what lets the leaf
+         * assert WHAT was refused. A `throw:` leaf would pass for the
+         * `assert(vt === 'ok', …)` two lines earlier just as happily.
+         *
+         * The control is the same outcome persisted through the REAL store:
+         * it completes, answers `isError: true`, and the run record it names
+         * really is in CAS. So the panic is the write's doing.
+         *
+         * **The failing store is a stub `Cas`, and it has to be.**
+         * `writeTextToCas` is generic over `Cas<O>`, whose `write` is
+         * declared to answer on the `IoChannel` -- a real host fails one for
+         * `ENOSPC`, `EROFS` or `EACCES`, and those are exactly the
+         * infrastructure failures the policy docstring names. What cannot
+         * reproduce them is `fjs/effects/node/virtual`: its `mkdir` builds
+         * the path chain unconditionally (a file in the way is replaced, not
+         * refused), its staging GC swallows every failure by design, and its
+         * publish step ignores each result and decides on a closing `stat`.
+         * A store broken by state surgery therefore writes SUCCESSFULLY
+         * there, which is a property of the model and not of the code. So
+         * the failure is supplied at the parameter that declares it, with
+         * one method overridden and the rest of the real `fileCas` intact.
+         */
+        anUnwritableStorePanicsNamingTheStepRatherThanLosingTheRunRecord: () => {
+            const cas = fileCas(sha256)('/unwritable')
+            const [state1, programHash] = virtualOrPanic(emptyState)(seedText(cas)(goodProgramSource))
+            /** @type {RunOutcome<unknown>} */
+            const failedRun = { kind: 'error', message: 'the run failed and must still be recorded', reads: [] }
+            /** @type {(store: Cas<FileCasOperation>) => Effect<FileCasOperation | MemOp, ToolsCallResult, never>} */
+            const persistThrough = store => handleRunOutcome(store)(programHash)([])(false)({})(
+                { taxYear: 2025, paramSetHash: 'sha256-paramset1' })(failedRun)
+
+            // Control: through the real store the record IS persisted, and
+            // the hash the caller is handed reads back out of CAS.
+            const [state2, controlResult] = virtualOrPanic(state1)(persistThrough(cas))
+            assertEq(controlResult.isError, true)
+            assertPersistedErrorRunRecord(cas)(state2)(firstTextContent(controlResult).text)
+
+            // The same store with its one fallible method failing, as a host
+            // out of disk space would.
+            /** @type {Cas<FileCasOperation>} */
+            const full = { ...cas, write: () => pureError(ioError({ code: 'ENOSPC', message: 'no space left on device' })) }
+            refuses(() => virtual(state1)(persistThrough(full)))(message => assertEq(
+                message,
+                'expected a CAS write to succeed: io error: ENOSPC'))
         },
     },
 
