@@ -629,7 +629,25 @@ export const scheduleD = inputs => {
     const unrecap1250Line16 = 0n
     // 17. "Combine lines 14-16. If zero or a gain, enter -0-."
     const unrecap1250Line17Raw = unrecap1250Line14 + unrecap1250Line15 + unrecap1250Line16
-    const unrecap1250Line17 = unrecap1250Line17Raw >= 0n ? 0n : unrecap1250Line17Raw
+    // **The printed floor is written as the constant it can only produce,
+    // not as a comparison.** All three terms above are documented zeros this
+    // phase, so the combine can only BE zero and the "enter -0-" floor has no
+    // reachable negative arm -- a branch no legal input can take is a branch
+    // no proof can pin, and `fjs/form6251`'s own clause (i) states the same
+    // position for the same reason: a comparison that can never be true is a
+    // claim a reader has to re-derive.
+    //
+    // The assert is what makes that safe rather than merely tidy. The day a
+    // later phase populates line 14, 15 or 16 it fires by name, and the
+    // printed floor has to come back beside whichever line moved -- which is
+    // strictly louder than `= unrecap1250Line17Raw` would be, since that
+    // would silently carry a GAIN through a line whose instruction is to
+    // floor it.
+    assert(
+        unrecap1250Line17Raw === 0n,
+        ['lines 14-16 are documented zeros this phase', unrecap1250Line17Raw],
+    )
+    const unrecap1250Line17 = 0n
     // 18. "Unrecaptured section 1250 gain: subtract line 17 from line 13.
     //     If zero or less, enter -0-. Enter here and on Schedule D line
     //     19."
@@ -1001,6 +1019,39 @@ export const proof = {
             assertEq(result.line5, 0n)
             assertEq(result.line12, 0n)
             assertEq(result.line16, 0n)
+            // Asserted DIRECTLY rather than through a `k1_` filter over
+            // `result.sources`: this return cites nothing at all, so such a
+            // filter never runs its predicate and cannot tell "no K-1
+            // citation" from "no citation of any kind". The leaf below is
+            // where the filter has something to reject.
+            assertEq(result.sources.length, 0, 'an absent box is ABSENT, never a zero citation')
+        },
+        // **THE CONTROL'S OWN CONTROL.** The leaf above filters
+        // `result.sources` for `k1_` paths on a return that has no sources at
+        // all, so the predicate never runs and `length === 0` cannot tell "no
+        // K-1 citation" from "no citation of any kind" -- the vacuous shape
+        // AGENTS.md names, one level down. Here a 1099-DIV supplies one
+        // non-K-1 citation, so the filter has something to REJECT, and the
+        // total count is hand-typed beside it so this leaf cannot go vacuous
+        // the same way.
+        kOnesWithNoGainBoxesCiteNothingBesideADocumentThatDoes: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [dividendForm('doc-div-beside-empty-k1s')({
+                    box2aTotalCapitalGainDistr: '1000.00',
+                })],
+                partnershipK1Forms: [partnershipGainK1('doc-k1-1065-empty-beside')({})],
+                sCorporationK1Forms: [sCorporationGainK1('doc-k1-1120s-empty-beside')({})],
+                estateTrustK1Forms: [estateTrustGainK1('doc-k1-1041-empty-beside')({})],
+            }))
+            assertEq(result.line5, 0n, 'the three K-1s carry no short-term gain box')
+            assertEq(result.line12, 0n, 'nor a long-term one')
+            // $1,000.00 of capital gain distributions, and the K-1s add
+            // nothing to it.
+            assertEq(result.line13, 100000n)
+            assertEq(result.line16, 100000n)
+            assertEq(result.sources.length, 1, 'box 2a alone: three K-1s cited nothing')
             const fromK1 = result.sources.filter(source => source.boxPath.startsWith('k1_'))
             assertEq(fromK1.length, 0, 'an absent box is ABSENT, never a zero citation')
         },
@@ -1242,6 +1293,51 @@ export const proof = {
             assertEq(source.documentHash, 'doc-carryover-worked-example-b')
             assertEq(source.boxPath, 'priorYearCapitalLossCarryoverWorksheet(shortTerm)')
             assertEq(source.value, '6000.00')
+        },
+        // Plan 15-02's Worked Example C, the LONG-TERM mirror of the leaf
+        // above (prior-year Schedule D line 7 +$1,000.00 short-term GAIN,
+        // line 15 -$8,000.00 long-term loss, line 21 -$3,000.00, Form 1040
+        // line 15 +$30,000.00), independently hand-computed by
+        // `fjs/tax/carryover/module.f.js`'s own worked example to a
+        // $4,000.00 LONG-term carryover and no short-term one -- reused here
+        // for the same reason the leaf above reuses Example B's figure.
+        //
+        // **The pair is what keeps lines 6 and 14 from being one rule read
+        // twice.** They share `carryoverOutputs`, so a citation built from
+        // the wrong half of it would total identically and print the wrong
+        // worksheet name; only the two leaves together say which half went
+        // where. Nothing had ever driven the long-term half.
+        presentValidCarryoverDrivesLineFourteenAndCitesTheLongTermHalf: () => {
+            /** @type {Stored<PriorYearCapitalLoss>} */
+            const carryoverDoc = {
+                documentHash: 'doc-carryover-worked-example-c',
+                value: {
+                    dialect: 'vnd.fjs.prior_year_capital_loss',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2024,
+                    priorYearFormLine15: '30000.00',
+                    priorYearScheduleDLine7: '1000.00',
+                    priorYearScheduleDLine15: '-8000.00',
+                    priorYearScheduleDLine21: '-3000.00',
+                },
+            }
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                priorYearCapitalLossCarryover: carryoverDoc,
+            }))
+            assertEq(result.line6, 0n, 'Worked Example C carries no short-term amount')
+            assertEq(result.line14, -400000n, '$4,000.00 long-term carryover, entered as a negative')
+            assertEq(result.line15, -400000n, 'and line 14 is line 15\'s only summand here')
+            assertEq(result.line16, -400000n, 'line 7 is zero, so line 16 is line 15')
+            assertEq(result.line21, -300000n, 'capped at $3,000.00 for a single filer')
+            assertEq(result.line7aCapitalGainOrLoss, -300000n, 'and that is what 1040 line 7a reads')
+            assertEq(result.sources.length, 1, 'exactly one source: the LT carryover citation')
+            const source = assertNotNullish(result.sources[0])
+            assertEq(source.documentHash, 'doc-carryover-worked-example-c')
+            assertEq(source.boxPath, 'priorYearCapitalLossCarryoverWorksheet(longTerm)')
+            assertEq(source.value, '4000.00')
         },
     },
     // TAX-34/Phase 29: the corrected figure and the uncorrected one, side by
