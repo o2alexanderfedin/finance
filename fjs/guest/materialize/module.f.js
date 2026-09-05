@@ -314,9 +314,22 @@ export const materializeHome = home => join(home, materializeDir)
  * `errorSummary`, never `errorMessage`, and name the step that failed in the
  * project's own words.** `cas_refresh`, `finance_documents_list`,
  * `buildRunSnapshot`'s re-tag in `fjs/server/fjs_run`, `fjs/guest/check` and
- * `fjs/report/amend` all already do this; `materializeProgram` was the last
- * holdout and is one no longer. `grep -rn errorMessage fjs --include='*.f.js'`
- * returns no code hit, which is the checkable form of the rule.
+ * `fjs/report/amend` all already do this. `grep -rn errorMessage fjs
+ * --include='*.f.js'` returns no code hit, which is the checkable form of the
+ * rule — but only for that spelling. Until 2026-09-05 this paragraph called
+ * `materializeProgram` "the last holdout", and {@link loadProgram} thirty
+ * lines below was rendering the same channel through `String(e)`, which the
+ * grep does not catch and which produced `import failed: ioError,[object
+ * Object]` — neither the host's words nor the project's. A claim that names
+ * the last offender goes stale the moment it is written; what is checkable is
+ * that no `String(e)` survives in a renderer position, and none does.
+ *
+ * **The `EvoChannel` arm of the same rule is `evoSummary`, not
+ * `errorSummary`.** An `EvoError` is not an `IoError`, so `errorSummary`
+ * flattens it to the bare `io error` and the project's own words are lost;
+ * `evoSummary` returns them and delegates every other case to `errorSummary`,
+ * so the rule above is preserved rather than excepted. Upstream's own
+ * `evoToolRegistry` renders `list`/`head` with `evoSummary` for this reason.
  *
  * The reason is not stylistic. Upstream's own docstring says `errorMessage` is
  * "for the operator of the program, who is entitled to the host's own words —
@@ -381,7 +394,7 @@ export const loadProgram = allowed => path => source => {
     if (t === 'error') {
         return pureError(v)
     }
-    return catchStep(import_(path), e => pureError(`import failed: ${String(e)}`))
+    return catchStep(import_(path), e => pureError(`import failed: ${errorSummary(e)}`))
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -699,10 +712,26 @@ export const proof = {
         },
         // A missing module is an error value, not a throw — the same
         // discipline Phase 3 locked for refusals.
+        //
+        // The MESSAGE is asserted, not merely the tag. Until 2026-09-05 this
+        // leaf checked `result[0]` alone, and underneath it `loadProgram`
+        // rendered its failure with `String(e)`: the answer was
+        // `import failed: ioError,[object Object]` for four months and the
+        // leaf was green throughout, because a tag says nothing about what
+        // reached the client. `io error` is bare here rather than
+        // `io error: ENOENT` because `virtual`'s `fail` attaches no OS code —
+        // the same reason `errorTaxonomy` states beside its own row.
         missingModuleIsAnErrorValue: () => {
             const [, result] = virtual({ ...emptyState, root: {} })(
                 loadProgram([])(programFileName('ABSENT'))(cleanSource))
             assertEq(result[0], 'error')
+            const message = result[1]
+            assert(typeof message === 'string', ['the error channel is a plain message', message])
+            assertEq(message, 'import failed: io error')
+            // The shapes that would mean the reason was destroyed rather than
+            // summarised, named so a regression cannot pass as a rewording.
+            assert(!message.includes('[object Object]'), ['the payload must not be stringified raw', message])
+            assert(!message.includes('ioError'), ['the raw tag must not reach a client', message])
         },
     },
     // ── The scanner's own edge cases ────────────────────────────────────
