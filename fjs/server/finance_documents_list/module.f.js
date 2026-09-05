@@ -476,12 +476,26 @@ const evoAnsweringRevisions = real => answers => ({
 /**
  * `real`, with `list` failing on the channel `Evo` declares for it.
  *
- * `notImplemented` rather than an `evoError`, and the choice is forced:
- * `Evo.list`'s channel is `EvoChannel = EvoError | NotImplemented`, this
- * tool renders its failures with `errorSummary` (an `IoChannel` renderer),
- * and `EvoError` is not an `IoChannel` — so `NotImplemented` is the only
- * value that both a conforming `Evo` may raise and this tool's own renderer
- * can be handed. It is also the realistic one: the shipped `evo.list` is a
+ * `notImplemented` rather than an `evoError`, and the choice is forced — but
+ * not for the reason this paragraph gave until 2026-09-05. It said
+ * `Evo.list`'s channel is `EvoChannel = EvoError | NotImplemented` and that
+ * the renderer was the binding constraint. **Upstream types `list` and `head`
+ * on `NotImplemented` ALONE**, reserving the full `EvoChannel` for `add` and
+ * `revision` (`fjs/cas/evo/types.d.ts:124,126,137,146`). So no conforming
+ * `Evo` can raise an `EvoError` from `list` at all, and the renderer never
+ * enters into it.
+ *
+ * That distinction is load-bearing, because the wrong version of it reads as
+ * a bug report: "this tool renders an `EvoChannel` with an `IoChannel`
+ * renderer, so an `EvoError` becomes the bare `io error`". The flattening is
+ * real — `errorSummary(evoError(m))` is `io error` — but **nothing here can
+ * produce one to flatten**. The only `EvoChannel` operation this module calls
+ * is `evo.revision`, inside `entryFor`, whose `catchStep` turns any failure
+ * into a skipped entry and never reaches the tool's renderer. `errorSummary`
+ * is therefore correct here, and `evoSummary` would be handling a case the
+ * types forbid.
+ *
+ * `NotImplemented` is also the realistic case: the shipped `evo.list` is a
  * memory-cache read, whose only failure is a runner that cannot dispatch it.
  * @type {(real: Evo<FileCasOperation>) => (command: string) => Evo<FileCasOperation>}
  */
