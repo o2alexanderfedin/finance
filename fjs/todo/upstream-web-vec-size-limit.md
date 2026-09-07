@@ -1,7 +1,7 @@
 # `fjs web` cannot serve a file larger than one `Vec` (131072 bytes)
 
 **Priority:** P2 — it blocks one adoption here; it does not affect anything shipped.
-**Status:** open — filed upstream as `functionalscript#1819` on 2026-08-31
+**Status:** open — filed as `functionalscript#1819`; design PR `functionalscript#1900` open since 2026-09-07
 **Found:** 2026-08-31, executing MAINT-11 (Phase 41, milestone v6), against `functionalscript@0.48.0`
 
 ## What is true today
@@ -69,3 +69,24 @@ description (`Serve a directory over HTTP`) hints at it.
 
 When it is answered, the swap this note blocks is one line in `demo/serve.sh`, and the
 comment there already names the line it becomes.
+
+## The design PR, and what it changed about this note
+
+`functionalscript#1900` fills upstream's own `fjs/effects/node/todo/streaming-http-bodies.md`
+— which **already existed**, at P3, with `fjs/web`'s 413 already listed among its tasks. So this
+gap was known upstream before we filed it; what #1819 added was a consumer who is blocked by it.
+
+The PR is design-only, deliberately. Streaming is not a `fjs/web` change: `ServerResponse.body`
+is a bare `Vec` and `answerRequest` ends with `res.end(fromVec(outBody))`, so the fix is a
+breaking public type change threaded through `RequestListener`, both runners and their proofs.
+Their own ladder — an underspecified todo, then details, then an implementation — is what the PR
+climbs one rung of.
+
+One rule in it was settled by measurement rather than argument: with a declared
+`Content-Length`, a producer that fails mid-body yields a truncated response Node reports as an
+error; under `Transfer-Encoding: chunked` the same failure arrives as a **clean, complete**
+response with `res.complete === true`. A truncated file indistinguishable from a whole one is
+DESIGN §10's plausible wrong value, so the design specifies `destroy`, not `end`.
+
+**The ceiling still stands** until an implementation lands, so `demo/serve.sh` stays on
+`python3 -m http.server` and MAINT-11's `fjs web` half stays blocked.
