@@ -1,7 +1,7 @@
 # `evo(cas)(key)` throws a raw `TypeError` when the memory slot was never allocated
 
 **Priority:** P3 — a diagnostics gap, not a live fault here. Nothing in this repository can reach it.
-**Status:** open — filed upstream as `functionalscript#1893` on 2026-09-05
+**Status:** open — filed as `functionalscript#1893`; fix PR `functionalscript#1899` open since 2026-09-07
 **Found:** 2026-09-05, sweeping error-rendering sites after MAINT-11, against `functionalscript@0.48.0`
 
 ## What is true today
@@ -82,3 +82,22 @@ Taken upstream under the standing authority in AGENTS.md §7, as
 [`functionalscript#1893`](https://github.com/functionalscript/functionalscript/issues/1893),
 with the reproduction above and both fix shapes offered. `functionalscript#1819` (the `fjs web`
 size ceiling) is the sibling filed one milestone earlier.
+
+## This note named the wrong module, and the PR says so
+
+`evo` is where the crash surfaced, not where it lives. The hole is in the virtual interpreter's
+`memRead` (`fjs/effects/node/virtual/module.f.mjs`), which reads the slot table by index and
+answers `ok(undefined)` for a key that was never allocated — the plausible wrong value upstream's
+own DESIGN.md §10 forbids. The `TypeError` then fired wherever that `undefined` was first
+dereferenced, which in our reproduction was `cache.bySubject`; any other slot consumer would have
+produced a different message from the same hole.
+
+That also settles the shape question this note posed as a choice. It is not one: the **real Node
+interpreter already panics** for this condition — `fjs/effects/node/memory/module.mjs` throws
+`memory key not found: ${id}` from both `memRead` and `memWrite`. The virtual runner was the
+outlier, so `functionalscript#1899` closes a divergence rather than setting policy. Shape 1
+(widening `list`/`head` to `EvoChannel`) would have been wrong twice: a breaking API change
+describing something that is not a runtime failure of `evo`, and dead against the real runner.
+
+The correction was posted to the issue as well, so the record upstream is not left pointing at
+the wrong file.
