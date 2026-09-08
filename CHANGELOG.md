@@ -58,6 +58,52 @@ wizard around it — `demo/form1040.html` — and a print stylesheet behind it.
   which this project does not obtain. Still no PDF, no image, no web font, no network request:
   the printable page works with the network unplugged, under the same strict CSP.
 
+### The Form 1040, on the IRS's own PDF
+
+**Phase 35, the other half.** The printed face above is a CSS re-creation, and **the IRS will
+not accept one.** The filable artifact is their own `f1040.pdf`, now committed verbatim at
+[`forms/f1040-2025.pdf`](./forms/f1040-2025.pdf) and filled from the engine.
+
+- **`@cantoo/pdf-lib` was approved by both owners on 2026-09-07**, as a `devDependency`, and
+  the approval is written into `.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` rather
+  than left in the conversation it was given in. AGENTS.md makes owner approval a hard stop;
+  a hard stop discharged only in chat is one the next reader cannot check. Nothing under
+  `fjs/` imports it — `fjs/form1040/pdf` decides what to write and where, as data, and
+  `form1040-pdf-gate.test.js` is the only place a library touches a byte.
+- **The guard is total over the 199 names the PDF declares**, which is the property the whole
+  approach rests on: every field carries a name, so an unmapped field is *detectable*. 56
+  amount rows, 5 filing-status boxes, and 138 named as fed by nothing WITH the reason — the
+  identity block, the dependents grid, the direct-deposit and signature and preparer blocks,
+  the per-line election ticks. Compared against the artifact both ways and on field kind.
+  Separately, over the engine: a line with no field, a field with no line, or two lines
+  claiming one printed number each refuse the WHOLE plan.
+- **The field names are the IRS's own.** The PDF carries an XFA template — it is a hybrid
+  AcroForm + XFA document, and this repository's roadmap said "no XFA" until now — in which
+  each printed line number is a `<draw name="Ln…">` traversing to the field beside it. All 57
+  bindings are re-derived from the committed bytes on every run and compared to the hand-typed
+  table. **57 against 56 rows:** line 38 is the estimated-tax penalty, which no dialect carries
+  the payment dates to compute, so mapping it would create the filled-from-nothing case the
+  guard forbids.
+- **Two returns are filled and read back out of the saved bytes**, all 199 fields swept:
+  eighteen hold hand-typed values and 181 are empty. Expectations are keyed by FIELD NAME, not
+  by line number — keyed by line they would be read through the map they check. `flatten()`
+  after filling, verified by reloading: **zero form fields left**, and every value read back
+  out of the page's own drawn marks. That last check needed a correction worth recording:
+  flatten draws through each widget's appearance stream and the text arrives as HEX string
+  operands (`<3134312C303030> Tj`), so a first version matching only `(literal) Tj` found
+  nothing at all — which would have read as "flatten dropped every value".
+- **Seven mutations, each watched to fail.** The instructive one is the transposition: swapping
+  the fields for lines 15 and 16 reddens seven leaves and leaves BOTH the flatten check and the
+  field-coverage check green, because a swap preserves the drawn strings and the name set
+  alike. Full table with predicted-versus-actual in the roadmap entry.
+- **What is NOT filled is named, not discovered.** The taxpayer's name, identifying number and
+  address are blank, and so are the dependents grid, the direct-deposit block and both
+  signature blocks. **A filer must complete the header block and sign before this can be
+  mailed.** The engine computes a return and holds no identity; a name copied out of a W-2 box
+  would be the only value on the page that no rule produced and no source cites.
+- **E-file still out of scope**, for the reason above it: IRS Modernized e-File requires
+  authorization as a provider.
+
 ### Form 461 — Limitation on Business Losses (§461(l))
 
 **A farm loss computes.** `fjs/form461` is the printed form, all sixteen lines, wired into

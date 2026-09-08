@@ -1482,7 +1482,7 @@ for why a phase without an ID is preferable to an ID invented to give it one.
 
 - [x] **Phase 35: A Filable Artifact — fill the official `f1040.pdf`**
       **Scheduled into v4 on 2026-08-19 with a researched approach; the CSS half already shipped in v3.
-      Executed 2026-09-07.**
+      Executed 2026-09-07/08.**
 
       ┌──────────────────────────────────────────────────────────────────────────────────────┐
       **THE DEPENDENCY GATE IS CLEARED. `@cantoo/pdf-lib` IS APPROVED BY BOTH OWNERS,
@@ -1570,14 +1570,32 @@ for why a phase without an ID is preferable to an ID invented to give it one.
          all 57 printed-line bindings from the committed bytes and compares them to the
          hand-typed table. 57 against 56 rows: line 38 is the estimated-tax penalty, which
          the engine does not compute.
-      4. **Seven mutations, each watched to fail**, each reverted, each a 1/1 (or 0/1) diff:
-         transposing lines 15 and 16 in the map (6 leaves red — and *not* the flatten check
-         or the coverage check, since a transposition preserves both the drawn strings and
-         the name set, which is exactly why the read-back is keyed by field NAME); deleting
-         one unfed name (7 red, two more than predicted); breaking the thousands separator
-         (7 red); weakening the field-with-no-line direction (1 red — precisely the leaf
-         written for it); narrowing `-0-` from "zero or less" to "less than zero" (2 red);
-         altering the pinned SHA-256 (1 red); pointing an amount line at a checkbox (10 red).
+      4. **Seven mutations, each watched to fail and each reverted.** Counts are `npm test`'s
+         own `ℹ fail`, re-read from the saved runs rather than from memory — a first version
+         of this table was low by one on four rows because it counted the reporter's
+         `failing tests:` header out of a list that already excluded it, which is the shape
+         of error this project keeps finding in its own claims.
+
+         | mutation | diff | predicted red | actual red |
+         |---|---|---|---|
+         | transpose the fields for lines 15 and 16 | 2 / 2 | 7 | **7** |
+         | delete one name from the unfed table | 0 / 1 | 5 | **8** |
+         | thousands grouping `\d{3}` → `\d{4}` | 1 / 1 | 6 | **8** |
+         | weaken the field-with-no-line direction of the guard | 1 / 1 | 1 | **1** |
+         | narrow `-0-` from "zero or less" to "less than zero" | 1 / 1 | 2 | **2** |
+         | alter the pinned SHA-256 by one character | 1 / 1 | 1 | **1** |
+         | point an amount line at a checkbox | 1 / 1 | ≥2 | **12** |
+
+         The transposition is 2 / 2 because a swap is two edits; every other row is the
+         single-token change AGENTS.md asks for. **What the transposition does NOT redden is
+         the finding worth keeping:** neither the flatten check nor the field-coverage check
+         moves, because a swap preserves the set of drawn strings and the set of field names
+         exactly. That is the whole reason the read-back expectations are keyed by field
+         NAME — keyed by line number they would be read through the map they are checking,
+         and value and expectation would move together. Two predictions were low (deleting a
+         name also breaks three message-content leaves that build on the same table; the
+         formatter also reaches two negative-amount leaves), and both surprises are in the
+         safe direction.
 
       **What it does NOT fill, named rather than discovered:** the taxpayer's name,
       identifying number and address; the dependents grid; the direct-deposit block; the
