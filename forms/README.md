@@ -21,10 +21,16 @@ running against a *fixed* artifact:
   the doubled proof run is that a green result nobody could distinguish from a
   real one survives for months.
 - **A fetch at test time makes the suite depend on the IRS not republishing.**
-  They do republish: the file here carries an XMP `MetadataDate` of
-  2026-01-02, four months after the revision Phase 33 read the printed labels
-  off (footer `Created 9/5/25`). A silently newer PDF is exactly the change
-  that could move a field name under a mapping table that still typechecks.
+  The file here carries an XMP `MetadataDate` of 2026-01-02 — four months
+  after Phase 33 read the printed labels off this form — while the printed
+  footer still reads `Cat. No. 11320B · Form 1040 (2025) Created 9/5/25`. So
+  the *revision* is the same one Phase 33 checked and the *file* is not: it was
+  re-saved and re-published in between. That is the more instructive case, not
+  the milder one — a byte-level change nothing on the page announces is exactly
+  the change that could move a field name under a mapping table that still
+  typechecks. (An earlier draft of this file read the metadata date as a new
+  revision. It was not; the rendered footer says so, and it was only found by
+  rendering a filled copy and looking at it.)
 
 So the bytes are here, the SHA-256 below is asserted by the gate, and replacing
 the file without re-running the mapping check turns the suite red rather than
@@ -44,7 +50,13 @@ Measured on 2026-09-07 with `@cantoo/pdf-lib` against the committed bytes:
 - **2 pages, 199 form fields, 199 widgets** — 126 text fields and 73
   checkboxes. Every field carries a name, which is the property the whole
   approach rests on: an unmapped field is a *detectable* hole.
-- `dc:title` is `2025 Form 1040`; the authoring tool is Adobe Designer 6.5.
+- `dc:title` is `2025 Form 1040`; the printed footer is `Cat. No. 11320B ·
+  Form 1040 (2025) Created 9/5/25`; the authoring tool is Adobe Designer 6.5.
+- **Filling it and rendering the result was checked by eye, once**, and it is
+  worth saying that plainly: the field map is verified mechanically against the
+  IRS's own XFA bindings, but nothing mechanical can tell you the amounts land
+  in boxes a human reads as the right ones. They do — both pages, every figure
+  in its ruled cell, the filing-status tick in the Single box.
 - **It is a hybrid AcroForm + XFA document, and `.planning/ROADMAP.md` said
   "no XFA".** That claim was wrong and is corrected there. The AcroForm's own
   dictionary holds an `/XFA` key with an eleven-packet stream set; what the
