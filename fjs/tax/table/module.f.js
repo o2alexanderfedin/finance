@@ -467,9 +467,68 @@ export const handTranscribedRows = [
     // directly -- the $25->$50 band-width transition.
     { atLeast: '2975.00', lessThan: '3000.00', single: 299, marriedFilingJointly: 299, marriedFilingSeparately: 299, headOfHousehold: 299 },
     { atLeast: '3000.00', lessThan: '3050.00', single: 303, marriedFilingJointly: 303, marriedFilingSeparately: 303, headOfHousehold: 303 },
+    // ── Phase 34: the twelve rows straddling a RATE change ─────────────────
+    //
+    // The ten rows this list held until 2026-09-07 sample every BAND-WIDTH
+    // region and both width transitions, which is what Phase 8 needed. Not
+    // one of them sits at a BRACKET boundary, and that is where a wrong
+    // stored ceiling first shows on the printed page: below $100,000 there
+    // are six such boundaries across the four columns (single and
+    // married-filing-separately share theirs), and the ten rows above cover
+    // none of them.
+    //
+    // Read from **Publication 17 (2025)**, the 2025 Tax Table beginning on
+    // printed page 111 -- a DIFFERENT document from the "Tax and Earned
+    // Income Credit Tables" the ten rows above cite, so where the two
+    // overlap they are also a check on each other. Each boundary contributes
+    // the row containing it and the row immediately below it, so a ceiling
+    // moved in either direction changes one of the pair.
+    //
+    // Four of the twenty-four figures added here land on an exact half
+    // dollar before rounding -- $11,925 taxed at ten percent is $1,192.50,
+    // and the $96,900-$96,950 row is a half dollar in three of its four
+    // columns at once -- so these rows exercise the tie-breaking direction
+    // as well as the boundary. Every figure was read off the printed page,
+    // and every one was independently re-derived by hand from the 2025 Tax
+    // Rate Schedules (Publication 17 page 125) before being trusted here.
+    //
+    // **They add no mutation coverage the ten did not already have, and
+    // that is a property of the ten worth writing down.** Moving single's
+    // twelve-percent ceiling from $48,475 to $48,375 reddens this leaf with
+    // the twelve rows present and reddens it identically with only the
+    // original ten (measured, not assumed). The reason is the last of the
+    // ten: the $99,950 row sits ABOVE every bracket boundary below
+    // $100,000, so its cumulative tax moves whenever any of them moves, in
+    // all four columns at once. What the twelve buy is not a caught
+    // mutation but a sampled fraction -- twenty-two rows of the 2,062 the
+    // page prints instead of ten -- and a second document behind them. The
+    // full-page diff that checks all 2,062 lives in
+    // `.planning/reports/phase-34-cross-check-harness/`, outside `npm test`
+    // because it needs a vendored copy of the printed table.
+    //
+    // single / married-filing-separately, ten percent to twelve at $11,925.
+    { atLeast: '11850.00', lessThan: '11900.00', single: 1188, marriedFilingJointly: 1188, marriedFilingSeparately: 1188, headOfHousehold: 1188 },
+    { atLeast: '11900.00', lessThan: '11950.00', single: 1193, marriedFilingJointly: 1193, marriedFilingSeparately: 1193, headOfHousehold: 1193 },
+    // head of household, ten percent to twelve at $17,000.
+    { atLeast: '16950.00', lessThan: '17000.00', single: 1799, marriedFilingJointly: 1698, marriedFilingSeparately: 1799, headOfHousehold: 1698 },
+    { atLeast: '17000.00', lessThan: '17050.00', single: 1805, marriedFilingJointly: 1703, marriedFilingSeparately: 1805, headOfHousehold: 1703 },
     // Publication 1040 (2025), Tax and Earned Income Credit Tables, read
     // directly -- Success Criterion 3's own row.
     { atLeast: '18000.00', lessThan: '18050.00', single: 1925, marriedFilingJointly: 1803, marriedFilingSeparately: 1925, headOfHousehold: 1823 },
+    // married filing jointly, ten percent to twelve at $23,850.
+    { atLeast: '23800.00', lessThan: '23850.00', single: 2621, marriedFilingJointly: 2383, marriedFilingSeparately: 2621, headOfHousehold: 2519 },
+    { atLeast: '23850.00', lessThan: '23900.00', single: 2627, marriedFilingJointly: 2388, marriedFilingSeparately: 2627, headOfHousehold: 2525 },
+    // single / married-filing-separately, twelve percent to twenty-two at
+    // $48,475 -- the second row's midpoint IS the boundary, and its
+    // $5,578.50 is the printed rate schedule's own constant.
+    { atLeast: '48400.00', lessThan: '48450.00', single: 5573, marriedFilingJointly: 5334, marriedFilingSeparately: 5573, headOfHousehold: 5471 },
+    { atLeast: '48450.00', lessThan: '48500.00', single: 5579, marriedFilingJointly: 5340, marriedFilingSeparately: 5579, headOfHousehold: 5477 },
+    // head of household, twelve percent to twenty-two at $64,850.
+    { atLeast: '64800.00', lessThan: '64850.00', single: 9176, marriedFilingJointly: 7302, marriedFilingSeparately: 9176, headOfHousehold: 7439 },
+    { atLeast: '64850.00', lessThan: '64900.00', single: 9187, marriedFilingJointly: 7308, marriedFilingSeparately: 9187, headOfHousehold: 7448 },
+    // married filing jointly, twelve percent to twenty-two at $96,950.
+    { atLeast: '96900.00', lessThan: '96950.00', single: 16238, marriedFilingJointly: 11154, marriedFilingSeparately: 16238, headOfHousehold: 14499 },
+    { atLeast: '96950.00', lessThan: '97000.00', single: 16249, marriedFilingJointly: 11163, marriedFilingSeparately: 16249, headOfHousehold: 14510 },
     // Publication 1040 (2025), Tax and Earned Income Credit Tables, read
     // directly -- the table's last row, immediately followed on the
     // printed page by "$100,000 or over, use the Tax Computation
@@ -560,6 +619,16 @@ export const handTranscribedTaxComputationWorksheetRows = [
 const expectedTaxComputationWorksheetRowCount = 20
 
 /**
+ * {@link handTranscribedRows}' own row count, hand-typed for the same reason
+ * as the constant above and added by Phase 34, which is when the list first
+ * grew: ten rows sampling the band structure, plus twelve straddling the six
+ * bracket boundaries below $100,000. Until then the diff had no count at all,
+ * so a row deleted in an edit would have taken four published figures out of
+ * the comparison while the remaining rows all still passed.
+ */
+const expectedHandTranscribedRowCount = 22
+
+/**
  * $100,000.00 above a section's last, open-ended row — the probe offset
  * that reaches the 37% band without needing a second hand-typed income
  * per section.
@@ -590,6 +659,11 @@ export const proof = {
     // (mirroring fjs/document/1099int/module.f.js's per-field assertion
     // pattern).
     rowByRowDiffMatchesPublishedTable: () => {
+        assertEq(
+            handTranscribedRows.length,
+            expectedHandTranscribedRowCount,
+            'expected ten band-structure rows and twelve bracket-boundary rows',
+        )
         for (const transcribed of handTranscribedRows) {
             const row = lookupTaxTable(taxParams2025)(centsFromString(transcribed.atLeast))
             assertEq(

@@ -1103,7 +1103,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: none mapped · **Tier**: T1 · **Status**: the dependency gate is CLEARED — `@cantoo/pdf-lib` approved by **both** owners on 2026-09-07 (Alexander directly; Sergey's agreement confirmed by Alexander in the same session). The authorization is written into the phase entry below so it survives the chat it was given in. Filling, the two-way field guard and the mutation pass shipped the same day; the header identity block is deliberately NOT filled and is named there.
 
 ### Phase 36: The Conversational Path
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on a real client session with real documents
+**Requirements**: none mapped · **Tier**: T1 · **Status**: **run 2026-09-07, gaps found and left open** — milestone v5. The path was driven end to end against a real `node index.js` server: documents in, `fjs_run`, **$6,135.00 owed on 1040 line 37**, and every figure traced: of the **144** `(documentHash, boxPath, value)` citations behind the 56 rendered lines, **zero name a value the store contradicts**, **135 resolve as first filed**, and **all 144 after one client-side profile amendment** that leaves the answer unmoved. Nothing under `fjs/` was changed to reach it. **One step is not reachable from the MCP surface** — the guest vocabulary a stored program is written in (`ctx.form1040Report` and five others) is named by no tool description, no served schema and no refusal, and a wrong guess at it exits the server process instead of returning an error result. Report `.planning/reports/phase-36-conversational-path.md`; the harness is `conversational-path-integration.test.js` (12 subtests). The remaining half of the criterion — a model choosing the calls, and reading boxes off a real scan — still needs a person at a real client.
 
 ### Phase 37: FunctionalScript 0.46.1
 **Requirements**: MAINT-06 (intent) · **Tier**: T3 · **Status**: complete 2026-08-19 · record: `.planning/reports/fjs-0.46.1-migration.md`
@@ -1179,9 +1179,9 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 31. Gap Closure — 8995-A, 8606 Part II, OCR island | v2 | 0/0 — no plans were written | Complete (TAX-32, TAX-29, MAINT-01) | 2026-08-17 |
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
 | 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
-| 34. Second-Implementation Cross-Check | **v5** | 0/TBD | Not started | - |
-| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/0 — no plans were written | Complete for the engine's own lines; the header identity block is named as unfilled | 2026-09-07 |
-| 36. The Conversational Path | **v5** | 0/TBD | Not started | - |
+| 34. Second-Implementation Cross-Check | **v5** | 0/0 — no plans were written | Partly satisfiable without the owner: 8,371 comparisons, 0 disagreements with Pub 17 and a TY2025 commercial engine, 4 with the IRS's own ATS scenarios that resolve against the source. No document read end to end; the owner-facing diff harness is written and waiting for the documents | 2026-09-08 · PR #155 |
+| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/0 — no plans were written | Complete for the engine's own lines; the header identity block is named as unfilled, so a filer must complete and sign before mailing | 2026-09-08 · PR #156 |
+| 36. The Conversational Path | **v5** | 0/0 — no plans were written | Run against a real server: the answer is reached and 144 of 144 citations resolve, but the guest vocabulary is unreachable from the surface — report in `.planning/reports/` | 2026-09-08 · PR #154 |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
 | 38. Take FunctionalScript 0.47.0 | v5 | 0/0 — no plans written | Complete (MAINT-09); superseded four days later by 0.48.0 in Phase 42 | 2026-08-27 · PR #139 |
 | 39. Retire the Protocol-Version Gap | **v6** | 0/0 — no plans written | Complete (MAINT-10); three dangling citations removed, and the proof that could not have failed replaced by one that watches the negotiation | 2026-08-31 · PR #145 |
@@ -1609,6 +1609,54 @@ for why a phase without an ID is preferable to an ID invented to give it one.
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
       answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
       unchanged and still wanted.
+
+      **RUN 2026-09-07. The answer arrives; one step of the path does not exist.** The box
+      stays unchecked deliberately — see below for what is still owed. Report:
+      `.planning/reports/phase-36-conversational-path.md`; harness:
+      `conversational-path-integration.test.js`, 12 subtests, four of them watched to fail.
+
+      **What worked, against a real `node index.js` process and a real filesystem.** A
+      single filer for TY2025 with a Form W-2, a Form 1099-INT and a Form 1099-DIV,
+      each arriving first as a `vnd.fjs.ocr` artifact and then as the dialect document
+      read off it, stored through `cas_add`/`evo_add`; the dialect list discovered from
+      the server's own unknown-dialect refusal and all thirty schemas read back; the
+      parameter set read through `finance_tax_params`; `fjs_run` over the stored program;
+      **`$6,135.00` owed on 1040 line 37**, matching a hand-derivation done before the
+      engine was asked. **Every one of the 144 `(documentHash, boxPath, value)` citations
+      behind the 56 rendered lines was fetched back through `cas_get` and compared**:
+      **zero** name a value the store contradicts, and after one client-side profile
+      amendment **all 144 resolve**. Nothing under `fjs/` was touched.
+
+      **The step that does not exist.** `fjs_run` executes a program written against the
+      frozen guest ABI, and **nothing on the MCP surface names it.** The whole surface was
+      captured in-session — thirteen tool descriptions and input schemas, all thirty
+      dialect schemas, the parameter set, the document list, the refusal — and searched
+      for `form1040Report`, `taxParams`, `centsFromString`, `centsToString`, `ctx.step`
+      and `ctx.pure`. **None is present**, with three controls proving the search finds
+      what is there. A client holding only the surface therefore cannot author the
+      program, and `.planning/REQUIREMENTS.md` forbids the tool that would let it skip
+      authoring — correctly, on this project's own thesis. A client that can also READ
+      this repository can, which is what the harness stands in for.
+
+      **And a wrong guess is not a refusal.** A program naming a `ctx` member that does
+      not exist passes `fjs_check` (`exportsReport: true`), then **exits the server
+      process with code 1** on an uncaught `TypeError` — no `isError` result, no run
+      record, the session's connection gone. Contrast the guard that does work: a program
+      that reads nothing is refused precisely, in the agent's own words, with the run
+      record kept and the session still answering. A hallucinated answer is caught; a
+      hallucinated vocabulary is not.
+
+      **Two smaller findings, both recorded rather than fixed.** `paramSetHash` is a
+      digest, not an address — `cas_get` answers `no such hash`, so the statutory figures
+      ($15,750.00, the Tax Table's $12,135.00) are traceable to a name where the
+      document-derived ones are traceable to bytes. And `sourceArtifactHash` exists on
+      only two of the thirty dialects, so the chain runs figure -> document -> scan for a
+      1099-DIV and stops one step short for a W-2.
+
+      **What is still owed before this box is checked**: a model choosing the calls rather
+      than a script making them, and a model reading the boxes off an actual scan. Neither
+      is testable without a person at a real client, which is what this phase was always
+      blocked on and still is.
 
 
 ---
