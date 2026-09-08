@@ -26,6 +26,16 @@
  * the printed page trustworthy, so the entry point a filer uses must not be
  * the one that skips them.
  *
+ * ## Two front doors, and now a third reader
+ *
+ * Phase 35 fills the IRS's own `f1040.pdf` from the same report, so a THIRD
+ * consumer now needs to know which printed line a `rule` string names.
+ * `lineNumberOf` therefore moved out of this file and into
+ * `fjs/form1040/pdf`, and this file imports it through `lib/engine.js` like
+ * everything else from the engine. One rule, one place: a face and a filled
+ * PDF that disagree about which line `1040 line 16 (Tax Computation
+ * Worksheet)` is would each look right on their own.
+ *
  * ## Two things that are deliberately not hardcoded
  *
  * **The amounts.** Every figure comes from `form1040Report` called on the
@@ -94,6 +104,7 @@ import { sourceFooter } from '../lib/github.js'
 import { inputs, documentLabel } from '../lib/fixtures.js'
 import {
     form1040Report, ty2025, money, moneyParts, shortAddress, individualFilingStatuses,
+    lineNumberOf,
 } from '../lib/engine.js'
 
 /** @import { Step } from '../demo.js' */
@@ -335,17 +346,6 @@ const filingStatusBoxes = [
     ['headOfHousehold', 'Head of household (HOH)'],
     ['qualifyingSurvivingSpouse', 'Qualifying surviving spouse (QSS)'],
 ]
-
-/**
- * The engine's line number for a report line's rule.
- *
- * Line 16's rule carries the METHOD that priced it — `1040 line 16 (Tax
- * Computation Worksheet)` — so the trailing parenthetical is stripped rather
- * than matched around. Step 3 learned this the expensive way: matching on
- * equality silently dropped the most interesting row on the page.
- * @type {(rule: string) => string}
- */
-const lineNumberOf = rule => rule.replace(/^1040 line /, '').replace(/ \(.*\)$/, '')
 
 /** A printed line number with a `$` box, split out of a page's bands.
  * @type {(bands: readonly Band[]) => readonly string[]}

@@ -1100,7 +1100,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on the owner's documents and an account at a second filer
 
 ### Phase 35: A Filable Artifact — fill the official `f1040.pdf`
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on one dependency approval (`@cantoo/pdf-lib`); research complete in the phase list above
+**Requirements**: none mapped · **Tier**: T1 · **Status**: the dependency gate is CLEARED — `@cantoo/pdf-lib` approved by **both** owners on 2026-09-07 (Alexander directly; Sergey's agreement confirmed by Alexander in the same session). The authorization is written into the phase entry below so it survives the chat it was given in. Filling, the two-way field guard and the mutation pass shipped the same day; the header identity block is deliberately NOT filled and is named there.
 
 ### Phase 36: The Conversational Path
 **Requirements**: none mapped · **Tier**: T1 · **Status**: **run 2026-09-07, gaps found and left open** — milestone v5. The path was driven end to end against a real `node index.js` server: documents in, `fjs_run`, **$6,135.00 owed on 1040 line 37**, and every figure traced: of the **144** `(documentHash, boxPath, value)` citations behind the 56 rendered lines, **zero name a value the store contradicts**, **135 resolve as first filed**, and **all 144 after one client-side profile amendment** that leaves the answer unmoved. Nothing under `fjs/` was changed to reach it. **One step is not reachable from the MCP surface** — the guest vocabulary a stored program is written in (`ctx.form1040Report` and five others) is named by no tool description, no served schema and no refusal, and a wrong guess at it exits the server process instead of returning an error result. Report `.planning/reports/phase-36-conversational-path.md`; the harness is `conversational-path-integration.test.js` (12 subtests). The remaining half of the criterion — a model choosing the calls, and reading boxes off a real scan — still needs a person at a real client.
@@ -1179,9 +1179,9 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 31. Gap Closure — 8995-A, 8606 Part II, OCR island | v2 | 0/0 — no plans were written | Complete (TAX-32, TAX-29, MAINT-01) | 2026-08-17 |
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
 | 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
-| 34. Second-Implementation Cross-Check | **v5** | 0/TBD | Not started | - |
-| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/TBD | CSS half shipped; PDF half blocked on a dependency decision | - |
-| 36. The Conversational Path | **v5** | 0/TBD | Run against a real server; the answer is reached and 144 of 144 citations resolve, but the guest vocabulary is unreachable from the surface — report in `.planning/reports/` | 2026-09-07 |
+| 34. Second-Implementation Cross-Check | **v5** | 0/0 — no plans were written | Partly satisfiable without the owner: 8,371 comparisons, 0 disagreements with Pub 17 and a TY2025 commercial engine, 4 with the IRS's own ATS scenarios that resolve against the source. No document read end to end; the owner-facing diff harness is written and waiting for the documents | 2026-09-08 · PR #155 |
+| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/0 — no plans were written | Complete for the engine's own lines; the header identity block is named as unfilled, so a filer must complete and sign before mailing | 2026-09-08 · PR #156 |
+| 36. The Conversational Path | **v5** | 0/0 — no plans were written | Run against a real server: the answer is reached and 144 of 144 citations resolve, but the guest vocabulary is unreachable from the surface — report in `.planning/reports/` | 2026-09-08 · PR #154 |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
 | 38. Take FunctionalScript 0.47.0 | v5 | 0/0 — no plans written | Complete (MAINT-09); superseded four days later by 0.48.0 in Phase 42 | 2026-08-27 · PR #139 |
 | 39. Retire the Protocol-Version Gap | **v6** | 0/0 — no plans written | Complete (MAINT-10); three dangling citations removed, and the proof that could not have failed replaced by one that watches the negotiation | 2026-08-31 · PR #145 |
@@ -1480,8 +1480,23 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       line. Two independent implementations agreeing is what a prior-year return was standing in
       for.
 
-- [ ] **Phase 35: A Filable Artifact — fill the official `f1040.pdf`**
-      **Scheduled into v4 on 2026-08-19 with a researched approach; the CSS half already shipped in v3.**
+- [x] **Phase 35: A Filable Artifact — fill the official `f1040.pdf`**
+      **Scheduled into v4 on 2026-08-19 with a researched approach; the CSS half already shipped in v3.
+      Executed 2026-09-07/08.**
+
+      ┌──────────────────────────────────────────────────────────────────────────────────────┐
+      **THE DEPENDENCY GATE IS CLEARED. `@cantoo/pdf-lib` IS APPROVED BY BOTH OWNERS,
+      2026-09-07.** Alexander approved it directly and confirmed in the same session that
+      Sergey had agreed. It is written here, and not only in the conversation it was given
+      in, because AGENTS.md makes owner approval a hard stop and an authorization that
+      lives in a chat log is an authorization the next reader cannot check. The scope of
+      the approval is the package named below, as a **`devDependency`** — nothing under
+      `fjs/` imports it, the shipped `finance` package's `dependencies` are unchanged, and
+      deleting `form1040-pdf-gate.test.js` would leave the engine untouched. That is the
+      shape AGENTS.md's one prior exception (`ui-tests/`) established for an approved
+      third-party tool, and moving it to `dependencies` would be a **new** question needing
+      a **new** approval.
+      └──────────────────────────────────────────────────────────────────────────────────────┘
 
       **What ships today and why it is not enough.** `demo/form1040.html` renders both pages of the
       form face in pure CSS, every amount from `form1040Report` at render time, every amount a button
@@ -1490,8 +1505,8 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       comprehension, not filing, so print fidelity is deliberately NOT chased to the millimetre.
 
       **The real artifact is their own PDF.** `https://www.irs.gov/pub/irs-pdf/f1040.pdf` is a
-      fillable AcroForm — verified by decompressing it: **199 widgets, 126 text fields, 73 checkboxes,
-      no XFA**. Filling those fields yields a form the IRS accepts on paper, in their layout with
+      fillable AcroForm — verified by decompressing it: **199 widgets, 126 text fields, 73
+      checkboxes**. Filling those fields yields a form the IRS accepts on paper, in their layout with
       their labels, and **deletes the entire transcription-risk class** that v3 paid for: checking
       the CSS face against the printed page found four real errors, including a checkbox block off by
       one for its whole length, and cost `10-RESEARCH.md` its standing as a label authority.
@@ -1512,9 +1527,15 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       an unpleasant conversation at exactly the wrong moment. `flatten()` after filling, so different
       viewers cannot render the same return differently.
 
-      **THE GATE IS NOT TECHNICAL.** `AGENTS.md` forbids adding any dependency, dev included, without
-      **every owner's approval**, and there are two owners. This phase cannot start until that
-      decision is taken — which is why it sits in v4 beside the two phases that need the taxpayer.
+      **Taken at `^2.9.2` on 2026-09-07, not the `2.9.1` researched above** — 2.9.2 published in
+      the intervening three weeks. The API used here is `PDFDocument.load` / `getForm` /
+      `getTextField` / `getCheckBox` / `flatten` / `save`, all of which pdf-lib 1.17.1 has under the
+      same names, so the escape route the comparison table was bought for is still one import line.
+
+      **THE GATE WAS NOT TECHNICAL, AND IT IS NOW CLEARED** — see the box at the head of this
+      entry. `AGENTS.md` forbids adding any dependency, dev included, without **every owner's
+      approval**, and there are two owners; both gave it on 2026-09-07. The paragraph that stood
+      here said the phase could not start until that decision was taken, and it was right.
 
       **The work, once approved, is small and mechanically checkable.** The engine already emits
       `{ value, rule, sources }` with printed line numbers. What is needed is a line-number → field-name
@@ -1525,6 +1546,65 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       watched to fail.
 
       **E-file stays out of scope.** IRS MeF requires provider authorization no personal project obtains.
+
+      ---
+
+      **What shipped, 2026-09-07.** `fjs/form1040/pdf/module.f.js` (pure, 100% line, branch
+      and function, 25 proof leaves) holds the map and both directions of the guard;
+      `form1040-pdf-gate.test.js` (8 tests) is the only place a PDF library touches a byte.
+      `forms/f1040-2025.pdf` is the artifact, committed and hash-pinned, with
+      `forms/README.md` recording where it came from.
+
+      1. **A filled `f1040.pdf` exists, and it was looked at.** Two returns are filled from
+         `form1040Report` through the shipped entry point; the artifacts are written under
+         the system temp directory, and one was rendered — both pages, every figure in its
+         ruled cell, Single ticked. `flatten()` after filling, verified by reloading: zero
+         form fields left, and every value read back out of the page's own drawn marks.
+      2. **The guard is total over the 199 names the PDF declares**, not over a set derived
+         from the map: 56 amount rows, 5 filing-status boxes, 138 named as fed by nothing
+         with the reason, compared against the artifact both ways and on field kind.
+         Separately, the engine direction: a line with no field, a field with no line, or
+         two lines claiming one printed number all refuse the WHOLE plan.
+         **Result: no unmapped fields, no unfilled engine lines, no phantom names.**
+      3. **The IRS's own XFA template is the field-name authority**, and the gate re-derives
+         all 57 printed-line bindings from the committed bytes and compares them to the
+         hand-typed table. 57 against 56 rows: line 38 is the estimated-tax penalty, which
+         the engine does not compute.
+      4. **Seven mutations, each watched to fail and each reverted.** Counts are `npm test`'s
+         own `ℹ fail`, re-read from the saved runs rather than from memory — a first version
+         of this table was low by one on four rows because it counted the reporter's
+         `failing tests:` header out of a list that already excluded it, which is the shape
+         of error this project keeps finding in its own claims.
+
+         | mutation | diff | predicted red | actual red |
+         |---|---|---|---|
+         | transpose the fields for lines 15 and 16 | 2 / 2 | 7 | **7** |
+         | delete one name from the unfed table | 0 / 1 | 5 | **8** |
+         | thousands grouping `\d{3}` → `\d{4}` | 1 / 1 | 6 | **8** |
+         | weaken the field-with-no-line direction of the guard | 1 / 1 | 1 | **1** |
+         | narrow `-0-` from "zero or less" to "less than zero" | 1 / 1 | 2 | **2** |
+         | alter the pinned SHA-256 by one character | 1 / 1 | 1 | **1** |
+         | point an amount line at a checkbox | 1 / 1 | ≥2 | **12** |
+
+         The transposition is 2 / 2 because a swap is two edits; every other row is the
+         single-token change AGENTS.md asks for. **What the transposition does NOT redden is
+         the finding worth keeping:** neither the flatten check nor the field-coverage check
+         moves, because a swap preserves the set of drawn strings and the set of field names
+         exactly. That is the whole reason the read-back expectations are keyed by field
+         NAME — keyed by line number they would be read through the map they are checking,
+         and value and expectation would move together. Two predictions were low (deleting a
+         name also breaks three message-content leaves that build on the same table; the
+         formatter also reaches two negative-amount leaves), and both surprises are in the
+         safe direction.
+
+      **What it does NOT fill, named rather than discovered:** the taxpayer's name,
+      identifying number and address; the dependents grid; the direct-deposit block; the
+      third-party designee; both signature blocks; the preparer block; and the per-line
+      election tick boxes. All 138 are in the table with reasons, so the guard knows about
+      every one of them — but **a filer must complete the header block and sign before this
+      can be mailed.** The engine computes a return and holds no identity; a name copied out
+      of a W-2 box would be the only value on the page that no rule produced and no source
+      cites, and that is a phase, not a line.
 
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
       answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,

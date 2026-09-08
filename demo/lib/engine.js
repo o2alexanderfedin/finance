@@ -10,11 +10,19 @@
  *
  * This works in a browser for one reason: every module under `fjs/` is pure
  * FunctionalScript and imports nothing from `node:`. The transitive closure
- * behind this file is 108 modules and contains no host API at all — no
- * filesystem, no network, no clock. (43 when this header was written;
- * re-measured on 2026-08-18 by walking the import graph.) A bundler is not merely unnecessary,
- * there is nothing for it to do: the browser's own module loader resolves
- * `functionalscript/...` through the import map in `index.html`.
+ * behind this file contains no host API at all — no filesystem, no network,
+ * no clock. A bundler is not merely unnecessary, there is nothing for it to
+ * do: the browser's own module loader resolves `functionalscript/...` through
+ * the import map in `index.html`.
+ *
+ * **The closure is 159 modules besides this one — 100 under `fjs/` and 59
+ * upstream — measured 2026-09-07** by following every `import … from` specifier
+ * from this file transitively. The number said **43** when this header was
+ * written and **108** after a re-measurement on 2026-08-18, and neither the
+ * method nor the boundary was recorded with it, so the figure could not be
+ * reproduced when Phase 35 added one module to the graph and went looking. The
+ * method is now stated with the count, which is the part that lets the next
+ * reader check it rather than trust it.
  *
  * @module
  */
@@ -31,6 +39,7 @@ import { validate as validateProfile, kindVocabulary } from '../../fjs/return/pr
 import { classifyScope, modeledKinds, unmodeledKindRefusals, scopeRefusal } from '../../fjs/return/scope/module.f.js'
 import { tripwires } from '../../fjs/return/tripwire/module.f.js'
 import { applyWholeDollarElection } from '../../fjs/report/line/module.f.js'
+import { lineNumberOf } from '../../fjs/form1040/pdf/module.f.js'
 import { validate as validateW2, w2Schema } from '../../fjs/document/w2/module.f.js'
 import { validate as validate1099Int, oneZeroNineNineIntSchema } from '../../fjs/document/1099int/module.f.js'
 import { centsFromString, centsToString, tryCentsFromString } from '../../fjs/exact/module.f.js'
@@ -72,6 +81,12 @@ export {
     applyWholeDollarElection,
     validateW2, w2Schema, validate1099Int, oneZeroNineNineIntSchema,
     centsFromString, centsToString, tryCentsFromString,
+    // Phase 35 moved `lineNumberOf` out of `steps/09-form1040.js` and into
+    // `fjs/form1040/pdf`, which is where the PDF field map needs it too. One
+    // rule, one place: the CSS face and the filled `f1040.pdf` must agree
+    // about which line a `rule` string names, and two copies of that decision
+    // agree right up until one of them is edited.
+    lineNumberOf,
 }
 
 /**
