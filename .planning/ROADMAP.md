@@ -1100,7 +1100,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on the owner's documents and an account at a second filer
 
 ### Phase 35: A Filable Artifact — fill the official `f1040.pdf`
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on one dependency approval (`@cantoo/pdf-lib`); research complete in the phase list above
+**Requirements**: none mapped · **Tier**: T1 · **Status**: the dependency gate is CLEARED — `@cantoo/pdf-lib` approved by **both** owners on 2026-09-07 (Alexander directly; Sergey's agreement confirmed by Alexander in the same session). The authorization is written into the phase entry below so it survives the chat it was given in. Filling, the two-way field guard and the mutation pass shipped the same day; the header identity block is deliberately NOT filled and is named there.
 
 ### Phase 36: The Conversational Path
 **Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on a real client session with real documents
@@ -1180,7 +1180,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
 | 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
 | 34. Second-Implementation Cross-Check | **v5** | 0/TBD | Not started | - |
-| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/TBD | CSS half shipped; PDF half blocked on a dependency decision | - |
+| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/0 — no plans were written | Complete for the engine's own lines; the header identity block is named as unfilled | 2026-09-07 |
 | 36. The Conversational Path | **v5** | 0/TBD | Not started | - |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
 | 38. Take FunctionalScript 0.47.0 | v5 | 0/0 — no plans written | Complete (MAINT-09); superseded four days later by 0.48.0 in Phase 42 | 2026-08-27 · PR #139 |
@@ -1480,8 +1480,23 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       line. Two independent implementations agreeing is what a prior-year return was standing in
       for.
 
-- [ ] **Phase 35: A Filable Artifact — fill the official `f1040.pdf`**
-      **Scheduled into v4 on 2026-08-19 with a researched approach; the CSS half already shipped in v3.**
+- [x] **Phase 35: A Filable Artifact — fill the official `f1040.pdf`**
+      **Scheduled into v4 on 2026-08-19 with a researched approach; the CSS half already shipped in v3.
+      Executed 2026-09-07.**
+
+      ┌──────────────────────────────────────────────────────────────────────────────────────┐
+      **THE DEPENDENCY GATE IS CLEARED. `@cantoo/pdf-lib` IS APPROVED BY BOTH OWNERS,
+      2026-09-07.** Alexander approved it directly and confirmed in the same session that
+      Sergey had agreed. It is written here, and not only in the conversation it was given
+      in, because AGENTS.md makes owner approval a hard stop and an authorization that
+      lives in a chat log is an authorization the next reader cannot check. The scope of
+      the approval is the package named below, as a **`devDependency`** — nothing under
+      `fjs/` imports it, the shipped `finance` package's `dependencies` are unchanged, and
+      deleting `form1040-pdf-gate.test.js` would leave the engine untouched. That is the
+      shape AGENTS.md's one prior exception (`ui-tests/`) established for an approved
+      third-party tool, and moving it to `dependencies` would be a **new** question needing
+      a **new** approval.
+      └──────────────────────────────────────────────────────────────────────────────────────┘
 
       **What ships today and why it is not enough.** `demo/form1040.html` renders both pages of the
       form face in pure CSS, every amount from `form1040Report` at render time, every amount a button
@@ -1490,8 +1505,8 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       comprehension, not filing, so print fidelity is deliberately NOT chased to the millimetre.
 
       **The real artifact is their own PDF.** `https://www.irs.gov/pub/irs-pdf/f1040.pdf` is a
-      fillable AcroForm — verified by decompressing it: **199 widgets, 126 text fields, 73 checkboxes,
-      no XFA**. Filling those fields yields a form the IRS accepts on paper, in their layout with
+      fillable AcroForm — verified by decompressing it: **199 widgets, 126 text fields, 73
+      checkboxes**. Filling those fields yields a form the IRS accepts on paper, in their layout with
       their labels, and **deletes the entire transcription-risk class** that v3 paid for: checking
       the CSS face against the printed page found four real errors, including a checkbox block off by
       one for its whole length, and cost `10-RESEARCH.md` its standing as a label authority.
@@ -1512,9 +1527,15 @@ for why a phase without an ID is preferable to an ID invented to give it one.
       an unpleasant conversation at exactly the wrong moment. `flatten()` after filling, so different
       viewers cannot render the same return differently.
 
-      **THE GATE IS NOT TECHNICAL.** `AGENTS.md` forbids adding any dependency, dev included, without
-      **every owner's approval**, and there are two owners. This phase cannot start until that
-      decision is taken — which is why it sits in v4 beside the two phases that need the taxpayer.
+      **Taken at `^2.9.2` on 2026-09-07, not the `2.9.1` researched above** — 2.9.2 published in
+      the intervening three weeks. The API used here is `PDFDocument.load` / `getForm` /
+      `getTextField` / `getCheckBox` / `flatten` / `save`, all of which pdf-lib 1.17.1 has under the
+      same names, so the escape route the comparison table was bought for is still one import line.
+
+      **THE GATE WAS NOT TECHNICAL, AND IT IS NOW CLEARED** — see the box at the head of this
+      entry. `AGENTS.md` forbids adding any dependency, dev included, without **every owner's
+      approval**, and there are two owners; both gave it on 2026-09-07. The paragraph that stood
+      here said the phase could not start until that decision was taken, and it was right.
 
       **The work, once approved, is small and mechanically checkable.** The engine already emits
       `{ value, rule, sources }` with printed line numbers. What is needed is a line-number → field-name

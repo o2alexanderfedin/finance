@@ -25,6 +25,7 @@
     "functionalscript": "^0.48.0"
   },
   "devDependencies": {
+    "@cantoo/pdf-lib": "^2.9.2",
     "typescript": "^7.0.2"
   }
 }
