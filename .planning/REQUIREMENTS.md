@@ -1948,8 +1948,28 @@ a parser is the tidier lie. A live milestone gets the shape that is actually che
 
 **Phases 34, 35 and 36 map no requirement** and are listed here so the absence is deliberate
 rather than an omission: 34 (Second-Implementation Cross-Check), 35 (A Filable Artifact —
-fill the official `f1040.pdf`), 36 (The Conversational Path). All three are **T1** and all
-three are blocked on the owner.
+fill the official `f1040.pdf`), 36 (The Conversational Path). All three are **T1**. Two of
+the three are still blocked on the owner being in the room with their documents; the third
+is not, and the reason is recorded rather than left in a chat log:
+
+> **`@cantoo/pdf-lib` is approved by both owners, 2026-09-07.** Alexander approved it
+> directly and confirmed in the same session that Sergey had agreed. This is written into a
+> planning document because AGENTS.md makes owner approval of a dependency a hard stop, and
+> a hard stop discharged only in conversation cannot be checked by the next reader — which
+> is the same failure mode this file's own checkbox-versus-table gate exists to catch.
+>
+> **The scope of the approval is the package as a `devDependency`**, imported by exactly one
+> root gate. Nothing under `fjs/` may import it, the shipped package's `dependencies` are
+> unchanged, and deleting the gate would leave the engine untouched — the shape AGENTS.md's
+> one prior approved exception (`ui-tests/`) established. Moving it into `dependencies` is a
+> **different question** and would need a **new** approval.
+
+Phase 35 executed on 2026-09-07 against that approval. What it does not do is stated where
+the code is, not only here: the taxpayer's name, identifying number and address are left
+blank, along with the dependents grid, the direct-deposit block and both signature blocks.
+Each is named in `fjs/form1040/pdf`'s own table with its reason, so the coverage guard knows
+about all of them — but **a filer must complete the header block and sign before the
+produced PDF can be mailed.**
 
 ---
 

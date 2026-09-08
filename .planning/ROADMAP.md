@@ -1547,6 +1547,47 @@ for why a phase without an ID is preferable to an ID invented to give it one.
 
       **E-file stays out of scope.** IRS MeF requires provider authorization no personal project obtains.
 
+      ---
+
+      **What shipped, 2026-09-07.** `fjs/form1040/pdf/module.f.js` (pure, 100% line, branch
+      and function, 25 proof leaves) holds the map and both directions of the guard;
+      `form1040-pdf-gate.test.js` (8 tests) is the only place a PDF library touches a byte.
+      `forms/f1040-2025.pdf` is the artifact, committed and hash-pinned, with
+      `forms/README.md` recording where it came from.
+
+      1. **A filled `f1040.pdf` exists, and it was looked at.** Two returns are filled from
+         `form1040Report` through the shipped entry point; the artifacts are written under
+         the system temp directory, and one was rendered — both pages, every figure in its
+         ruled cell, Single ticked. `flatten()` after filling, verified by reloading: zero
+         form fields left, and every value read back out of the page's own drawn marks.
+      2. **The guard is total over the 199 names the PDF declares**, not over a set derived
+         from the map: 56 amount rows, 5 filing-status boxes, 138 named as fed by nothing
+         with the reason, compared against the artifact both ways and on field kind.
+         Separately, the engine direction: a line with no field, a field with no line, or
+         two lines claiming one printed number all refuse the WHOLE plan.
+         **Result: no unmapped fields, no unfilled engine lines, no phantom names.**
+      3. **The IRS's own XFA template is the field-name authority**, and the gate re-derives
+         all 57 printed-line bindings from the committed bytes and compares them to the
+         hand-typed table. 57 against 56 rows: line 38 is the estimated-tax penalty, which
+         the engine does not compute.
+      4. **Seven mutations, each watched to fail**, each reverted, each a 1/1 (or 0/1) diff:
+         transposing lines 15 and 16 in the map (6 leaves red — and *not* the flatten check
+         or the coverage check, since a transposition preserves both the drawn strings and
+         the name set, which is exactly why the read-back is keyed by field NAME); deleting
+         one unfed name (7 red, two more than predicted); breaking the thousands separator
+         (7 red); weakening the field-with-no-line direction (1 red — precisely the leaf
+         written for it); narrowing `-0-` from "zero or less" to "less than zero" (2 red);
+         altering the pinned SHA-256 (1 red); pointing an amount line at a checkbox (10 red).
+
+      **What it does NOT fill, named rather than discovered:** the taxpayer's name,
+      identifying number and address; the dependents grid; the direct-deposit block; the
+      third-party designee; both signature blocks; the preparer block; and the per-line
+      election tick boxes. All 138 are in the table with reasons, so the guard knows about
+      every one of them — but **a filer must complete the header block and sign before this
+      can be mailed.** The engine computes a return and holds no identity; a name copied out
+      of a W-2 box would be the only value on the page that no rule produced and no source
+      cites, and that is a phase, not a line.
+
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
       answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
       unchanged and still wanted.
