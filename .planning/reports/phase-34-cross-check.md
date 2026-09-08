@@ -393,8 +393,11 @@ and a report that implied otherwise would be worse than no report.**
    provenance — is untouched here.
 3. **The refusals are untested.** Phase 33's most interesting result was that
    twenty of fifty-one returns produced a NAMED refusal rather than a plausible
-   wrong number. Nothing in this phase runs `form1040Report` at all, so nothing
-   here says whether the engine still refuses well.
+   wrong number. **No comparison in this phase calls `form1040Report`**, so
+   nothing here says whether the engine still refuses well. The one place it is
+   called is the smoke test of `diff-return.mjs`, on a fixture invented to
+   exercise the diff tool — which is why that run is not evidence about the
+   engine and is not counted anywhere above.
 4. **No qualified dividends, no capital gains, no preferential rates.** Six of
    the ten published returns were skipped for exactly this reason, so the
    Qualified Dividends and Capital Gain Tax Worksheet — the single most
