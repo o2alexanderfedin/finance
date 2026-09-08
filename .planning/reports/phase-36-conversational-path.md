@@ -519,7 +519,7 @@ assertion, repeatably, on a real process and a real filesystem.
 |---|---|
 | `npx tsc --noEmit` | 0 errors |
 | `node --test all.test.js` | **3344 / 3344** (unchanged — this phase adds no `proof` leaf) |
-| `npm run cov` | exit 0 at 100 lines / 100 branches / 100 functions; **3405 / 3405**, 123 rows in the report, **no file below 100 on any metric** (baseline before this phase: 3393) |
+| `npm run cov` | exit 0 at 100 lines / 100 branches / 100 functions; **3405 / 3405**; the report's 123 percentage-carrying rows (122 files plus the `all files` total) read 100.00 / 100.00 / 100.00 without exception — **no file below 100 on any metric** (baseline before this phase: 3393 tests, same 123 rows) |
 | `node --test planning-truth-gate.test.js` | **24 / 24** |
 | `node --test conversational-path-integration.test.js` | **12 / 12** |
 
