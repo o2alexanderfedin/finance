@@ -131,7 +131,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/mod
 import { stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
 import { unknown as jsonUnknown } from 'functionalscript/fjs/media/json/rtti/module.f.mjs'
 import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
-import { refuses } from '../../refuses/module.f.js'
+import { refuses, attempt, thrownSummary } from '../../refuses/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
@@ -236,10 +236,17 @@ import { stringify as jsonText } from '../../json/module.f.js'
  * still runs here unchanged.
  * **The failures are in the channel** (0.46.0), as plain messages, and
  * {@link asRunOutcome} is the single place they become a `kind: 'error'`
- * outcome. Splitting it that way is what lets `loadProgram`'s refusal and
- * `interpret`'s refusal reach the run record by the same route: the tail
- * describes the success path, and the one function that names the failures
- * is the one whose job is to record them.
+ * outcome. Splitting it that way is what lets `loadProgram`'s refusal,
+ * `interpret`'s refusal and — since 2026-09-09 — the guest's own THROW
+ * reach the run record by the same route: the tail describes the success
+ * path, and the one function that names the failures is the one whose job is
+ * to record them.
+ *
+ * That last one is the reason `attempt` is called below rather than the
+ * guest's expression being evaluated bare. A guest program that reaches for
+ * a name the context does not have used to take the whole server process
+ * with it; the comment at the call site states both throw surfaces, the
+ * reproduced one, and the semantics change the wrapper makes.
  * @type {(cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (taxParams: TaxParamSet) => (path: string) => (source: string) => (literalCount: number) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>, string>}
  */
 const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin => {
@@ -254,7 +261,57 @@ const runProgramTail = cas => evoApi => taxParams => path => source => literalCo
     return step(withSnapshot, ([snapshot, module_]) => {
         const hostMap = buildHostMap(snapshot)
         const report = /** @type {{ readonly report: TaxReport<unknown> }} */ (module_)
-        const [t, v] = interpret(hostMap)(report.report(taxGuestCtx(taxParams))(args))
+        // ── The guest's throw is not our panic (2026-09-09) ───────────────
+        //
+        // The expression inside `attempt` is one synchronous run of
+        // UNTRUSTED code, and the guest can throw on TWO surfaces inside it:
+        //
+        // 1. constructing the effect — `report.report(ctx)(args)` runs the
+        //    guest's own body before `interpret` ever sees a node; and
+        // 2. every continuation `interpret` then invokes — `step`'s `Do`
+        //    case DEFERS, so a guest that composes `ctx.step(...)` all the
+        //    way down constructs fine and throws later, inside
+        //    `fjs/exec`'s own `result[2](result[1])` dispatch loop.
+        //
+        // The reproduced defect is surface 2, not 1: the guessed program in
+        // `conversational-path-integration.test.js` reaches for
+        // `ctx.computeForm1040` inside the innermost `ctx.step` callback.
+        // Both are wrapped anyway, and both have a proof below, because a
+        // wrapper that covered only the surface that was reported would be
+        // one guest program away from the same crash.
+        //
+        // Neither is a panic. A guest program is INPUT that arrived over
+        // MCP; a name it guessed wrong is a recoverable failure of that
+        // input, and by this project's own rules a recoverable failure
+        // belongs in an error channel. Before this, the `TypeError` went out
+        // through `run(main)` and exited the process: no `isError`, no run
+        // record, and a connection the client could not use again.
+        //
+        // `attempt` is `fjs/refuses`' primitive and the single `try` under
+        // `fjs/` — the boundary is drawn in the one place already allowed to
+        // catch, never with a second `try` here. `thrownSummary`, not
+        // `refusalText`: the latter asserts a BARE thrown value, so a real
+        // `TypeError` would fire its assert inside this very handler and
+        // reintroduce the crash one level deeper.
+        //
+        // Feeding the rendered text to `pureError` — the SAME arm the
+        // `t === 'error'` case below uses — is what makes the rest free:
+        // `asRunOutcome` turns it into a `kind:'error'` outcome,
+        // `handleRunOutcome` writes the `status:'error'` run record (PROV-03)
+        // and answers an `errorResult`. No new machinery.
+        //
+        // **The semantics change this makes, stated rather than hidden:** a
+        // HOST panic raised inside `interpret` or inside `hostMap` — one of
+        // our own `assert`s, not a guest's — now also surfaces as `isError`
+        // instead of crashing loudly. The two are indistinguishable in-band
+        // (both arrive as a throw out of one synchronous expression running
+        // guest-supplied code), the message still names the failure and the
+        // run record still records it, so the trade is accepted knowingly.
+        const ran = attempt(() => interpret(hostMap)(report.report(taxGuestCtx(taxParams))(args)))
+        if (ran[0] === 'error') {
+            return pureError(`guest program threw: ${thrownSummary(ran[1])}`)
+        }
+        const [t, v] = ran[1]
         if (t === 'error') {
             return pureError(v)
         }
@@ -808,13 +865,15 @@ const probeDo = do_
 /**
  * Extracts the run-record hash embedded in `fjsRunTool`'s own error text
  * (`... (run record: <hash>)`), reads that record back OUT of `cas` — never
- * the in-process outcome — and asserts it validates with `status: 'error'`.
- * All three error-taxonomy leaves below make this identical assertion
- * (PROV-03: a failed run still gets a run record), so it is factored here
- * once rather than repeated three times.
- * @type {(cas: Cas<FileCasOperation>) => (state: State) => (errorText: string) => void}
+ * the in-process outcome — and returns it, validated.
+ *
+ * Split out of {@link assertPersistedErrorRunRecord} in 2026-09-09's
+ * guest-throw fix, which needs the record's `error` FIELD and not only its
+ * `status`. Two readers of the same record would be two chances to disagree
+ * about where it lives, so there is still one.
+ * @type {(cas: Cas<FileCasOperation>) => (state: State) => (errorText: string) => Run}
  */
-const assertPersistedErrorRunRecord = cas => state => errorText => {
+const readPersistedErrorRunRecord = cas => state => errorText => {
     const match = /run record: (\S+)\)/.exec(errorText)
     assert(match !== null, ['expected the error text to name a run record hash', errorText])
     const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
@@ -822,11 +881,39 @@ const assertPersistedErrorRunRecord = cas => state => errorText => {
     assert(runHashVec !== null, 'expected a decodable runHash')
     const [, runRead] = virtual(state)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
     assert(runRead[0] === 'ok', ['expected the error run record to read back', runRead])
-    const [vt, record] = validateRun(JSON.parse(utf8ToString(runRead[1])))
-    assert(vt === 'ok', ['expected the error record to validate', vt, record])
-    if (vt === 'ok') {
-        assertEq(record.status, 'error')
-    }
+    const validated = validateRun(JSON.parse(utf8ToString(runRead[1])))
+    assert(validated[0] === 'ok', ['expected the error record to validate', validated])
+    return validated[1]
+}
+
+/**
+ * Reads the run record `fjsRunTool`'s own error text names and asserts it
+ * carries `status: 'error'`. Every error-taxonomy leaf below makes this
+ * identical assertion (PROV-03: a failed run still gets a run record), so it
+ * is factored here once rather than repeated at each of them.
+ * @type {(cas: Cas<FileCasOperation>) => (state: State) => (errorText: string) => void}
+ */
+const assertPersistedErrorRunRecord = cas => state => errorText =>
+    assertEq(readPersistedErrorRunRecord(cas)(state)(errorText).status, 'error')
+
+/**
+ * Asserts `fjsRunTool`'s error text WHOLE — only the run-record hash, the
+ * one part of it that is data rather than wording, is taken from the text
+ * itself.
+ *
+ * A substring assertion will not do here and the reason is recorded in
+ * AGENTS.md: a leaf that asserted `'40%'` survived the very mutation it
+ * existed to catch, because `"Not more than 40%"` contains it. The expected
+ * text is spelled out on this side of the boundary, independently of the
+ * template `handleRunOutcome` composes, so a change to either wording
+ * reddens.
+ * @type {(errorText: string) => (expectedFailure: string) => void}
+ */
+const assertWholeErrorText = errorText => expectedFailure => {
+    const match = /\(run record: (\S+)\)$/.exec(errorText)
+    assert(match !== null, ['expected the error text to end with a run record hash', errorText])
+    const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
+    assertEq(errorText, `fjs_run failed: ${expectedFailure} (run record: ${runHash})`)
 }
 
 /**
@@ -1856,15 +1943,22 @@ export const proof = {
                 }
             },
         },
-        // EXEC-12, Success Criterion 4: three named failure classes, each
-        // its own leaf so a regression localizes — a combined loop cannot
-        // say WHICH class broke. Each leaf drives the FULL fjsRunTool.handle
-        // (never executeRun/loadProgram in isolation — those are already
-        // proven at their own layer, Plan 06 Task 1 and Phase 6
-        // respectively) and asserts the returned ToolsCallResult's OWN
-        // isError:true, plus that a status:'error' run record was
-        // persisted and reads back (PROV-03: provenance that covers only
-        // successes is not provenance).
+        // EXEC-12, Success Criterion 4: named failure classes, each its own
+        // leaf so a regression localizes — a combined loop cannot say WHICH
+        // class broke. Each leaf drives the FULL fjsRunTool.handle (never
+        // executeRun/loadProgram in isolation — those are already proven at
+        // their own layer, Plan 06 Task 1 and Phase 6 respectively) and
+        // asserts the returned ToolsCallResult's OWN isError:true, plus that
+        // a status:'error' run record was persisted and reads back (PROV-03:
+        // provenance that covers only successes is not provenance).
+        //
+        // **There were three, and on 2026-09-09 there are five.** The two
+        // added are the guest's own THROW, at each of its two surfaces. They
+        // are not a refinement of the first three: until that date a guest
+        // that threw produced NO failure class, because it produced no
+        // failure — it took the server process with it. See their own
+        // comment below, and `fjs/refuses`'s module header for why the catch
+        // lives where it does.
         errorTaxonomy: {
             // Failure class 1: a guest program that refuses via a
             // non-`Error`, non-`CasOp` command. `interpret`'s own refusal
@@ -1974,6 +2068,118 @@ export const proof = {
 
                 // Session survives: a FOLLOWING call against the SAME
                 // threaded state still succeeds.
+                assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
+            },
+            // ── Failure classes 4 and 5 (2026-09-09): the guest THROWS ────
+            //
+            // Added by the fix for the crash Phase 36 found. Before it,
+            // neither of these was a failure class at all: the guest's
+            // `TypeError` went out through `run(main)` and exited the server
+            // process, so there was no `isError` to assert and no run record
+            // to read. `.planning/reports/phase-36-conversational-path.md`
+            // §5.2 is the finding; `conversational-path-integration.test.js`
+            // is the end-to-end proof against a REAL process, and these two
+            // are the same behaviour at this layer, one per throw surface.
+            //
+            // Two leaves rather than one because a guest has two places to
+            // throw and they are genuinely different moments: constructing
+            // the effect, and a continuation `interpret` invokes. A single
+            // leaf could not say which one regressed, and a wrapper narrowed
+            // to either surface alone still ships the crash.
+            //
+            // Both assert the message WHOLE. The zero-read refusal is the
+            // other thing `fjs_run` answers `isError` with, and the two must
+            // be tellable apart by an assertion rather than by the reader —
+            // which a substring assertion would not do.
+            guestThrowWhileConstructingBecomesErrorResult: () => {
+                const home = '/error-taxonomy-guest-throw-constructing'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const [state1, goodHash] = seedGoodProgram(cas)(state0)
+
+                const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+                const [state2, throwingHash] = virtualOrPanic(state1)(seedText(cas)(programSource))
+                // Surface 1: the guest's own body throws BEFORE any effect
+                // node exists, so `interpret` is handed nothing — the throw
+                // happens while `report.report(ctx)(args)` is still being
+                // evaluated, inside the same wrapped expression. The spy is
+                // what makes "while constructing" an ASSERTION rather than a
+                // claim about a fixture: it flips inside the report body and
+                // the body never returns an effect.
+                const observed = { reportEntered: false }
+                /** @type {Report<string>} */
+                const throwsWhileConstructing = () => () => {
+                    observed.reportEntered = true
+                    throw new TypeError('ctx.computeTaxOwed is not a function')
+                }
+
+                const [state2b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(throwingHash)(programSource)(throwsWhileConstructing)([])(undefined)(state2)
+                assertEq(observed.reportEntered, true)
+                const [state3, callResult] = virtualOrPanic(state2b)(handleRunOutcome(cas)(throwingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                assertEq(callResult.isError, true)
+                const first = firstTextContent(callResult)
+                assertWholeErrorText(first.text)('guest program threw: TypeError: ctx.computeTaxOwed is not a function')
+                assertPersistedErrorRunRecord(cas)(state3)(first.text)
+                // The record carries the SAME text the client was answered
+                // with — the provenance and the response cannot drift.
+                assertEq(
+                    readPersistedErrorRunRecord(cas)(state3)(first.text).error,
+                    'guest program threw: TypeError: ctx.computeTaxOwed is not a function')
+
+                // Session survives: a FOLLOWING call against the SAME
+                // threaded state still succeeds. This is the assertion the
+                // crash made impossible.
+                assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
+            },
+            guestThrowInsideAContinuationBecomesErrorResult: () => {
+                const home = '/error-taxonomy-guest-throw-continuation'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const [state1, goodHash] = seedGoodProgram(cas)(state0)
+
+                const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+                const [state2, throwingHash] = virtualOrPanic(state1)(seedText(cas)(programSource))
+                // Surface 2, and the one the reproduced defect actually
+                // took: `step`'s `Do` case DEFERS, so this program
+                // CONSTRUCTS fine — the throw happens later, inside
+                // `fjs/exec`'s dispatch loop, when `interpret` invokes the
+                // continuation. The guessed program in
+                // `conversational-path-integration.test.js` has exactly this
+                // shape, four `ctx.step`s deep.
+                // The spy is what makes "inside a continuation" an ASSERTION:
+                // it can only flip if `interpret` dispatched the `evoList`
+                // for real and then invoked the callback. A leaf without it
+                // would read identically to the construction one above.
+                const observed = { continuationReached: false }
+                /** @type {Report<string>} */
+                const throwsInsideAContinuation = ctx => () =>
+                    ctx.step(ctx.evoList('false'), () => {
+                        observed.continuationReached = true
+                        throw new TypeError('ctx.computeForm1040 is not a function')
+                    })
+
+                const [state2b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(throwingHash)(programSource)(throwsInsideAContinuation)([])(undefined)(state2)
+                assertEq(observed.continuationReached, true)
+                const [state3, callResult] = virtualOrPanic(state2b)(handleRunOutcome(cas)(throwingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                assertEq(callResult.isError, true)
+                const first = firstTextContent(callResult)
+                assertWholeErrorText(first.text)('guest program threw: TypeError: ctx.computeForm1040 is not a function')
+                const record = readPersistedErrorRunRecord(cas)(state3)(first.text)
+                assertEq(record.status, 'error')
+                assertEq(
+                    record.error,
+                    'guest program threw: TypeError: ctx.computeForm1040 is not a function')
+                // The `evoList` dispatched before the throw is NOT in the
+                // record, and that is `fjs/exec`'s own already-documented
+                // behaviour rather than something this fix changes: a chain
+                // that does not complete discards its accumulated read set,
+                // because `interpret`'s `reads` is a local it never returns.
+                // Asserted rather than left implied, so a future change that
+                // starts preserving them is a decision someone makes here.
+                assertEq(record.inputs.length, 0)
+
                 assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
             },
         },

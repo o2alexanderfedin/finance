@@ -33,6 +33,17 @@ the citation chain all work through the shipped tools. But the vocabulary a stor
 program must be written in appears nowhere on the surface, and a wrong guess at it does
 not produce a refusal — it terminates the server process.
 
+> **FIXED 2026-09-09 — the last clause of that verdict no longer holds.** A wrong guess
+> now produces a refusal: `isError: true`, the message `fjs_run failed: guest program
+> threw: TypeError: ctx.computeForm1040 is not a function (run record: …)`, a
+> `status: 'error'` run record, and a session that keeps answering. Branch
+> `fix/guest-throw-kills-the-server`, commit `5c7f324`. **Everything else in this
+> verdict stands**, including the part that decides the phase: the vocabulary is still
+> named nowhere on the surface (§5.1), so the guess still has to be made — it is now
+> survivable, not unnecessary. The original wording is left exactly as written on
+> 2026-09-07 throughout this report, with dated annotations where it has been overtaken;
+> a silently corrected record is the worse failure.
+
 The executable record is `conversational-path-integration.test.js` (12 subtests, all
 green). Every number in this report is asserted there; nothing below is prose-only.
 
@@ -406,6 +417,34 @@ authoring is mandatory, and the surface does not teach it.
 
 ### 5.2 A wrong guess at the vocabulary ends the session
 
+> **FIXED 2026-09-09, on branch `fix/guest-throw-kills-the-server`, commit `5c7f324`.**
+> Read this section as the record of what was found on 2026-09-07; it is left as written.
+> What changed, and what did not:
+>
+> - **The crash is gone.** `fjs/server/fjs_run`'s `runProgramTail` ran the guest in one
+>   bare synchronous expression. It is now wrapped in `fjs/refuses`' `attempt` — the one
+>   `try` this project permits — and the thrown value is rendered by a total renderer
+>   (`thrownSummary`: `name: message`, never the stack, which would carry the
+>   materialize home's absolute path to the client) into the error channel that was
+>   already there. The `status: 'error'` run record (PROV-03) and the `errorResult` come
+>   from machinery this file already described; nothing new was added to produce them.
+> - **The transcript below now reads:** `<- isError: true "fjs_run failed: guest program
+>   threw: TypeError: ctx.computeForm1040 is not a function (run record: …)"`, with the
+>   process still running and the following `cas_list` answered.
+> - **Two throw surfaces, not one.** This report says the guess "passes `fjs_check` and
+>   then throws", which is right, but not about WHERE. Every `ctx.step` defers, so the
+>   program below CONSTRUCTS without incident and `ctx.computeForm1040` fires four
+>   continuations deep, inside `fjs/exec`'s dispatch loop. The other surface — a report
+>   body that throws before returning any effect at all — was never exercised by this
+>   drive. Both are covered, with a proof each, because a fix narrowed to the surface
+>   this report happened to hit would still ship the crash.
+> - **§5.1 is NOT fixed and was not touched.** The vocabulary is still unreachable from
+>   the surface. This closes the consequence, not the cause.
+> - **The harness leaf that pinned this was inverted, not deleted.** The same guessed
+>   program, the same `fjs_check` pass, the same separate process; `serverExited
+>   {code: 1}` became `isError: true` plus the whole message, the run record read back
+>   and validated, and a `cas_list` that succeeds.
+
 The consequence of §5.1 is not a slower path to the same place. A second server, a second
 store, and a program that walks a subject correctly using the four op names and then
 reaches for a tax entry point it has to guess the name of:
@@ -451,6 +490,13 @@ answering** — the harness asserts the server has not exited and that a followi
 one `executeRun` can see coming: a hallucinated *answer* is caught, a hallucinated
 *vocabulary* is not.
 
+> **2026-09-09:** the last sentence is now false, and this section has changed job rather
+> than gone stale. Both are caught. The counterweight is a DISCRIMINATOR: two different
+> `isError` messages for two different failures, each asserted whole in the harness, so a
+> change that collapsed one into the other reddens. The zero-read refusal itself is
+> untouched — the guest-throw wrapper sits inside `runProgramTail` and must not have
+> moved this arm, which is what the pair of whole-message assertions checks.
+
 ---
 
 ## 6. The verdict on sufficiency
@@ -463,6 +509,13 @@ can store documents, read every dialect's schema, read the parameter set, list w
 holds, run a program it already has, fetch a result, and resolve every citation — but the
 one step that turns documents into a return is unreachable, and failing at it costs the
 session.
+
+> **2026-09-09: the last four words are no longer true — failing at it now costs one tool
+> call.** The verdict itself is UNCHANGED: still NOT sufficient, and for the same reason,
+> because §5.1 is what decides it and §5.1 is untouched. What the fix changes is the
+> price of the attempt, not whether the attempt can succeed. An agent that guesses wrong
+> now gets a message it can read, and can guess again — which is a strictly better place
+> to be stuck, and still stuck.
 
 **Claude Code, or any client that can also read this repository: sufficient, with the two
 qualifications in §4.2 and §4.3.** `taxReturnReportSource` is a module export sitting on
@@ -532,6 +585,16 @@ Four assertions were watched to fail before being trusted, per AGENTS.md:
 | expected server exit code 1 → 0 | the §5.2 leaf |
 | `'1040 line 37 -> dependents = []'` removed from the absent list | the §4.2 leaf, naming the missing row |
 
+> **2026-09-09:** the third mutation in that table no longer exists to make — there is no
+> expected exit code left in the §5.2 leaf, because the server does not exit. Its
+> successor is stated in the fix's own record: removing the `attempt` wrapper at
+> `fjs/server/fjs_run`'s guest call site reddens exactly three leaves and no others — the
+> inverted §5.2 leaf here, and `errorTaxonomy.guestThrowWhileConstructingBecomesErrorResult`
+> and `...guestThrowInsideAContinuationBecomesErrorResult` in `fjs/server/fjs_run`.
+> Predicted, run, confirmed, restored. Every other figure in the table above is as
+> measured on 2026-09-07 and is not re-stated here; the fix's own numbers belong to the
+> fix.
+
 ---
 
 ## 9. What this leaves open
@@ -539,10 +602,19 @@ Four assertions were watched to fail before being trusted, per AGENTS.md:
 - **The two gaps are not closed and were deliberately not closed.** Closing §5.1 means
   either a tool that describes the guest ABI or documentation the client can fetch, and
   both are code. That is a decision for the owners, not for the phase that found it.
+
+  > **2026-09-09: one of the two is now closed — §5.2.** §5.1 is untouched and this
+  > bullet still holds of it in full. See below.
 - **§5.2 is the more urgent of the two** and is separable from it: a guest that throws
   should become a `status: 'error'` run record and an `isError` result, exactly as a
   guest that reads nothing already does. It is filed here rather than fixed for the same
   reason.
+
+  > **FIXED 2026-09-09**, on branch `fix/guest-throw-kills-the-server`, commit `5c7f324`,
+  > and this bullet's own sentence is the specification the fix implements — a guest that
+  > throws is now a `status: 'error'` run record and an `isError` result, exactly as a
+  > guest that reads nothing already was. Nothing else in this section was addressed: the
+  > vision step, §4.2's `?? []`, and §5.1 are all still open.
 - **§4.2's `?? []`** is a one-line question with a real design answer behind it, and it
   wants the `ReportLine` non-empty-`sources` invariant considered alongside it.
 - **The vision step (§7.1) remains completely untested**, here and everywhere else in

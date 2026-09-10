@@ -17,6 +17,39 @@ pinned rerun reproducing it byte for byte. That is what `1.0.0` names.
 
 ## Unreleased
 
+### A guest program's throw stops the run, not the server
+
+**Fixed.** Phase 36 found it and pinned it as an assertion rather than a paragraph: a stored
+program that called a method the guest context does not have — `ctx.computeForm1040(...)`, a
+plausible guess at a vocabulary the MCP surface names nowhere — passed `fjs_check` and then
+**killed the server process**. Uncaught `TypeError`, exit code 1, no `isError`, no run record,
+and a connection the client could not use again. A hallucinated *answer* was caught by the
+zero-read guard; a hallucinated *vocabulary* was not caught by anything.
+
+- **The guest now runs inside `fjs/refuses`' new `attempt`**, and a throw becomes
+  `fjs_run failed: guest program threw: <name>: <message> (run record: …)` — an `isError`
+  result and a `status: 'error'` run record, from the error channel and the record-writing
+  machinery that already existed. Nothing new was added downstream of the catch.
+- **Both surfaces a guest can throw on are covered**: constructing the effect, and any
+  continuation the interpreter invokes. The reproduced defect was the second — every
+  `ctx.step` defers, so the guessed program constructed cleanly and threw four continuations
+  deep — and a fix narrowed to it would still have shipped the crash. One proof each.
+- **`attempt` holds the single `try` this project permits under `fjs/`**, and `refuses` is
+  re-expressed on top of it, unchanged in behaviour, so the count stays at one and AGENTS.md's
+  rule needed no edit. That module's header now carries the second, *production* reason it is
+  the carve-out: the untrusted-guest boundary.
+- **The thrown value is rendered by a total renderer, never by `refusalText`.** The latter
+  asserts a BARE thrown value and would have panicked inside the very handler installed to
+  stop the panic. The renderer is `name: message` and **never the stack** — a stack carries
+  the materialize home's absolute path into MCP responses and into run records a client can
+  fetch, which is what the `errorSummary` convention exists to prevent.
+- **The harness leaf that pinned the crash was inverted, not deleted.** Same guessed program,
+  same `fjs_check` pass; `serverExited { code: 1 }` became the whole refusal message, the run
+  record read back and validated, a silent stderr, and a following call that succeeds.
+- **Named in the semantics, not hidden:** a *host* panic raised inside the interpreter or the
+  host map now also surfaces as `isError` rather than crashing loudly. The two are
+  indistinguishable in-band and the message still names the failure.
+
 ### The Form 1040, on a page you can print
 
 **Phase 35.** The engine returned cited numbers; there was no output a filer could hand to

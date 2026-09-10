@@ -61,10 +61,16 @@
 //      list, and the unknown-dialect refusal) and searched for the six names
 //      an agent must know to author the program. None is there. This is the
 //      gap that decides the phase.
-//   2. *"a wrong guess at the vocabulary ends the session…"* — the
-//      consequence of (1). A program naming a `ctx` member that does not
-//      exist is not refused: the server PROCESS exits with code 1, and the
-//      chat session's connection is gone. `fjs_check` passes it first.
+//   2. *"a wrong guess at the vocabulary is refused, not fatal"* — the
+//      consequence of (1), and **the one gap of the four that has since been
+//      CLOSED**. Until 2026-09-09 a program naming a `ctx` member that does
+//      not exist was not refused at all: the server PROCESS exited with code
+//      1 and the chat session's connection was gone, with `fjs_check`
+//      passing it first. This leaf pinned that crash, `serverExited` and
+//      all. It now pins its absence — same precondition, `isError: true`,
+//      the whole message, the run record read back, and the session still
+//      answering. See the leaf's own comment for the flip, and
+//      `fjs/refuses`'s module header for where the catch lives.
 //   3. *"135 of the 144 citations…"* — nine cite `dependents` on a profile
 //      that does not carry it, because the engine cites `… ?? []`. The
 //      subtest after it closes those nine from the CLIENT side, with no code
@@ -275,6 +281,13 @@ const expectedStoredHashes = {
  * needs, and it is close to the name `.planning/REQUIREMENTS.md` permanently
  * forbids as a TOOL (`finance_compute_1040`) — the forbidding of which is
  * exactly why the capability has to be reached some other way.
+ *
+ * **Note where in this text the throw happens**, because the fix is written
+ * around it: every `ctx.step` DEFERS, so the program above constructs
+ * without incident and `ctx.computeForm1040` fires four continuations deep,
+ * inside `fjs/exec`'s own dispatch loop. It is the CONTINUATION surface, not
+ * the construction one — `fjs/server/fjs_run` covers both, and has a proof
+ * per surface, precisely because this one program only exercises the second.
  */
 const guessedVocabularyProgramSource = [
     'export const report = ctx => args => ctx.step(ctx.evoList(\'false\'), activeJson => {',
@@ -297,13 +310,19 @@ const guessedVocabularyProgramSource = [
  * Spawns one real `node index.js <home>` server and returns the client
  * primitives every leg below speaks through — the same `send`/`waitForId`/
  * `call` shapes the three existing harnesses use, extracted here only
- * because THIS file needs two server processes (the second one is killed by
- * the program it runs, which is the finding) and a second hand-mirrored copy
- * inside one file would be a copy with no reader.
+ * because THIS file needs two server processes and a second hand-mirrored
+ * copy inside one file would be a copy with no reader. The second process
+ * exists because the probe below USED to be killed by the program it ran —
+ * running it against the main session would have taken the rest of this test
+ * with it. Since 2026-09-09 it survives, and the separate process is kept
+ * deliberately: it is what lets the leaf assert survival against a store
+ * whose only content is its own.
  *
  * Readiness is proven by matching the response's own JSON-RPC `id`, never by
  * a sleep. `exitInfo()` reports a server that died rather than answered, so a
- * dead process fails a leaf explicitly instead of hanging to its deadline.
+ * dead process fails a leaf explicitly instead of hanging to its deadline —
+ * which is exactly how the crash was caught, and is now how its return would
+ * be.
  */
 const startServer = home => {
     const proc = spawn('node', [join(repoRoot, 'index.js'), home], { stdio: ['pipe', 'pipe', 'pipe'] })
@@ -974,10 +993,39 @@ test(
                 }
             })
 
-            await t.test('the gap: a wrong guess at the vocabulary ends the session rather than being refused', async () => {
-                // A SEPARATE server process and a SEPARATE store, because the
-                // finding is that this one dies. Running it against the
-                // session above would take the rest of this test with it.
+            await t.test('the gap, closed: a wrong guess at the vocabulary is refused and the session goes on', async () => {
+                // ── THIS LEAF PINNED THE CRASH, AND FLIPPED ON 2026-09-09 ──
+                //
+                // As written on 2026-09-07 it asserted the DEFECT: that this
+                // exact call produced no tool result at all, that
+                // `serverExited` was `{ code: 1, signal: null }`, that the
+                // guest's `TypeError` was on stderr, and that a following
+                // `cas_list` got the same exit report instead of an answer.
+                // That was the strongest statement available at the time —
+                // the report's §5.2 in mechanized form, so the gap could not
+                // quietly be described as closed while it was open.
+                //
+                // The fix inverts it. Every precondition is unchanged and
+                // deliberately so — the SAME guessed program, the same
+                // `fjs_check` pass, the same separate process — and the four
+                // death assertions become the four strongest life
+                // assertions there are: `isError: true`, the whole message,
+                // the `status:'error'` run record read back out of the same
+                // store, and the following `cas_list` SUCCEEDING. A leaf
+                // that pinned a crash is the right place to pin its absence,
+                // because nothing else proves the same thing about the same
+                // program.
+                //
+                // Where the fix lives: `fjs/server/fjs_run`'s
+                // `runProgramTail` wraps the guest expression in
+                // `fjs/refuses`' `attempt`. That module's header says why
+                // the catch belongs there and nowhere else.
+                //
+                // A SEPARATE server process and a SEPARATE store, kept from
+                // the original: it is what made the finding safe to assert
+                // when this one DID die, and it is what lets the survival
+                // assertions below be about a session with nothing else in
+                // it.
                 const probeHome = mkdtempSync(join(tmpdir(), 'finance-conversational-probe-home-'))
                 try {
                     probeServer = startServer(probeHome)
@@ -1015,30 +1063,93 @@ test(
                     assert.deepEqual(JSON.parse(checkResponse.result.content[0].text), { exportsReport: true })
 
                     const guessRun = await probeServer.call('fjs_run', { hash: guessHash, taxYear: 2025 })
-                    // Not `isError: true` with a message the agent could read
-                    // and correct. The process is gone.
-                    assert.equal(guessRun.result, undefined,
-                        `expected no tool result at all; the server was expected to die: ${JSON.stringify(guessRun)}`)
-                    assert.deepEqual(guessRun.serverExited, { code: 1, signal: null })
-                    assert.ok(guessRun.stderr.includes('TypeError: ctx.computeForm1040 is not a function'),
-                        `expected the guest's own TypeError on stderr: ${guessRun.stderr.slice(0, 400)}`)
-                    // The connection really is unusable afterwards, not merely
-                    // slow: a subsequent call gets the same exit report.
+                    // There IS a tool result. `waitForId` returns a bare
+                    // `{ serverExited, stderr }` when the process dies, so
+                    // this assertion alone distinguishes the two worlds —
+                    // and it is stated before the message, so a regression
+                    // reports "the server died" rather than a confusing
+                    // `undefined` property read.
+                    assert.equal(guessRun.serverExited, undefined,
+                        `the server exited instead of answering: ${JSON.stringify(guessRun)}`)
+                    assert.equal(guessRun.result.isError, true,
+                        `expected a readable refusal: ${JSON.stringify(guessRun)}`)
+                    const guessMessage = guessRun.result.content[0].text
+                    // The WHOLE message, with only the run-record hash — the
+                    // one part of it that is data — taken from the text. Not
+                    // a substring: AGENTS.md records a leaf that asserted
+                    // `'40%'` and survived the mutation it existed to catch,
+                    // because `"Not more than 40%"` contains it. Here the
+                    // near-miss is real and adjacent — the zero-read refusal
+                    // in the next leaf is the OTHER thing `fjs_run` answers
+                    // `isError` with, and the two must be told apart by an
+                    // assertion.
+                    const guessRunRecordMatch = /\(run record: (\S+)\)$/.exec(guessMessage)
+                    assert.ok(guessRunRecordMatch !== null,
+                        `expected the refusal to end by naming a run record: ${guessMessage}`)
+                    const guessRunHash = guessRunRecordMatch[1]
+                    assert.equal(
+                        guessMessage,
+                        'fjs_run failed: guest program threw: TypeError: ctx.computeForm1040 is not a function'
+                        + ` (run record: ${guessRunHash})`)
+                    // Never the stack. A stack frame would carry the server's
+                    // own materialize-home absolute path to a remote client,
+                    // which is the leak `fjs/guest/materialize`'s
+                    // `errorSummary` convention exists to prevent; the guest
+                    // channel obeys the same rule via `thrownSummary`.
+                    assert.ok(!guessMessage.includes(repoRoot),
+                        `a host path reached the MCP response: ${guessMessage}`)
+                    assert.ok(!guessMessage.includes('.fjs-run'),
+                        `a materialize path reached the MCP response: ${guessMessage}`)
+                    // PROV-03: the failed run is recorded, read back out of
+                    // the very store this session serves, and validated —
+                    // the same `error` text the client was answered with, so
+                    // response and provenance cannot drift.
+                    const guessRecordResponse = await probeServer.call(
+                        'cas_get', { hash: guessRunHash, content: true })
+                    assert.ok(!guessRecordResponse.result.isError,
+                        `the run record did not resolve: ${JSON.stringify(guessRecordResponse)}`)
+                    const guessRecord = JSON.parse(
+                        JSON.parse(guessRecordResponse.result.content[0].text).text)
+                    assert.equal(guessRecord.dialect, 'vnd.fjs.run')
+                    assert.equal(guessRecord.status, 'error')
+                    assert.equal(guessRecord.programHash, guessHash)
+                    assert.equal(guessRecord.taxYear, 2025)
+                    assert.equal(
+                        guessRecord.error,
+                        'guest program threw: TypeError: ctx.computeForm1040 is not a function')
+                    // Nothing reached stderr either: the throw was READ, not
+                    // reported by a dying process.
+                    assert.equal(probeServer.stderr(), '',
+                        `expected a silent server: ${probeServer.stderr().slice(0, 400)}`)
+                    // The connection is usable afterwards — the assertion
+                    // this leaf was written unable to make. A subsequent call
+                    // is answered rather than returning the same exit report.
+                    assert.equal(probeServer.exitInfo(), null)
                     const afterwards = await probeServer.call('cas_list', {})
-                    assert.deepEqual(afterwards.serverExited, { code: 1, signal: null })
+                    assert.equal(afterwards.serverExited, undefined,
+                        `the server exited before the following call: ${JSON.stringify(afterwards)}`)
+                    assert.ok(!afterwards.result.isError,
+                        `expected the session to survive a guest's throw: ${JSON.stringify(afterwards)}`)
                 } finally {
                     rmSync(probeHome, { recursive: true, force: true })
                 }
             })
 
             await t.test('what the surface does refuse well: a program that computes without reading anything', async () => {
-                // The counterweight to the leaf above, and the reason it is
-                // stated as a gap in the guest ABI rather than as "guest
-                // programs are unguarded". A program that reads NOTHING is
-                // refused precisely, in the agent's own terms, with the run
-                // record preserved — exactly the behaviour the crash above
-                // does not get. `fjs_run` is fine here; the difference is
-                // whether the failure is one `executeRun` can see coming.
+                // The counterweight to the leaf above. It was written as the
+                // reason that leaf named a gap in the guest ABI's failure
+                // MODE rather than "guest programs are unguarded": a program
+                // that reads NOTHING was already refused precisely, in the
+                // agent's own terms, with the run record preserved — the
+                // behaviour the crash above did not get.
+                //
+                // Since 2026-09-09 both are refused, and the counterweight
+                // has become a DISCRIMINATOR instead: two different `isError`
+                // messages for two different failures, each asserted in full
+                // above and here, so a fix that collapsed one into the other
+                // reddens. That the zero-read refusal is unchanged is itself
+                // the assertion — the guest-throw wrapper sits inside
+                // `runProgramTail` and must not have moved this arm.
                 const blindHash = await casAdd([
                     'export const report = ctx => args => ctx.pure(JSON.stringify({ amountOwed: "6135.00" }))',
                     '',
@@ -1046,12 +1157,23 @@ test(
                 const blindRun = await call('fjs_run', { hash: blindHash, taxYear: 2025 })
                 assert.equal(blindRun.result.isError, true)
                 const message = blindRun.result.content[0].text
-                assert.ok(message.includes('report produced zero observed reads over any stored document'),
-                    `expected the zero-reads refusal: ${message}`)
-                assert.ok(message.includes('run record: '), `expected a run record hash in the refusal: ${message}`)
-                // The server is still answering. Stated against the previous
-                // leaf's `serverExited`, so "refused" and "died" are told
-                // apart by an assertion rather than by the reader.
+                // Whole, not by substring, for the reason the leaf above
+                // states — and so the discriminator claim in this comment is
+                // an assertion rather than a description. The literal count
+                // is 0 because the blind program's one number lives inside a
+                // string.
+                const blindRunRecordMatch = /\(run record: (\S+)\)$/.exec(message)
+                assert.ok(blindRunRecordMatch !== null,
+                    `expected the refusal to end by naming a run record: ${message}`)
+                assert.equal(
+                    message,
+                    'fjs_run failed: report produced zero observed reads over any stored document'
+                    + ' (source contains 0 numeric literal(s)) — a computed report must read at'
+                    + ` least one stored document (run record: ${blindRunRecordMatch[1]})`)
+                // The server is still answering — and so is the probe server
+                // in the leaf above, now that a guest's throw is refused
+                // rather than fatal. This assertion used to be the ONE of
+                // the pair that could be made.
                 assert.equal(server.exitInfo(), null)
                 const stillAlive = await call('cas_list', {})
                 assert.ok(!stillAlive.result.isError, `expected the session to survive a refusal: ${JSON.stringify(stillAlive)}`)
