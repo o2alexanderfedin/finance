@@ -1,7 +1,7 @@
 # `fjs web` cannot serve a file larger than one `Vec` (131072 bytes)
 
 **Priority:** P2 — it blocks one adoption here; it does not affect anything shipped.
-**Status:** open — filed as `functionalscript#1819`; design PR `functionalscript#1900` open since 2026-09-07
+**Status:** open — design MERGED upstream (`functionalscript#1900`, 2026-09-10); the ceiling stands until an implementation lands
 **Found:** 2026-08-31, executing MAINT-11 (Phase 41, milestone v6), against `functionalscript@0.48.0`
 
 ## What is true today
@@ -90,3 +90,15 @@ DESIGN §10's plausible wrong value, so the design specifies `destroy`, not `end
 
 **The ceiling still stands** until an implementation lands, so `demo/serve.sh` stays on
 `python3 -m http.server` and MAINT-11's `fjs web` half stays blocked.
+
+## The design landed; the ceiling did not move
+
+`functionalscript#1900` was **merged on 2026-09-10**. What merged is the design in
+upstream's own `fjs/effects/node/todo/streaming-http-bodies.md`, not an implementation — so
+`fjs web` still answers 413 above 131072 bytes, `demo/serve.sh` stays on `python3 -m
+http.server`, and MAINT-11's `fjs web` half stays blocked. Issue `#1819` is still open, which
+is correct: it closes when a consumer can serve a large file, not when a document describes how.
+
+**It is not in a release either.** `0.49.0` shipped 2026-09-02, before the merge, so no
+published version carries this. The next version after that is the first one worth re-reading
+this note against.

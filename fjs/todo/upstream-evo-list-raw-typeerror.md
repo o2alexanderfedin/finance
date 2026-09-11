@@ -1,7 +1,7 @@
 # `evo(cas)(key)` throws a raw `TypeError` when the memory slot was never allocated
 
 **Priority:** P3 — a diagnostics gap, not a live fault here. Nothing in this repository can reach it.
-**Status:** open — filed as `functionalscript#1893`; fix PR `functionalscript#1899` open since 2026-09-07
+**Status:** FIXED upstream (`functionalscript#1899`, merged 2026-09-08); not in a published release yet
 **Found:** 2026-09-05, sweeping error-rendering sites after MAINT-11, against `functionalscript@0.48.0`
 
 ## What is true today
@@ -101,3 +101,14 @@ describing something that is not a runtime failure of `evo`, and dead against th
 
 The correction was posted to the issue as well, so the record upstream is not left pointing at
 the wrong file.
+
+## Fixed upstream, and not yet in a release
+
+`functionalscript#1899` was **merged on 2026-09-08**. The `ok(undefined)` for a never-allocated
+slot is gone: the virtual interpreter now refuses, matching what the real Node interpreter
+already did, and the mirror hole in `memWrite` closed with it.
+
+**No published version carries it.** `0.49.0` shipped 2026-09-02, six days before the merge.
+This note therefore stays until the version that contains the fix is installed here — at which
+point it is deleted rather than annotated, per AGENTS.md's rule for a gap that upstream has
+closed. Issue `#1893` remains open upstream; closing it is the maintainer's call, not ours.
