@@ -82,25 +82,45 @@ same day, so "still carried forward" is true of two phases now, not three.
 
 </details>
 
-## Next Milestone Goals
+## Current Milestone: v7 The Drop-In
 
-**Not decided. Two candidates are on the table and both are the owner's call.**
+**Goal:** Take `functionalscript` 0.49.0, and write the consumer's side of a release that
+reaches this code at zero sites.
 
-1. **Take FunctionalScript 0.49.0.** It shipped 2026-09-02 and this repository is on 0.48.0.
-   `AGENTS.md`'s re-read rule fires on exactly that event, which is why the gap is visible at
-   all rather than found four days late as 0.47.0's once was. **Neither upstream fix this
-   project landed is in it** — `functionalscript#1899` merged 2026-09-08 and `#1900` on
-   2026-09-10, both after 0.49.0 was cut — so taking it does not retire
-   `fjs/todo/upstream-evo-list-raw-typeerror.md`. Sizing it means reading its changelog the way
-   v6 read 0.48.0's; it has not been read.
-2. **Decide whether the accountant-facing demo becomes a requirement category of its own.**
-   Browser hand entry, generated forms, the client-side store, the `ui-tests` package, the
-   measured palette and demo mode coined no requirement IDs, so there is nothing to retrofit
-   and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and it is a scope question
-   rather than a bookkeeping one.
+**Target features:**
+- **MAINT-15** — `functionalscript` 0.49.0 taken. `^0.48.0` does not admit it, so this is an
+  explicit bump. Named by version, never as "the latest": MAINT-09 says "take 0.47.0" and
+  0.47.0 was superseded four days later, and the ID was deliberately not re-pointed.
+- **MAINT-16** — a consumer-side migration report, in the shape of `fjs-0.48.0-migration.md`.
+  For a drop-in release the report **is** the deliverable: the absence of breakage is
+  invisible upstream unless somebody downstream measures it and says so.
 
-Neither is started. **Phases 34 and 36 are not candidates** — they are not blocked on a
-decision, they are blocked on a person being in the room.
+**Why it is one phase, and why that is a measurement rather than an estimate.** Before this
+section was written, 0.49.0 was installed in a throwaway worktree off `fe16839` and the
+repository was run against it **with zero code edits**: `tsc` 0, `npm test` 3457/3457,
+`test:integration` 13/13 including the SEC path-leak proof, and all 30 served dialect schemas
+byte-identical (sha `6062f5b85f01160b` both sides). 140 upstream files changed; 13 of the 60
+paths this repository imports changed, none moved or was removed.
+
+Contrast v6: 0.48.0 moved `rtti` across 140 import sites and turned `option` from a function
+into a tag at 459 call sites. **A milestone sized to the fear rather than to the measurement
+would have been four phases.**
+
+**Key context — three things this milestone deliberately does not do, each measured:**
+- `fjs/todo/upstream-evo-list-raw-typeerror.md` **survives**. `functionalscript#1899` merged
+  2026-09-08, six days after 0.49.0 was cut, and is not in the tarball. Deleting the note
+  during the bump would delete a live record.
+- **MAINT-11 stays PARTIAL.** `fjs/web/module.f.mjs` is byte-identical across the bump; the
+  413 ceiling stands and `#1819` is still open.
+- **No capability-adoption phase.** 0.49.0's additions delete nothing here — `allOk`, `both`
+  and `And` are used at zero sites, and `errorMessage` is forbidden by this repository's own
+  SEC convention. v6 refused to admit a capability on "it is new" rather than "it removes
+  something", and so does this.
+
+**Deferred, and still the older question.** Whether the accountant-facing demo becomes a
+requirement category of its own — browser hand entry, generated forms, the client-side store,
+the `ui-tests` package, the measured palette. It coined no IDs, so there is nothing to
+retrofit and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and not in v7.
 
 ## Requirements
 
@@ -638,7 +658,12 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-10 after the v6 milestone closed (`/gsd-complete-milestone`). Replaced
+*Last updated: 2026-09-10 — milestone v7 opened (`/gsd-new-milestone`): take
+FunctionalScript 0.49.0, plus the consumer-side report. Sized from a throwaway-worktree probe
+rather than from the changelog: 0.49.0 is a drop-in, and the three things it does NOT fix are
+recorded above so nobody tidies them away during the bump.*
+
+*Previously updated: 2026-09-10 after the v6 milestone closed (`/gsd-complete-milestone`). Replaced
 "Current Milestone" with Current State and Next Milestone Goals; corrected the `option` call-site
 figure from 596/59 to the measured 459/34; corrected a Validated section that had read "None yet"
 since before v1 shipped; settled the backward-compatibility decision and logged six decisions v6

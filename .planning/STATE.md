@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v6
-milestone_name: A Current Engine, Actually Current
-status: complete
-stopped_at: "Milestone v6 is CLOSED, 2026-09-10, by /gsd-complete-milestone. It owned four phases - 42, 39, 40, 41, executed in that order on 2026-08-31 as PRs #144/#145/#146/#147 - and all four shipped: 0.48.0 taken with all 30 served schemas byte-identical, the protocol-version gap and the proof that could not fail both retired, dialect validation on the cas_add write path, toolResultStep adopted and the migration report written. Archived to .planning/milestones/v6-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md; ledger entry in .planning/MILESTONES.md; retrospective in .planning/RETROSPECTIVE.md; tagged milestone/v6. THE ONE REQUIREMENT NOT FULLY DELIVERED is MAINT-11's fjs web swap, blocked on a 131072-byte ceiling - functionalscript#1819, STILL OPEN, and correctly so: it closes when a consumer can serve a large file, not when a document describes how. REQUIREMENTS.md is deliberately NOT deleted at this close, against the GSD workflow's final step: planning-truth-gate.test.js:666 asserts the file is in the citing set on every npm test, and this repository's REQUIREMENTS.md is one cumulative document for all 134 requirements rather than a per-milestone one. Carried forward and still open: phases 34 and 36, blocked since v4 on a person at a real client with real documents - both were run on 2026-09-08 as far as they go without that person (PRs #155 and #154), and phase 35 COMPLETED the same day (PR #156). Next milestone is undecided; the live candidate is FunctionalScript 0.49.0, which shipped 2026-09-02 and carries NEITHER of the two upstream fixes this project landed, because both merged after it was cut."
-last_updated: "2026-09-11T00:50:00.000Z"
+milestone: v7
+milestone_name: The Drop-In
+status: planning
+stopped_at: "Milestone v7 opened 2026-09-10, the same day v6 closed. ONE phase - 43 - and two requirements: MAINT-15 take functionalscript 0.49.0, MAINT-16 the consumer-side migration report. It is one phase because the migration was MEASURED before the milestone was written, not estimated: 0.49.0 was installed in a throwaway worktree off fe16839 and the repository run against it with ZERO code edits - tsc 0, npm test 3457/3457, test:integration 13/13 including the SEC path-leak proof, and all 30 served dialect schemas byte-identical, sha 6062f5b85f01160b on both sides. 140 upstream files changed; 13 of the 60 paths we import changed, none moved or was removed. Contrast v6, where 0.48.0 moved rtti across 140 import sites and turned option from a function into a tag at 459 call sites. THE PROBE DID NOT RUN test:ui OR npm run cov - those belong to executing the phase, and cov thresholds are at 100/100/100 where they fail the build. THREE THINGS v7 DELIBERATELY DOES NOT DO, each measured rather than assumed: fjs/todo/upstream-evo-list-raw-typeerror.md SURVIVES - functionalscript#1899 merged 2026-09-08, six days after 0.49.0 was cut, and is not in the tarball, so deleting the note during the bump would delete a live record; MAINT-11 stays PARTIAL because fjs/web/module.f.mjs is byte-identical across the bump and #1819 is still open; and there is NO capability-adoption phase, because 0.49.0's additions delete nothing here - allOk, both and And are used at zero sites and errorMessage is forbidden by this repository's own SEC convention. Phases 34 and 36 are not in v7, exactly as they were not in v6."
+last_updated: "2026-09-10T21:20:00.000-07:00"
 last_activity: 2026-09-10
 progress:
-  total_phases: 4
-  completed_phases: 4
+  total_phases: 1
+  completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 100
+  percent: 0
 ---
 
 # Project State
@@ -44,25 +44,25 @@ file: it is what a stale document says whether or not it is true.**)*
 
 ## Session
 
-Status: complete — milestone v6 is CLOSED and archived; no milestone is open
-Stopped at: Milestone v6 closed 2026-09-10. All four phases it owned shipped (42, 39, 40, 41). Archived to .planning/milestones/, ledger in MILESTONES.md, retrospective in RETROSPECTIVE.md, tagged milestone/v6. MAINT-11's `fjs web` half is the one requirement not fully delivered, blocked on functionalscript#1819 which is still open. Phases 34 and 36 carry forward still open, blocked on a person at a real client; phase 35 completed 2026-09-08. No next milestone is defined — the candidates are FunctionalScript 0.49.0 (shipped 2026-09-02) and the demo-scope question, and both are the owner's call.
-Progress: [██████████] 100%
+Status: planning — milestone v7 "The Drop-In" is open; Phase 43 is its only phase and is unblocked
+Stopped at: Milestone v7 opened 2026-09-10, the same day v6 closed. One phase (43), two requirements (MAINT-15 take 0.49.0, MAINT-16 the consumer-side report). Sized from a throwaway-worktree probe, not from the changelog: 0.49.0 installs against this tree with ZERO code edits and everything passes. Nothing is executed yet — the bump itself is not made, and `package.json` still declares ^0.48.0.
+Progress: [░░░░░░░░░░] 0%
 Last activity: 2026-09-10
 
-*(100% is 4 of the 4 phases milestone v6 OWNED — 39, 40, 41, 42 — not 4 of 7. The `7` this
-block used to carry counted the three phases carried forward from v4 (34, 35, 36), which the
-ROADMAP's own v6 section says in so many words the milestone "does not touch" and which its
-Progress table files under v5. Two of those three are still open and are recorded as carried
-forward, below and in `MILESTONES.md`, rather than being counted against a milestone that
-disclaimed them.*
+*(0% is 0 of milestone v7's single phase. The previous text here explained that v6's 100% was
+4 of the 4 phases it OWNED, not 4 of 7 — the `7` counted the three carried forward from v4,
+which the ROADMAP's own v6 section says it "does not touch". That reading stands and v7
+inherits it: 34 and 36 are still open and still belong to no milestone that claims them.*
 
-*These four lines read `planning — milestone v5 is open` until 2026-09-10 — which is byte for
-byte the stale snapshot the GSD hook wrote over this file THREE times during v6, each time
-hand-reverted rather than fixed. This file explains the mechanism itself, ten lines below:
-`buildStateFrontmatter` rebuilds the frontmatter from the FIRST `Status:` / `Stopped at:` /
-`Progress:` / `Last activity:` lines in the body, and those were still v5's. Reverting the
-header three times without correcting the body is what scheduled the fourth occurrence. It is
-corrected at the source here.)*
+*These four lines are the ones `buildStateFrontmatter` rebuilds the header from — the FIRST
+`Status:` / `Stopped at:` / `Progress:` / `Last activity:` in the body. **They went stale
+three times during v6 and were hand-reverted three times before anyone corrected the body**,
+and on 2026-09-10 `gsd-sdk query state.milestone-switch` demonstrated the mechanism live: it
+rewrote the frontmatter and the Current Position section for v7 and **left these four lines
+reading "milestone v6 is CLOSED"**, which would have re-armed the same stomp pointing the
+other way. They are written here by hand, after the SDK call and verified against its diff.
+Any `gsd-*` command that touches this file should be followed by
+`git diff .planning/STATE.md` before committing.)*
 
 **These four lines are written for the tool, and they must stay the first of their kind in this
 file.** `gsd-sdk` rebuilds the frontmatter above out of *this body* on every write —
@@ -116,22 +116,25 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: none in flight — milestone v6 closed 2026-09-10; no milestone is open
+Phase: 43 — Take FunctionalScript 0.49.0. Planned, not started; no plans written.
 Plan: —
-Status: Between milestones. Two open phases (34, 36) carry forward, both blocked on a person at
-  a real client with real documents, not on a decision or on any work that can be done here.
-Last activity: 2026-09-10 — Milestone v6 closed and archived
+Status: Milestone v7 initialized. Requirements and roadmap are written; nothing is executed.
+Last activity: 2026-09-10 — Milestone v7 opened
 
-**Not "nothing is in flight".** This file records that as its most dangerous sentence, because
-it is what a stale document says whether or not it is true. What is accurate today: no phase is
-being executed, and the tree is green at `npm test` 3457/3457, `test:integration` 13/13,
-`test:ui` 46/46, `tsc` 0, coverage 100.00/100.00/100.00 across 122 files — measured on the
-closing commit, not quoted from an earlier run. What is *owed* is listed above and in
-`MILESTONES.md` under "Known gaps at close".
+**What is true about the tree right now.** `package.json` still declares `^0.48.0` and 0.48.0
+is what is installed — the bump is the phase, and the phase has not run. The tree is green at
+`npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0, coverage
+100.00/100.00/100.00 across 122 files, measured on `fe16839`.
 
-**Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created at
-this close and neither existed during v1-v5; the single entry in each is v6, and that is not
-evidence v6 was the first milestone.
+**What the probe already established, so the phase does not re-derive it.** 0.49.0 installed
+against this exact tree with zero code edits passes `tsc`, `npm test` and `test:integration`,
+and serves all 30 dialect schemas byte-identically (`6062f5b85f01160b`). The probe worktree
+was removed. **It did not run `test:ui` or `npm run cov`** — those are the phase's to run, and
+the coverage thresholds are at 100/100/100 where they fail the build.
+
+**Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created
+at v6's close and neither existed during v1–v5; the single entry in each is v6, and that is
+not evidence v6 was the first milestone.
 
 ## Shipped outside the ledger — the accountant demo, 2026-08-21
 
