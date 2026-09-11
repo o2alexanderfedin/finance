@@ -91,6 +91,23 @@ docstring (`:410-412`) says a deviation from the formula is *"a readable epoch-r
 rather than an invalid blob"*. So the browser is not writing something that will be rejected;
 it is unintentionally writing epoch-reset markers on every amendment after the first.
 
+**Why it was never caught: the coverage stops one write short of the divergence.** This is
+the sharpest part of the finding, and it was checked against both suites.
+
+- `ui-tests/entry.spec.js:172` — *"re-entering the same payer and year amends rather than
+  duplicates"* — stores a W-2 and then **one** amendment. That is write 2, the write where the
+  two rules agree by coincidence.
+- `ui-tests/coverage.spec.js:99-101` stores a W-2 three times, but the third is a deliberate
+  **refusal** (`'60,000'`, comma-grouped money the engine rejects), so it never becomes a
+  revision. Two successful writes again.
+
+**No test in the repository reaches a third successful revision of one subject.** The defect
+begins at exactly that write. This is a cousin of the failure mode this project keeps
+correcting — a proof that cannot fail — with the difference that this proof *could* fail; it
+simply stops one step before the first input that would make it. **The fix's test is therefore
+already specified: store, amend, amend again, and assert the third revision's `generation` is
+2.**
+
 **Severity, stated honestly.** No number this demo displays is currently wrong: nothing in this
 repository reads `generation` for behaviour — `demo/lib/store.js:114` is the only site in the
 tree that computes a non-zero one, and every other occurrence is a `generation: 0` root fixture.
@@ -155,6 +172,37 @@ decide, and they should decide it the same way.
 
 ---
 
+## Findings 1-3 are fixed, and the fix was watched to redden
+
+All three were repaired in `demo/lib/store.js` on 2026-09-10, pointwise as recommended.
+
+| | Fix |
+|---|---|
+| 1 | `generation: previous.length` → `await nextGeneration(db)(previous)`, which reads the parents from the store and returns `0` for a root else `1 + max(parents' generations)` — upstream's rule, with the `max` as a `reduce` for the reason upstream gives (a spread of a caller-sized array overflows the stack before any error path runs). |
+| 2 | `readAll`'s two silent skips are now raises. A row that is not two strings is a corrupt store, and the function's own docstring already said what it owes a caller in that case. |
+| 3 | `JSON.parse` → `decodeText`, upstream's `parseJson` → shape → `checkReferences` pipeline. The import it needed was already on line 46. |
+
+**The regression test was watched to fail before it was trusted.**
+`ui-tests/entry.spec.js:188` — *"a SECOND amendment carries generation 2, which is where the
+count and the rule part"* — stores a W-2 and amends it **twice**, then reads the generations
+straight out of IndexedDB rather than off the screen, because the field is rendered nowhere.
+
+- With the fix: **passes**, `[0, 1, 2]`.
+- With `generation: previous.length` restored: **fails**, `[0, 1, 1]`.
+
+Restored byte-identical afterwards. A leaf that passes either way is what let this live; this
+one does not.
+
+**Battery after the fix:** `npm test` **3457/3457**, `tsc` **0**, `test:ui` **47/47** (46 before
+— the new test is the difference), `npm run cov` **100.00 / 100.00 / 100.00**.
+
+**The local `generation` rule is a transcription, and transcriptions are how this happened.**
+Upstream's `computeGeneration` is module-private, so a second host has no way to *ask* for the
+answer. That gap is recorded at `fjs/todo/upstream-export-compute-generation.md` — per
+AGENTS.md, a workaround must never be silent — and the ask is one word: `export`.
+
+---
+
 ## The structural answer, and what it costs
 
 All three exist because the browser hand-writes store operations. The shipped path computes
@@ -184,6 +232,78 @@ effect-host shape (`IndexedDbOp` + `Cas<IndexedDbOp>` + `asyncRun`) as the struc
 and note that it is also what would let the browser store be proven under the virtual
 interpreter instead of being untestable wiring. Doing the architecture first would mean fixing
 wrong stored data behind a larger change.
+
+---
+
+## The root-level `*.test.js` carve-out — no file should move, but its written justification has decayed
+
+AGENTS.md permits a small set of root-level impure files and justifies them in one sentence
+(`AGENTS.md:11-16`): *"Each states in its own header why it cannot be a `.f.js` proof: it reads
+the filesystem, or spawns a real process, neither of which a pure module may do."*
+
+**The conclusion is right — all eleven must stay impure.** The justification is not, in three
+checkable ways. Each was re-verified here before being written down.
+
+### 1. The live count is wrong, in the bullet written to stop exactly that
+
+The bullet says *"`ls *.js` is the live list; it is **ten** files today"*. It is **twelve** —
+eleven `*.test.js` plus `index.js`. Two postdate the note: `form1040-pdf-gate.test.js` and
+`conversational-path-integration.test.js`.
+
+The same bullet explains why this matters: it *"named only the first two until 2026-08-17 — long
+enough for an audit to read the set as stray impure JS."* It has now drifted a second time, in
+the same direction.
+
+### 2. The disjunction is missing its third clause
+
+"Reads the filesystem, or spawns a real process" covers ten of eleven. It does not cover
+`form1040-pdf-gate.test.js`, whose own header (`:18-23`) gives the real reason: *"It imports
+`@cantoo/pdf-lib`, which nothing under `fjs/` may. That is not a limitation to work around, it
+is the boundary."* Even with an unrestricted `readFile`, that import alone forbids the move.
+
+**And there is a second, independent blocker on that file that nobody had written down**: the
+`readFile` effect cannot read the artifact at all. `maxLengthBytes` is **131,072** (run it:
+`node -e "import('functionalscript/fjs/types/bit_vec/module.f.mjs').then(m=>console.log(m.maxLengthBytes))"`)
+and `forms/f1040-2025.pdf` is **220,237 bytes**. This is the **same `Vec` ceiling** as
+`functionalscript#1819`, reached from a second direction — the issue is filed about `fjs web`
+serving a large file, and here it blocks reading one.
+
+### 3. Three gate headers cite a precedent claim that 0.49.0 has falsified
+
+`magi-gate.test.js:11-14`, `payer-report-gate.test.js:14` and `year-genericity-gate.test.js:14`
+each say:
+
+> *"A recursive filesystem walk over `fjs/`'s own source text is not something a `.f.js`
+> module's purity rule permits — **no existing FunctionalScript proof precedent exists for
+> file-content scanning** (13-PATTERNS.md's own "No Analog Found" table)."*
+
+**At the pinned 0.49.0 there is such a precedent, and it is upstream's own.**
+`fjs/website/module.f.mjs:118` walks a directory tree as an effect —
+`const walk = dir => step(readdir(dir, {}), entries => foldStep(…))` — reads file *contents*
+with `readUtf8File`, and `fjs/website/proof.f.mjs:42` proves the whole generator under the
+virtual interpreter against an in-memory tree:
+`const [generated, result] = virtual({ ...emptyState, root })(main())`.
+
+*(An earlier draft of this section said four headers. It is three —
+`planning-truth-gate.test.js` does not carry the claim. Corrected before publishing, by
+grepping rather than by trusting the count.)*
+
+**The conclusion survives the rationale's death, and deserves a durable replacement.** These
+gates must stay impure not because scanning files is unprecedented but because **the gate's
+subject is the real tree**. A pure proof driving the same scan under `virtual` proves the
+scanner, not the repository. That framing cannot go stale the way a precedent claim can.
+
+### What the integration suites need, and why no effect covers it
+
+The five process-driving suites are blocked on something already filed:
+`fjs/todo/upstream-node-spawn-effect.md` → `functionalscript#1649`. Upstream has `Exec`
+(one command, one stdin string up front, resolves only at exit) and **no long-lived `Spawn`**.
+These tests need a process alive *across* round-trips, where each request's content depends on
+the previous response's hashes. `Exec`'s contract structurally cannot express that, and the
+virtual interpreter omits `exec` entirely — its own docstring says `exec`, `forever` and `test`
+*"have no meaning against an in-memory filesystem."*
+
+**No change is warranted there.** The note is accurate, re-checked, and filed.
 
 ---
 
