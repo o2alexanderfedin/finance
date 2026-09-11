@@ -185,6 +185,54 @@ test('re-entering the same payer and year amends rather than duplicates', async 
         .toContainText('$70,000.00')
 })
 
+test('a SECOND amendment carries generation 2, which is where the count and the rule part', async ({ page }) => {
+    // The test above stops at ONE amendment, and that is exactly why this bug
+    // lived: `generation: previous.length` agrees with evo's rule for a root
+    // (0 parents -> 0) and for a first amendment (one parent at generation 0
+    // -> 1), and diverges only from the second. Upstream's rule is
+    // `1 + max(parents' generations)` (`fjs/cas/evo` `computeGeneration`), so a
+    // chain reads 0, 1, 2, 3 -- while the count read 0, 1, 1, 1.
+    //
+    // Nothing else would have caught it: `fjs/media/revision` validates
+    // `generation` only as a non-negative safe integer, and upstream reads a
+    // deviation from the formula as a deliberate epoch reset rather than as
+    // corruption -- so a wrong value is not rejected, it MEANS something else.
+    await openEmpty(page)
+    await store(page)('vnd.fjs.return_profile')(profile)
+    await store(page)('vnd.fjs.w2')(w2)
+    await store(page)('vnd.fjs.w2')({ ...w2, box1WagesTipsOtherCompensation: '70000.00' })
+    await store(page)('vnd.fjs.w2')({ ...w2, box1WagesTipsOtherCompensation: '80000.00' })
+    await expect(page.locator('#message')).toContainText('amending')
+
+    // Read the generations straight out of the store the page wrote, rather
+    // than believing the screen: the field is not rendered anywhere, which is
+    // the other half of why this went unnoticed.
+    const generations = await page.evaluate(() => new Promise((resolve, reject) => {
+        const open = indexedDB.open('finance-demo')
+        open.onerror = () => reject(open.error)
+        open.onsuccess = () => {
+            const request = open.result.transaction('revisions', 'readonly')
+                .objectStore('revisions').getAll()
+            request.onerror = () => reject(request.error)
+            request.onsuccess = () => resolve(request.result
+                .map(text => JSON.parse(String(text)))
+                .filter(r => r.subject.includes('w2') || r.subject.includes('11-1111111'))
+                .map(r => r.generation)
+                .sort((a, b) => a - b))
+        }
+    }))
+    // Three W-2 revisions: the root and two amendments, each one deeper than
+    // the last. Under the old rule this read 0, 1, 1.
+    expect(generations, 'each amendment must be one generation deeper than its parent')
+        .toEqual([0, 1, 2])
+
+    // And the return still uses the latest figure, so the fix did not disturb
+    // what the previous test pins.
+    await page.click('#compute')
+    await expect(page.locator('#result').locator('tr', { hasText: '1040 line 1a' }).first())
+        .toContainText('$80,000.00')
+})
+
 test('documents survive a reload, because they are in the browser and not in the page', async ({ page }) => {
     await openEmpty(page)
     await store(page)('vnd.fjs.return_profile')(profile)
