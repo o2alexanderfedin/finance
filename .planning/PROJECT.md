@@ -39,7 +39,7 @@ Full record: [`MILESTONES.md`](./MILESTONES.md) · archive:
 **Where the code stands.** `functionalscript@0.48.0`; 123 `.f.js` modules under `fjs/`;
 `npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0 errors, and coverage
 **100.00 / 100.00 / 100.00 across all 122 measured files** at thresholds that fail the build.
-**134 of the 136** requirements in `REQUIREMENTS.md` are checked; the two outstanding are v7's own, MAINT-15 and MAINT-16. *(This read "all 134 … are checked" for the few hours between v6's close and v7's opening, which added them.)*
+**Every requirement in `REQUIREMENTS.md` is checked — 136 of 136 at the time of writing, and the count is the part to derive rather than trust.** This sentence has now carried a stale number twice in one day: "all 134" survived v7 opening by hours, and "134 of 136" survived Phase 43 executing by about an hour. It is phrased without a load-bearing figure the third time.
 
 **What is open, and it is the same two things it has been since v4.** Phases 34 and 36 — a
 second implementation run over the owner's own documents, and a model (rather than a script)
@@ -126,10 +126,9 @@ retrofit and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and n
 
 ### Validated
 
-**134 of the 136 requirements in `REQUIREMENTS.md` are complete, across six milestones.**
-The two outstanding are milestone v7's own — MAINT-15 (take `functionalscript` 0.49.0) and
-MAINT-16 (the consumer-side report) — and they are Pending because v7 is open, not because
-anything stalled.
+**Every requirement in `REQUIREMENTS.md` is complete, across seven milestones.**
+v7's two — MAINT-15 (take `functionalscript` 0.49.0) and MAINT-16 (the consumer-side report) —
+closed on 2026-09-10 with the phase that owned them.
 
 This section read "(None yet — ship to validate)" until 2026-09-10, which was written before
 v1 shipped and was false from v1's close onward — four milestones of drift in the field that

@@ -102,3 +102,20 @@ is correct: it closes when a consumer can serve a large file, not when a documen
 **It is not in a release either.** `0.49.0` shipped 2026-09-02, before the merge, so no
 published version carries this. The next version after that is the first one worth re-reading
 this note against.
+
+## 0.49.0 was taken, and this note survived it — verified, not assumed
+
+**Phase 43 installed `functionalscript@0.49.0` on 2026-09-10 and the ceiling did not move.**
+`fjs/web/module.f.mjs` is **byte-identical** between the 0.48.0 and 0.49.0 tarballs:
+
+```sh
+diff -q v48/fjs/web/module.f.mjs v49/fjs/web/module.f.mjs   # no output
+```
+
+So the `413` above one `Vec` still stands, `demo/serve.sh` still runs `python3 -m
+http.server`, **MAINT-11 stays PARTIAL**, and `#1819` is still open.
+
+This paragraph exists because the sentence above it — *"the next version after that is the
+first one worth re-reading this note against"* — was a promise, and a promise nobody records
+keeping is indistinguishable from one nobody kept. 0.49.0 was that version; the note was
+re-read; the answer was no. The **next** release is now the one worth re-reading it against.
