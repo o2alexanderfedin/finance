@@ -28,15 +28,39 @@ in CAS alongside the result it produced. Reproducibility, traceability, cost-fre
 over hypothetical inputs, and reports beyond the 1040 all follow from that one property —
 a new report is a new program, not new engine code.
 
-## Current Milestone: v6 A Current Engine, Actually Current
+## Current State
+
+**Shipped: v6 — A Current Engine, Actually Current (2026-09-10).** Phases 39, 40, 41 and 42,
+executed `42 → 39 → 40 → 41`. Six requirements COVERED and MAINT-11 PARTIAL, blocked upstream.
+Full record: [`MILESTONES.md`](./MILESTONES.md) · archive:
+[`milestones/v6-ROADMAP.md`](./milestones/v6-ROADMAP.md) · audit:
+[`milestones/v6-MILESTONE-AUDIT.md`](./milestones/v6-MILESTONE-AUDIT.md).
+
+**Where the code stands.** `functionalscript@0.48.0`; 123 `.f.js` modules under `fjs/`;
+`npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0 errors, and coverage
+**100.00 / 100.00 / 100.00 across all 122 measured files** at thresholds that fail the build.
+All 134 requirements in `REQUIREMENTS.md` are checked.
+
+**What is open, and it is the same two things it has been since v4.** Phases 34 and 36 — a
+second implementation run over the owner's own documents, and a model (rather than a script)
+choosing the calls while reading boxes off a real scan. Both are blocked on a person at a real
+client with real documents, and everything reachable without that person was executed on
+2026-09-08.
+
+<details>
+<summary>The milestone goal as it was written when v6 opened (2026-08-31)</summary>
 
 **Goal:** Take `functionalscript` 0.48.0, and execute the v5 work whose diagnosis was written
 down and never carried out.
 
 **Target features:**
 - `functionalscript` 0.48.0 taken — `rtti` relocated to `fjs/rtti` across 140 import sites,
-  and `option` rewritten from a function to a union member at 596 call sites in 59 files,
-  with `toJsonSchema` byte-identical across the bump as the criterion that decides it
+  and `option` rewritten from a function to a union member. *(This line said "596 call sites in
+  59 files". Measured on the pre-transform tree the figure is **459 calls across 34 files**:
+  `grep` had matched `option(` in docstrings and `todo/*.md` as readily as in code, and once in
+  `demo/steps/02-line16.js` where it builds an HTML `<option>` and is not rtti at all. The 138
+  prose mentions were corrected as documentation, separately.)* `toJsonSchema` byte-identical
+  across the bump was the criterion that decided it, and it held over all 30 served schemas
 - The MCP protocol-version gap actually retired: 0.47.0 closed the upstream half and this
   repository never noticed, so the prose calling it a live gap, the three citations to a note
   deleted in `7244f81`, and the proof that passes for the wrong reason all go
@@ -48,16 +72,64 @@ down and never carried out.
 
 **What v5 actually shipped.** MAINT-09 alone — 0.47.0 taken, in PR #139 (merge `14e6868`).
 Its record said `Pending` until v6 opened, which is the failure this milestone starts by
-correcting. MAINT-10, DOC-25 and MAINT-11/12/13 carry forward **at their original phase
-numbers**, 39, 40 and 41, on the same reasoning that kept 34–36: the citations that address a
+correcting. MAINT-10, DOC-25 and MAINT-11/12/13 carried forward **at their original phase
+numbers**, 39, 40 and 41, on the same reasoning that kept 34-36: the citations that address a
 phase by number outnumber the tidiness of renumbering.
 
+**How that goal came out.** All of it, except MAINT-11's `fjs web` half. And the last bullet
+was overtaken: 35 shipped on 2026-09-08 and 34 and 36 were run to their blocked boundary the
+same day, so "still carried forward" is true of two phases now, not three.
+
+</details>
+
+## Next Milestone Goals
+
+**Not decided. Two candidates are on the table and both are the owner's call.**
+
+1. **Take FunctionalScript 0.49.0.** It shipped 2026-09-02 and this repository is on 0.48.0.
+   `AGENTS.md`'s re-read rule fires on exactly that event, which is why the gap is visible at
+   all rather than found four days late as 0.47.0's once was. **Neither upstream fix this
+   project landed is in it** — `functionalscript#1899` merged 2026-09-08 and `#1900` on
+   2026-09-10, both after 0.49.0 was cut — so taking it does not retire
+   `fjs/todo/upstream-evo-list-raw-typeerror.md`. Sizing it means reading its changelog the way
+   v6 read 0.48.0's; it has not been read.
+2. **Decide whether the accountant-facing demo becomes a requirement category of its own.**
+   Browser hand entry, generated forms, the client-side store, the `ui-tests` package, the
+   measured palette and demo mode coined no requirement IDs, so there is nothing to retrofit
+   and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and it is a scope question
+   rather than a bookkeeping one.
+
+Neither is started. **Phases 34 and 36 are not candidates** — they are not blocked on a
+decision, they are blocked on a person being in the room.
 
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+**All 134 requirements in `REQUIREMENTS.md` are complete, across six milestones.** This
+section read "(None yet — ship to validate)" until 2026-09-10, which was written before v1
+shipped and was false from v1's close onward — four milestones of drift in the field that
+records whether anything has been validated at all.
+
+It is not restated as a list here, because a second copy of 134 checkboxes is a second thing to
+keep true. Derive it:
+
+```sh
+grep -cE '^- \[x\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # 134 complete
+grep -cE '^- \[ \] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # 0 outstanding
+```
+
+`planning-truth-gate.test.js` compares those checkboxes against the traceability tables on
+every `npm test`, so the two cannot disagree silently.
+
+**One is complete with a live caveat.** MAINT-11 is ticked on the strength of `toolResultStep`,
+`memoryRun` and `path.escapes`; its `fjs web` item is blocked upstream and `demo/serve.sh` still
+runs `python3`. The tick is accurate to what the requirement delivered and the gap is recorded
+in `fjs/todo/upstream-web-vec-size-limit.md` — but a reader who stops at the checkbox gets the
+wrong picture, which is why it is named here.
+
+**The Active list below is v1's, kept as written.** It was never rewritten as requirements
+landed; `REQUIREMENTS.md` is the live ledger and this is the origin document.
 
 ### Active
 
@@ -424,7 +496,7 @@ supersede rather than overwrite.
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| No backward compatibility until publication | The software is unpublished, so there are no older clients to serve and advertising a second MCP protocol revision buys nothing. `financeConfig` keeps one pinned revision; the negotiation proof builds its OWN two-entry `McpConfig`, which is all that is needed to tell negotiating from not — with one entry the counter-proposal equals the old unconditional pin, which is exactly why the v5 proof passed for the wrong reason (v6, MAINT-10) | — Pending |
+| No backward compatibility until publication | The software is unpublished, so there are no older clients to serve and advertising a second MCP protocol revision buys nothing. `financeConfig` keeps one pinned revision; the negotiation proof builds its OWN two-entry `McpConfig`, which is all that is needed to tell negotiating from not — with one entry the counter-proposal equals the old unconditional pin, which is exactly why the v5 proof passed for the wrong reason (v6, MAINT-10) | ✓ **Settled in v6 (MAINT-10).** The negotiation proof now builds its own two-revision config and asserts a supported non-latest revision is echoed back; `financeConfig` still advertises one. The sub-question is closed: unpublished software has no older clients |
 | The agent emits a program, not an answer | A generated number is opaque and unverifiable; a generated program is reviewable, re-runnable, diffable, and storable in CAS next to its result. This is what makes an LLM acceptable in front of tax math (PR #1) | — Pending |
 | MCP server executes FunctionalScript in content-addressable space | Follows from the above — something must run the emitted program, and running it over CAS keeps inputs, program, and output in one addressable space (PR #1) | — Pending |
 | Node first as the script runner, `fjs` later | Ships the capability without waiting on `fjs` to become self-hosting; the runner is swappable because the programs it runs are unchanged either way (PR #1) | — Pending |
@@ -448,6 +520,12 @@ supersede rather than overwrite.
 | Defer what-if to v2 | v1 must first compute one real 1040 correctly; scenarios are worthless on top of an unverified engine. Revisited after PR #1: with agent-authored programs, a scenario may need no feature work at all — the deferral now covers only shipping it as a named, tested capability | — Pending |
 | Generic helpers written to be upstreamable into fjs | AGENTS.md policy: anything reusable and non-app-specific belongs in its own file/directory so it can move into FunctionalScript later. Affects where parsers and numeric utilities live from day one | — Pending |
 | git-flow with `main`/`develop`, protected by a pre-commit hook | Direct commits to `main` and `develop` are blocked; all work goes through `feature/*`, `release/*`, `hotfix/*`, `bugfix/*` | — Pending |
+| Byte-identity of the served surface decides a mechanical migration, not a green suite | Phase 38 taught it the expensive way: a call-site experiment typechecked, passed every test, and silently moved 47 served containers while presenting the smaller diff as proof. v6 therefore made `toJsonSchema` over all 30 dialect schemas byte-identical the criterion for taking 0.48.0 (v6, MAINT-14) | ✓ Good — 459 `option` call sites rewritten, sha `f2f79e40a957e7a6` unchanged |
+| A proof must fail if the feature is absent, or it does not count | v5's protocol-version proof requested an unsupported revision, so negotiating and pinning returned the same value and the assertion passed either way. The rule generalises past MCP: build the fixture so the un-featured implementation gives a *different* answer (v6, MAINT-10) | ✓ Good — and it caught a second instance the same milestone, in the coverage sweep |
+| Coverage is a search strategy, not a number | Reaching 100/100/100 across 122 files was allowed no ignore comments and no weakened thresholds, and every new leaf had to assert what the covered path produced. Six real defects were behind the gaps (v6, outside the ledger, PR #151) | ✓ Good — thresholds raised 90 → 100 and proven to fail the build |
+| An owner approval is written where the next reader can check it | `@cantoo/pdf-lib` was approved by both owners on 2026-09-07 for Phase 35. `AGENTS.md` makes owner approval a hard stop, and an authorization living only in a chat log is one the next reader cannot verify — so it was written into the roadmap entry with its scope stated (`devDependency` only; the shipped package's `dependencies` are unchanged) | ✓ Good — same shape as the `ui-tests/` precedent |
+| Exactly one `try` under `fjs/**.f.js`, and it lives in `fjs/refuses` | The guest-throw crash needed error handling at the `fjs_run` call site. Rather than add a second `try`, `fjs/refuses` gained `attempt` and a total renderer, and the call site uses it — so the invariant `AGENTS.md:94` states is still checkable with one grep (v6, PR #157) | ✓ Good — count still 1 |
+| A finding is verified against the source before it is accepted | Roughly a third of findings across this project's review rounds were wrong until the cited code was read, and several proposed remedies were themselves wrong. In v6 this stopped a fix shipping for a **non-defect**: an `evoSummary` change to `finance_documents_list` was reverted once the type declarations showed `list`/`head` are typed `NotImplemented`-only, so no `EvoError` can reach the renderer (v6, PR #152) | — Standing |
 
 ## Success Criteria
 
@@ -560,7 +638,14 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-27 — milestone v5 opened (`/gsd-new-milestone`): the 0.47.0 upgrade, the
+*Last updated: 2026-09-10 after the v6 milestone closed (`/gsd-complete-milestone`). Replaced
+"Current Milestone" with Current State and Next Milestone Goals; corrected the `option` call-site
+figure from 596/59 to the measured 459/34; corrected a Validated section that had read "None yet"
+since before v1 shipped; settled the backward-compatibility decision and logged six decisions v6
+made. Archives are in `.planning/milestones/`; `REQUIREMENTS.md` is deliberately NOT deleted at
+close — `planning-truth-gate.test.js` reads it on every `npm test`.*
+
+*Previously updated: 2026-08-27 — milestone v5 opened (`/gsd-new-milestone`): the 0.47.0 upgrade, the
 write-path validation hole, and phases 34-36 carried forward from v4 at their original numbers.
 Recorded the owner's standing authority to take an fjs gap upstream directly.*
 

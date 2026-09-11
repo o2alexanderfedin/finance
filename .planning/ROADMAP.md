@@ -1,6 +1,6 @@
 # Roadmap: Finance
 
-**Milestone:** v1
+**Milestone:** **v6 — SHIPPED 2026-09-10.** *(This line read `v1` until 2026-09-10, five milestones stale — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
 **Granularity:** fine. **Do not quote a phase count from this line — three have been wrong here.** Derive it: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md` (33 entries today: 1-30 plus the inserted 12.1, plus the gap-closure Phases 31 and 32). See "Granularity Note" below.
 **Coverage:** **120** requirements in REQUIREMENTS.md — 95 v1 plus 25 v2 — of which 8 are MAINT. This line read **93** until 2026-08-17. Derive it: `grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md`; `planning-truth-gate.test.js` compares the checkboxes against the traceability tables on every `npm test`.
 **Count note:** these two lines were themselves stale until 2026-08-07 — they said "15 phases" and
@@ -13,6 +13,24 @@ grep -oE '\*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | sort -u | wc -l   #
 grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          # phases
 ```
 **Created:** 2026-08-03
+
+## Milestones
+
+| Milestone | Phases | Status |
+|---|---|---|
+| **v1** — the substrate and the first 1040 | 1-20 | ✅ shipped 2026-08-14 · tags `v0.10.0`, `v0.12.0` |
+| **v2** — the product path and four personas | 21-32 | ✅ shipped 2026-08-17 · tag `v1.0.0` |
+| **v3** — external validation and fjs 0.46.1 | 33, 37 | ✅ shipped 2026-08-19 |
+| **v4** — verified with the taxpayer present | 34-36 | ⏸ opened 2026-08-19; **34 and 36 still open**, carried through v5 and v6 |
+| **v5** — a current engine and a filable return | 35, 38 | ✅ 38 shipped 2026-08-27; 35 shipped 2026-09-08 |
+| **v6** — a current engine, *actually* current | 39-42 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v6-ROADMAP.md) |
+
+**Only v6 is archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The three open phases are 34 and 36** (blocked since v4 on a person at a real client with real documents); everything else is complete. Derive rather than trust:
+
+```sh
+grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 2 open
+grep -cE '^- \[x\] \*\*Phase ' .planning/ROADMAP.md   # 40 complete
+```
 
 ## Overview
 
@@ -1097,7 +1115,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: none mapped · **Tier**: T1 · **Status**: complete 2026-08-19 · record: `.planning/reports/taxcalcbench-33.md`
 
 ### Phase 34: Second-Implementation Cross-Check
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on the owner's documents and an account at a second filer
+**Requirements**: none mapped · **Tier**: T1 · **Status**: **run 2026-09-08, and still open** — milestone v5. *(This line read "not started" until 2026-09-10, nine days after PR #155 landed and while the Progress table two sections down said otherwise; two statements of one fact with no check between them.)* What the owner is not needed for was done: **8,371 comparisons**, **0** disagreements with Publication 17 and with a TY2025 commercial engine, and **4** with the IRS's own ATS scenarios, each of which resolves against the source. What is still owed is the phase's actual criterion — the owner's own documents through a second filer, line by line — and the diff harness for it is written and waiting (`.planning/reports/phase-34-cross-check.md`, harness beside it).
 
 ### Phase 35: A Filable Artifact — fill the official `f1040.pdf`
 **Requirements**: none mapped · **Tier**: T1 · **Status**: the dependency gate is CLEARED — `@cantoo/pdf-lib` approved by **both** owners on 2026-09-07 (Alexander directly; Sergey's agreement confirmed by Alexander in the same session). The authorization is written into the phase entry below so it survives the chat it was given in. Filling, the two-way field guard and the mutation pass shipped the same day; the header identity block is deliberately NOT filled and is named there.
@@ -1679,6 +1697,16 @@ for why a phase without an ID is preferable to an ID invented to give it one.
 
 ## Milestone v6: A Current Engine, Actually Current
 
+**✅ SHIPPED 2026-09-10.** Archived to [`milestones/v6-ROADMAP.md`](./milestones/v6-ROADMAP.md), with its requirements index at [`milestones/v6-REQUIREMENTS.md`](./milestones/v6-REQUIREMENTS.md) and the audit that ratifies it at [`milestones/v6-MILESTONE-AUDIT.md`](./milestones/v6-MILESTONE-AUDIT.md).
+
+Four phases owned — 39, 40, 41, 42, executed `42 → 39 → 40 → 41`. Six requirements COVERED and MAINT-11 PARTIAL, blocked upstream on [`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819).
+
+**The section below is collapsed, not removed.** Every line of it is still in this file, so the `grep` recipes at the top of this document still count what they always counted — 42 phase checkboxes, 40 complete, 2 open.
+
+<details>
+<summary>✅ v6 — the milestone section as it was written (Phases 39-42) — SHIPPED 2026-09-10</summary>
+
+
 **Why a second bump three days after the first.** 0.47.0 was taken on 2026-08-27 and
 0.48.0 published 2026-08-30T19:06:59Z. Staying put was considered and rejected on two
 grounds: the two breaking changes below are mechanical, and their cost grows with this
@@ -1744,3 +1772,5 @@ T1, still blocked on the owner being in the room, still unscheduled against the 
 work), and it does not advertise a second MCP protocol revision — see MAINT-10, where that
 open sub-question is now answered: the software is unpublished, so there are no older
 clients and backward compatibility buys nothing.
+
+</details>
