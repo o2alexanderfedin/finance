@@ -2324,3 +2324,124 @@ record of what that milestone scoped; these are what v6 owns. `parseRequirements
 ID's status from the last row it reads, and both say `Pending`, so the two agree — which is
 the only way a duplicate row is allowed to exist here.
 
+
+---
+
+## v7 Requirements — The Drop-In (MAINT)
+
+**This milestone is small, and that is the measurement talking, not an estimate.** Before a
+line of it was written, 0.49.0 was installed in a throwaway worktree off `fe16839` and the
+repository was run against it **unchanged**. Everything passed. The size of the milestone is
+derived the way this project derives every other number: by measuring, then writing it down.
+
+| Measured on `fe16839`, 2026-09-10 | Result |
+|---|---|
+| Upstream files changed 0.48.0 → 0.49.0 | **140 changed, 13 added paths, 8 removed** |
+| Of the **60** upstream paths this repository imports | **13 changed, 0 moved, 0 removed** |
+| `tsc --noEmit` on 0.49.0, zero code edits | **0 errors** |
+| `npm test` on 0.49.0, zero code edits | **3457 / 3457** |
+| `test:integration` on 0.49.0, zero code edits | **13 / 13**, including the SEC path-leak proof |
+| `toJsonSchema` over all 30 served dialect schemas | **byte-identical**, sha `6062f5b85f01160b` both sides |
+
+Contrast v6, which is why the contrast is worth stating: 0.48.0 moved `rtti` across **140
+import sites** and turned `option` from a function into a tag at **459 call sites**. 0.49.0
+reaches this code at **zero**.
+
+- [ ] **MAINT-15** *(T3)*: **Take `functionalscript` 0.49.0.** `^0.48.0` does not admit
+      0.49.0 — a caret on a `0.x` pins the minor — so this is an explicit bump, exactly as
+      MAINT-09 and MAINT-14 were.
+
+      **Named by version, never as "the latest".** MAINT-09 says "take 0.47.0" and 0.47.0 was
+      superseded four days later; the ID was deliberately not re-pointed, because a
+      requirement that silently re-aims at a different release makes the record of what was
+      actually taken, and when, unrecoverable. If 0.50.0 publishes before this phase executes,
+      **that is a new decision**, not a quiet substitution — which is precisely what v6 did
+      when 0.48.0 landed on top of 0.47.0.
+
+      **What actually changed in the thirteen paths we import**, read rather than assumed:
+
+      - `fjs/effects/module.f.mjs` gains `errorMessage`, and `fjs/effects/node` now
+        re-exports it from there. **This is a relocation, not a new behaviour** — the
+        function already existed in `fjs/effects/node` at 0.48.0. The convention at
+        `fjs/guest/materialize/module.f.js:314` — *`errorSummary`, never `errorMessage`* —
+        is unaffected, and its `grep -rn errorMessage fjs` instruction still finds what it
+        was written to find.
+      - `all`, `allOk`, `both` and `import_` move from `fjs/effects/node` to
+        `fjs/effects/common` and are **re-exported from node**, so every existing import
+        site keeps working. This repository uses `import_` (35 sites) and **none** of
+        `allOk`, `both` or `all` directly.
+      - `fjs/effects/node/module.mjs`'s oversized-file error now appends the path:
+        `… exceeds maximum allowed size of N bytes: '<path>'`. **This does not reach a
+        client**, and the reason is structural rather than lucky: `errorSummary` renders
+        `payload.code` and answers the bare `io error` when a host attached none — it never
+        forwards `payload.message`. The SEC integration proof was run against 0.49.0 and
+        passes.
+      - `readdir` entries gain `isDirectory`; `FileCas.url` becomes `readonly`;
+        `RequiredMap` is re-expressed through a new `AbstractRequiredMap`; and `And`,
+        `TupleRestTs` and three rtti internals switch `[A] extends [B]` to
+        `readonly [A] extends readonly [B]`. All additive or type-identical here — `tsc`
+        reports 0 and this repository uses `And` at **0** sites.
+      - The virtual interpreter's file resolution was reworked substantially
+        (`resolveFile`, `jsModuleUnsupported`, `jsModuleNotAFile`). Our proofs exercise it
+        heavily and all pass.
+
+      **Upstream dropped `typescript` from its own `devDependencies`.** This repository still
+      pins `^7.0.2` and must keep doing so — `npm test` is `tsc && node --test`, and the
+      compiler is ours to choose, not something to inherit.
+
+      **The acceptance criteria are Phase 42's, unchanged, and the probe satisfies only three
+      of the four.** `tsc` 0 and the explicit version; byte-identity over all 30 served
+      schemas; the proof-leaf **set** may only grow, compared as sets and not as totals; and
+      the full battery green. The probe did **not** run `test:ui` or `npm run cov` — those
+      belong to executing the phase, and the coverage thresholds are at 100/100/100 where
+      they fail the build.
+
+- [ ] **MAINT-16** *(T3)*: **A consumer-side migration report for 0.49.0**, in the shape of
+      `fjs-0.46.1-migration.md` and `fjs-0.48.0-migration.md`.
+
+      **For a drop-in release the report is the deliverable, not the paperwork behind it.**
+      Sergey asked for this in `todo/update-fjs-0.46.0` (PR #96): *"an extensive, structured
+      report on the migration … whether you learned anything new and how you adapted to the
+      project, as well as what the main challenges were."* A release where a consumer changes
+      **nothing** answers that question too, and it is the answer a library author can least
+      see from where the library is authored — the absence of breakage is invisible upstream
+      unless somebody downstream measures it and says so.
+
+      It must carry, at minimum: the thirteen imported paths that changed and what each one
+      did; the four checks and their results; the two things 0.49.0 was hoped to fix and did
+      not (below); and the `errorMessage` relocation, because the next reader of that
+      convention docstring will want to know the name moved and the rule did not.
+
+### What v7 explicitly does NOT do — both measured, not assumed
+
+**`fjs/todo/upstream-evo-list-raw-typeerror.md` survives this migration and must not be
+deleted.** The note's own closing rule says it is deleted "when the version that contains the
+fix is installed here". **0.49.0 is not that version.** `functionalscript#1899` merged
+2026-09-08, six days after 0.49.0 was cut on 2026-09-02, and the fix is not in the tarball —
+`grep -rn 'memory key not found'` over 0.49.0 finds it only in `fjs/effects/node/memory/`,
+the **real** runner, which already carried it at 0.48.0. The virtual runner's matching asserts
+are absent. Anyone tidying this note away during the bump would be deleting a live record.
+
+**MAINT-11 stays PARTIAL and the `fjs web` ceiling is untouched.**
+`fjs/web/module.f.mjs` is **byte-identical** between 0.48.0 and 0.49.0. The 413 above one
+`Vec` still stands, `demo/serve.sh` still runs `python3 -m http.server`, and
+[`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819)
+is still open. `functionalscript#1900`'s streaming design merged 2026-09-10, also after
+0.49.0 was cut.
+
+**No capability adoption phase.** v6's MAINT-11 existed because 0.47.0's new capabilities
+each **deleted** something here. 0.49.0's additions do not: `allOk`, `both` and `And` are
+used at zero sites, `errorMessage` is forbidden by this repository's own SEC convention, and
+`readdir`'s new `isDirectory` has no caller. A phase admitted on "it is new" rather than "it
+removes something" is the one v6 refused to write.
+
+**Phases 34 and 36 are not in this milestone.** They are not blocked on a decision or on a
+release; they are blocked on a person at a real client with real documents, and no version of
+`functionalscript` changes that.
+
+### v7 Traceability
+
+| REQ-ID | Tier | Phase | Milestone | Status |
+|--------|------|-------|-----------|--------|
+| MAINT-15 | T3 | 43. Take FunctionalScript 0.49.0 | v7 | Pending |
+| MAINT-16 | T3 | 43. Take FunctionalScript 0.49.0 | v7 | Pending |

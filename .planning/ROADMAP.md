@@ -1,6 +1,6 @@
 # Roadmap: Finance
 
-**Milestone:** **v6 — SHIPPED 2026-09-10.** *(This line read `v1` until 2026-09-10, five milestones stale — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
+**Milestone:** **v7 — The Drop-In**, opened 2026-09-10 (Phase 43). v6 SHIPPED 2026-09-10. *(This line read `v1` until 2026-09-10, five milestones stale — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
 **Granularity:** fine. **Do not quote a phase count from this line — three have been wrong here.** Derive it: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md` (33 entries today: 1-30 plus the inserted 12.1, plus the gap-closure Phases 31 and 32). See "Granularity Note" below.
 **Coverage:** **120** requirements in REQUIREMENTS.md — 95 v1 plus 25 v2 — of which 8 are MAINT. This line read **93** until 2026-08-17. Derive it: `grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md`; `planning-truth-gate.test.js` compares the checkboxes against the traceability tables on every `npm test`.
 **Count note:** these two lines were themselves stale until 2026-08-07 — they said "15 phases" and
@@ -24,11 +24,12 @@ grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          
 | **v4** — verified with the taxpayer present | 34-36 | ⏸ opened 2026-08-19; **34 and 36 still open**, carried through v5 and v6 |
 | **v5** — a current engine and a filable return | 35, 38 | ✅ 38 shipped 2026-08-27; 35 shipped 2026-09-08 |
 | **v6** — a current engine, *actually* current | 39-42 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v6-ROADMAP.md) |
+| **v7** — the drop-in | 43 | 🚧 **OPEN**, started 2026-09-10 |
 
-**Only v6 is archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The three open phases are 34 and 36** (blocked since v4 on a person at a real client with real documents); everything else is complete. Derive rather than trust:
+**Only v6 is archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36** — blocked since v4 on a person at a real client with real documents — **and 43**, this milestone's only phase. Everything else is complete. Derive rather than trust:
 
 ```sh
-grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 2 open
+grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 3 open — 34, 36, 43
 grep -cE '^- \[x\] \*\*Phase ' .planning/ROADMAP.md   # 40 complete
 ```
 
@@ -1143,6 +1144,9 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 ### Phase 42: Take FunctionalScript 0.48.0
 **Requirements**: MAINT-14 · **Tier**: T3 · **Status**: complete — milestone v6, shipped in PR #144 (merge `80b5e1e`)
 
+### Phase 43: Take FunctionalScript 0.49.0
+**Requirements**: MAINT-15, MAINT-16 · **Tier**: T3 · **Status**: not started — milestone v7. **Measured against `fe16839` on 2026-09-10, before this phase was written**, by installing 0.49.0 in a throwaway worktree and running the repository against it unchanged: `tsc` **0**, `npm test` **3457/3457**, `test:integration` **13/13**, and all 30 served dialect schemas **byte-identical** (sha `6062f5b85f01160b` on both sides). 140 upstream files changed; **13 of the 60 paths this repository imports** changed, **none moved or was removed**. The probe did not run `test:ui` or `npm run cov` — those belong to executing the phase.
+
 ---
 
 ## Progress
@@ -1208,6 +1212,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 40. Validation on the Write Path | **v6** | 0/0 — no plans written | Complete (DOC-25); `cas_add` now refuses content that declares a finance dialect and does not satisfy it | 2026-08-31 · PR #146 |
 | 41. New Capabilities and the Migration Report | **v6** | 0/0 — no plans written | Complete (MAINT-11 partial / MAINT-12 / MAINT-13); the `fjs web` half of MAINT-11 is blocked upstream on a 131072-byte ceiling, filed in `fjs/todo/` | 2026-08-31 · PR #147 |
 | 42. Take FunctionalScript 0.48.0 | **v6** | 0/0 — no plans written | Complete; 140 rtti sites and 459 `option` calls rewritten, all 30 served schemas byte-identical | 2026-08-31 · PR #144 |
+| 43. Take FunctionalScript 0.49.0 | **v7** | 0/0 — no plans written | Not started (MAINT-15, MAINT-16) | - |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
 > had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all
@@ -1774,3 +1779,79 @@ open sub-question is now answered: the software is unpublished, so there are no 
 clients and backward compatibility buys nothing.
 
 </details>
+
+---
+
+## Milestone v7: The Drop-In
+
+**Opened 2026-09-10, the same day v6 closed.** One phase, two requirements, and the reason
+it is that small is that the migration was **measured before this section was written** —
+not estimated, not scoped from the changelog, but performed in a throwaway worktree off
+`fe16839` and thrown away.
+
+| Measured 2026-09-10 on `fe16839`, 0.49.0 installed, **zero code edits** | Result |
+|---|---|
+| Upstream files changed 0.48.0 → 0.49.0 | 140 changed, 13 added paths, 8 removed |
+| Of the **60** upstream paths this repository imports | **13 changed, 0 moved, 0 removed** |
+| `tsc --noEmit` | **0 errors** |
+| `npm test` | **3457 / 3457** |
+| `test:integration` | **13 / 13**, including the SEC path-leak proof |
+| `toJsonSchema` over all 30 served dialect schemas | **byte-identical**, sha `6062f5b85f01160b` both sides |
+
+**Why the contrast with v6 is the point.** 0.48.0 moved `rtti` across 140 import sites and
+turned `option` from a function into a tag at 459 call sites; it needed a phase of its own and
+a byte-identity criterion to be sure it had not moved the served surface. 0.49.0 reaches this
+code at **zero sites**. A milestone sized to the fear rather than to the measurement would
+have been four phases; this one is a single line in `package.json` and the report that says
+so with evidence.
+
+**The report is the deliverable, not the paperwork.** A release where a consumer changes
+nothing still answers the question Sergey asked in `todo/update-fjs-0.46.0` — and it is the
+answer a library author can least see from where the library is authored. The absence of
+breakage is invisible upstream unless somebody downstream measures it and says so.
+
+- [ ] **Phase 43: Take FunctionalScript 0.49.0** - MAINT-15, MAINT-16. `^0.48.0` does not
+      admit 0.49.0 — a caret on a `0.x` pins the minor — so this is an explicit bump, as
+      MAINT-09 and MAINT-14 were. **Named by version, never as "the latest":** MAINT-09 says
+      "take 0.47.0" and 0.47.0 was superseded four days later; the ID was deliberately not
+      re-pointed, because a requirement that silently re-aims at a different release makes the
+      record of what was actually taken, and when, unrecoverable. **If 0.50.0 publishes before
+      this executes, that is a new decision** — which is exactly what v6 was when 0.48.0
+      landed on top of 0.47.0.
+
+      **Acceptance is Phase 42's, unchanged**, and the probe above satisfies only three of the
+      four:
+
+      1. `package.json` names 0.49.0 explicitly and `tsc` reports **0** errors.
+      2. **`toJsonSchema` over all 30 dialect schemas is byte-identical** to 0.48.0's output.
+      3. **The proof-leaf set may only grow.** Compare leaf-name SETS, not totals, with the
+         recipe AGENTS.md documents; `comm -23 baseline-leaves.txt result-leaves.txt` must be
+         empty. No touched module's assertion count may fall.
+      4. The full battery holds: `npm test`, `test:integration` **13/13**, `test:ui` **46/46**,
+         and `npm run cov` at **100 / 100 / 100** — thresholds that fail the build. **The
+         probe ran neither `test:ui` nor `cov`**; they belong here.
+
+**What v7 explicitly does NOT do, both measured rather than assumed.**
+
+**`fjs/todo/upstream-evo-list-raw-typeerror.md` survives and must not be deleted.** The note's
+own closing rule retires it "when the version that contains the fix is installed here".
+**0.49.0 is not that version.** `functionalscript#1899` merged 2026-09-08, six days after
+0.49.0 was cut; `grep -rn 'memory key not found'` over the 0.49.0 tarball finds it only in
+`fjs/effects/node/memory/`, the **real** runner, which already carried it at 0.48.0. The
+virtual runner's matching asserts are absent. Tidying the note away during the bump would
+delete a live record.
+
+**MAINT-11 stays PARTIAL.** `fjs/web/module.f.mjs` is **byte-identical** across the bump — the
+413 above one `Vec` stands, `demo/serve.sh` still runs `python3 -m http.server`, and
+`functionalscript#1819` is still open. `#1900`'s streaming design merged 2026-09-10, also after
+0.49.0 was cut.
+
+**No capability-adoption phase.** v6's MAINT-11 was admitted because each 0.47.0 capability
+**deleted** something here. 0.49.0's additions do not: `allOk`, `both` and `And` are used at
+zero sites, `errorMessage` is forbidden by this repository's own SEC convention
+(`fjs/guest/materialize/module.f.js:314`), and `readdir`'s new `isDirectory` has no caller.
+A phase admitted on "it is new" rather than "it removes something" is the one v6 refused to
+write, and this milestone does not write it either.
+
+**Phases 34 and 36 are not in v7**, exactly as they were not in v6. They are blocked on a
+person at a real client with real documents, and no release changes that.
