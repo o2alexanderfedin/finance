@@ -11,10 +11,25 @@
 // 2. A recursive filesystem walk over `fjs/report/payer`'s own source text is
 //    not something a `.f.js` module's purity rule permits -- no existing
 //    FunctionalScript proof precedent exists for file-content scanning
-//    (13-PATTERNS.md's own "No Analog Found" table, cited by
+//    (13-PATTERNS.md's own "No Analog Found" table -- RETIRED, see the
+//    correction below -- cited by
 //    `magi-gate.test.js`). This file is therefore, like `index.js`,
 //    `all.test.js`, and `magi-gate.test.js`, a root-level impure JS file by
 //    necessity (AGENTS.md's carve-out for exactly this category).
+//
+// CORRECTION, 2026-09-10: the "no precedent" clause above is false against
+// `functionalscript@0.49.0`, and is left in place rather than deleted so the
+// record shows what was believed. Upstream's own `fjs/website/module.f.mjs`
+// walks a directory tree with `readdir` as an effect, reads file CONTENTS with
+// `readUtf8File`, and `fjs/website/proof.f.mjs` proves the whole generator
+// under `fjs/effects/node/virtual` against an in-memory tree. Its module
+// docstring states the position this header denies: "Discovery is part of the
+// program, not a script beside it."
+//
+// The conclusion survives the rationale. This file stays impure for a reason
+// that cannot go stale: THE GATE'S SUBJECT IS THE REAL TREE. A pure proof
+// driving the same scan under the virtual interpreter would prove the scanner
+// against a fixture it supplied itself -- which is not what this gate is for.
 //
 // `@ts-nocheck` disables TYPE checking of this one file only -- it adds
 // nothing to `package.json`, and no other file in this repo carries it

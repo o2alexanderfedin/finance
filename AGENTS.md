@@ -10,10 +10,30 @@
   - [./index.js](./index.js), used to start the app,
   - [./all.test.js](./all.test.js), used to initialize FunctionalScript Emergent Testing Framework,
   - the root-level `*.test.js` gate and integration suites, which `npm test`'s `node --test *.test.js`
-    glob is what discovers. `ls *.js` is the live list; it is **ten** files today, not two, and this
-    bullet named only the first two until 2026-08-17 — long enough for an audit to read the set as
-    stray impure JS. Each states in its own header why it cannot be a `.f.js` proof: it reads the
-    filesystem, or spawns a real process, neither of which a pure module may do.
+    glob is what discovers. **`ls *.js` is the live list — run it rather than reading a count
+    here.** This bullet named only the first two until 2026-08-17, long enough for an audit to
+    read the set as stray impure JS; it was then given a count, and the count said **ten** while
+    the answer was **twelve** — `form1040-pdf-gate.test.js` and `conversational-path-integration.test.js` both
+    arrived after it was written. A number beside the command that computes it is the second
+    statement of one fact, and the second statement is the one that drifts. So there is no number
+    here now.
+
+    Each file states in its own header why it cannot be a `.f.js` proof. There are **three**
+    reasons, not two:
+    - **it reads the real tree** — the gate's subject *is* this repository, and a pure proof
+      driving the same scan under `fjs/effects/node/virtual` would prove the scanner, not the
+      tree. *(Three gate headers instead say no proof precedent exists for file-content scanning.
+      That was retired by upstream: `fjs/website/module.f.mjs` walks a tree with `readdir` as an
+      effect, reads contents with `readUtf8File`, and `fjs/website/proof.f.mjs` proves it under
+      the virtual interpreter. The conclusion survives; the rationale did not.)*
+    - **it spawns a real process** — and needs one alive *across* round-trips, which upstream's
+      one-shot `Exec` structurally cannot express. Filed as
+      [`fjs/todo/upstream-node-spawn-effect.md`](./fjs/todo/upstream-node-spawn-effect.md) →
+      `functionalscript#1649`.
+    - **it imports the one approved third-party library**, which nothing under `fjs/` may.
+      `form1040-pdf-gate.test.js` is pinned by `@cantoo/pdf-lib` alone — and, independently, by
+      the `Vec` ceiling: `readFile` cannot exceed **131,072** bytes and `forms/f1040-2025.pdf` is
+      **220,237**, the same ceiling as `functionalscript#1819` reached from the reading side.
 - The files can be used as normal ESM files.
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
