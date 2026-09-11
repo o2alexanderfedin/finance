@@ -2347,7 +2347,7 @@ Contrast v6, which is why the contrast is worth stating: 0.48.0 moved `rtti` acr
 import sites** and turned `option` from a function into a tag at **459 call sites**. 0.49.0
 reaches this code at **zero**.
 
-- [ ] **MAINT-15** *(T3)*: **Take `functionalscript` 0.49.0.** `^0.48.0` does not admit
+- [x] **MAINT-15** *(T3)*: **Take `functionalscript` 0.49.0.** `^0.48.0` does not admit
       0.49.0 — a caret on a `0.x` pins the minor — so this is an explicit bump, exactly as
       MAINT-09 and MAINT-14 were.
 
@@ -2396,7 +2396,7 @@ reaches this code at **zero**.
       belong to executing the phase, and the coverage thresholds are at 100/100/100 where
       they fail the build.
 
-- [ ] **MAINT-16** *(T3)*: **A consumer-side migration report for 0.49.0**, in the shape of
+- [x] **MAINT-16** *(T3)*: **A consumer-side migration report for 0.49.0**, in the shape of
       `fjs-0.46.1-migration.md` and `fjs-0.48.0-migration.md`.
 
       **For a drop-in release the report is the deliverable, not the paperwork behind it.**
@@ -2443,5 +2443,19 @@ release; they are blocked on a person at a real client with real documents, and 
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
-| MAINT-15 | T3 | 43. Take FunctionalScript 0.49.0 | v7 | Pending |
-| MAINT-16 | T3 | 43. Take FunctionalScript 0.49.0 | v7 | Pending |
+| MAINT-15 | T3 | 43. Take FunctionalScript 0.49.0 | v7 | Complete |
+| MAINT-16 | T3 | 43. Take FunctionalScript 0.49.0 | v7 | Complete |
+
+**Executed 2026-09-10, and every acceptance criterion met.** `package.json` declares `^0.49.0`
+and 0.49.0 is installed; `tsc` **0**; all 30 served dialect schemas **byte-identical**
+(`6062f5b85f01160b` both sides); the proof-leaf set is **3388 → 3388** with `comm -23` empty
+and **no file's assertion count moved** (123 files, 11,573 assertions); `npm test` **3457/3457**,
+`test:integration` **13/13**, `test:ui` **46/46**, `npm run cov` **100.00/100.00/100.00**.
+**The source diff is empty** — only `package.json` and `package-lock.json` changed. The report
+is [`.planning/reports/fjs-0.49.0-migration.md`](./reports/fjs-0.49.0-migration.md).
+
+**Both things the phase was told not to delete are still there**, and each note now records the
+re-read rather than merely surviving it: `fjs/todo/upstream-evo-list-raw-typeerror.md` (0.49.0
+does not carry `#1899` — verified by `grep` over the tarball, not inferred from dates) and
+`fjs/todo/upstream-web-vec-size-limit.md` (`fjs/web/module.f.mjs` byte-identical across the
+bump, so **MAINT-11 stays PARTIAL** and `#1819` stays open).

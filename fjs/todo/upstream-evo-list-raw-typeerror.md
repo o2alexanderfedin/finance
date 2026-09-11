@@ -112,3 +112,28 @@ already did, and the mirror hole in `memWrite` closed with it.
 This note therefore stays until the version that contains the fix is installed here — at which
 point it is deleted rather than annotated, per AGENTS.md's rule for a gap that upstream has
 closed. Issue `#1893` remains open upstream; closing it is the maintainer's call, not ours.
+
+## 0.49.0 was taken, and this note survived it — verified against the tarball
+
+**Phase 43 installed `functionalscript@0.49.0` on 2026-09-10. It does not carry the fix**, and
+that was checked rather than inferred from the dates:
+
+```sh
+grep -rn 'memory key not found' v49/
+# only fjs/effects/node/memory/{module,proof}.mjs — the REAL runner, which already
+# carried it at 0.48.0. The virtual runner's matching asserts are absent.
+```
+
+`functionalscript#1899` merged 2026-09-08, six days after 0.49.0 was cut on 2026-09-02, so no
+published version carries it yet. **This note therefore stays**, under its own rule above: it is
+deleted when the version that contains the fix is installed here, and 0.49.0 is not that
+version.
+
+**It was specifically at risk during this migration.** "Take the new version" is exactly the
+task during which a stale-looking upstream note gets tidied away, and this one *looks* stale —
+it says FIXED in its own status line. It is fixed **upstream**, on `main`, and not in anything
+installable. `fixed` and `released` are different states, and only the second one retires a
+note. Phase 43's roadmap entry, its requirement (MAINT-15) and the milestone's `STATE.md` all
+name this note by path as something the phase must **not** delete, for that reason.
+
+The next release after 0.49.0 is the first one worth re-reading this note against.

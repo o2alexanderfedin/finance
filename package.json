@@ -22,7 +22,7 @@
     "test:ui": "npm --prefix ui-tests test"
   },
   "dependencies": {
-    "functionalscript": "^0.48.0"
+    "functionalscript": "^0.49.0"
   },
   "devDependencies": {
     "@cantoo/pdf-lib": "^2.9.2",

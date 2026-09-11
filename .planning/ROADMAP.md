@@ -24,12 +24,12 @@ grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          
 | **v4** — verified with the taxpayer present | 34-36 | ⏸ opened 2026-08-19; **34 and 36 still open**, carried through v5 and v6 |
 | **v5** — a current engine and a filable return | 35, 38 | ✅ 38 shipped 2026-08-27; 35 shipped 2026-09-08 |
 | **v6** — a current engine, *actually* current | 39-42 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v6-ROADMAP.md) |
-| **v7** — the drop-in | 43 | 🚧 **OPEN**, started 2026-09-10 |
+| **v7** — the drop-in | 43 | ✅ phase complete 2026-09-10; milestone closing |
 
-**Only v6 is archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36** — blocked since v4 on a person at a real client with real documents — **and 43**, this milestone's only phase. Everything else is complete. Derive rather than trust:
+**Only v6 is archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36**, blocked since v4 on a person at a real client with real documents. Everything else is complete, Phase 43 included. Derive rather than trust:
 
 ```sh
-grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 3 open — 34, 36, 43
+grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 2 open — 34 and 36
 grep -cE '^- \[x\] \*\*Phase ' .planning/ROADMAP.md   # 40 complete
 ```
 
@@ -1145,7 +1145,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: MAINT-14 · **Tier**: T3 · **Status**: complete — milestone v6, shipped in PR #144 (merge `80b5e1e`)
 
 ### Phase 43: Take FunctionalScript 0.49.0
-**Requirements**: MAINT-15, MAINT-16 · **Tier**: T3 · **Status**: not started — milestone v7. **Measured against `fe16839` on 2026-09-10, before this phase was written**, by installing 0.49.0 in a throwaway worktree and running the repository against it unchanged: `tsc` **0**, `npm test` **3457/3457**, `test:integration` **13/13**, and all 30 served dialect schemas **byte-identical** (sha `6062f5b85f01160b` on both sides). 140 upstream files changed; **13 of the 60 paths this repository imports** changed, **none moved or was removed**. The probe did not run `test:ui` or `npm run cov` — those belong to executing the phase.
+**Requirements**: MAINT-15, MAINT-16 · **Tier**: T3 · **Status**: **complete — milestone v7, 2026-09-10.** The bump is one line and the source diff is empty. **Measured against `fe16839` on 2026-09-10, before this phase was written**, by installing 0.49.0 in a throwaway worktree and running the repository against it unchanged: `tsc` **0**, `npm test` **3457/3457**, `test:integration` **13/13**, and all 30 served dialect schemas **byte-identical** (sha `6062f5b85f01160b` on both sides). 140 upstream files changed; **13 of the 60 paths this repository imports** changed, **none moved or was removed**. The probe did not run `test:ui` or `npm run cov` — those belong to executing the phase.
 
 ---
 
@@ -1212,7 +1212,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 40. Validation on the Write Path | **v6** | 0/0 — no plans written | Complete (DOC-25); `cas_add` now refuses content that declares a finance dialect and does not satisfy it | 2026-08-31 · PR #146 |
 | 41. New Capabilities and the Migration Report | **v6** | 0/0 — no plans written | Complete (MAINT-11 partial / MAINT-12 / MAINT-13); the `fjs web` half of MAINT-11 is blocked upstream on a 131072-byte ceiling, filed in `fjs/todo/` | 2026-08-31 · PR #147 |
 | 42. Take FunctionalScript 0.48.0 | **v6** | 0/0 — no plans written | Complete; 140 rtti sites and 459 `option` calls rewritten, all 30 served schemas byte-identical | 2026-08-31 · PR #144 |
-| 43. Take FunctionalScript 0.49.0 | **v7** | 0/0 — no plans written | Not started (MAINT-15, MAINT-16) | - |
+| 43. Take FunctionalScript 0.49.0 | **v7** | 0/0 — no plans written | Complete (MAINT-15, MAINT-16); zero source lines changed, all 30 schemas byte-identical, 3388 proof leaves in and out | 2026-09-10 |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
 > had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all
@@ -1810,7 +1810,7 @@ nothing still answers the question Sergey asked in `todo/update-fjs-0.46.0` — 
 answer a library author can least see from where the library is authored. The absence of
 breakage is invisible upstream unless somebody downstream measures it and says so.
 
-- [ ] **Phase 43: Take FunctionalScript 0.49.0** - MAINT-15, MAINT-16. `^0.48.0` does not
+- [x] **Phase 43: Take FunctionalScript 0.49.0** - MAINT-15, MAINT-16. **COMPLETE 2026-09-10.** All four criteria met, and the source diff is empty: `tsc` 0, all 30 schemas byte-identical (`6062f5b85f01160b`), leaf set 3388 → 3388 with `comm -23` empty and no assertion count moved, and the full battery green including `test:ui` 46/46 and `cov` 100/100/100 — the two the probe did not run. Report: `.planning/reports/fjs-0.49.0-migration.md`. `^0.48.0` does not
       admit 0.49.0 — a caret on a `0.x` pins the minor — so this is an explicit bump, as
       MAINT-09 and MAINT-14 were. **Named by version, never as "the latest":** MAINT-09 says
       "take 0.47.0" and 0.47.0 was superseded four days later; the ID was deliberately not
