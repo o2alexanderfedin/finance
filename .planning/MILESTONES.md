@@ -49,7 +49,9 @@ and an empty source diff — and the consumer-side report that says so with evid
 - Suite at close: `npm test` **3457/3457**, `test:integration` **13/13**, `test:ui` **46/46**,
   `cov` **100.00/100.00/100.00**, `tsc` **0**, proof leaves **3388 → 3388**
 
-**Git range:** `d0cdd22` (v7 opened) → `133f25a` (PR #163)
+**Git range:** `f2a63d1` (PR #161, milestone opened) → `133f25a` (PR #163)
+
+*(This read `d0cdd22` until it was checked: that is PR #162, the figure fix, not the milestone opening. The v6 row two entries down names its opening merge and set the convention.)*
 
 ### Known gaps at close
 
