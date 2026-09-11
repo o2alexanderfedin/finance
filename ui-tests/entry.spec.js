@@ -69,7 +69,35 @@ const store = page => dialect => async values => {
             await control.fill(String(value))
         }
     }
+    // `#save`'s handler is `async`: it awaits a `casAdd` and an `evoAdd`
+    // against IndexedDB BEFORE it says anything. Awaiting the click awaits
+    // the dispatch, not the write, so a helper that stopped there would mean
+    // "clicked", not "stored" — and the next line would race the database.
+    //
+    // `documents survive a reload` is where that bit: `page.reload()` follows
+    // the last `store` with nothing in between, and the reload aborted the
+    // in-flight write. Every earlier caller happened to be safe only because
+    // an auto-retrying `expect` sat between the click and anything that could
+    // interrupt it, which is luck rather than a contract.
+    //
+    // The message is cleared first so the wait cannot be satisfied by the
+    // PREVIOUS save's sentence — with two stores in a row, "wait for a
+    // message" would otherwise return immediately and prove nothing.
+    //
+    // Visible-with-either-verdict, not `entry-message-ok`: `an invalid entry
+    // is refused in the engine's own words` stores through this same helper
+    // and REQUIRES the refusal, so asserting success here would break it.
+    // Both verdicts are written after the handler has finished with the
+    // database, which is what this wait is for.
+    await page.evaluate(() => {
+        const box = document.getElementById('message')
+        if (box !== null) {
+            box.textContent = ''
+            box.hidden = true
+        }
+    })
     await page.click('#save')
+    await expect(page.locator('#message'), 'the save must reach a verdict before the test goes on').toBeVisible()
 }
 
 test('the form is generated from the dialect registry, not hand-written', async ({ page }) => {
