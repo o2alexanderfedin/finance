@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v7
 milestone_name: The Drop-In
 status: complete
-stopped_at: "Phase 43 EXECUTED 2026-09-10 and milestone v7's only phase is done. functionalscript 0.49.0 is installed and package.json declares ^0.49.0. ALL FOUR ACCEPTANCE CRITERIA MET, and the source diff is EMPTY - only package.json and package-lock.json changed: tsc 0; all 30 served dialect schemas byte-identical, sha 6062f5b85f01160b on both sides; the proof-leaf set 3388 -> 3388 with comm -23 empty, 0 lost and 0 gained, and no file's assertion count moved across 123 files and 11573 assertions; npm test 3457/3457, test:integration 13/13, test:ui 46/46, npm run cov 100.00/100.00/100.00 at thresholds that fail the build. test:ui and cov are the two the probe did NOT run, and they are the reason the probe was not allowed to count as the verification. MAINT-16's report is .planning/reports/fjs-0.49.0-migration.md. BOTH NOTES THE PHASE WAS TOLD NOT TO DELETE SURVIVE, and each now records the re-read rather than merely surviving it: upstream-evo-list-raw-typeerror.md, because 0.49.0 does not carry functionalscript#1899 - verified by grep over the tarball, not inferred from the merge date - and upstream-web-vec-size-limit.md, because fjs/web/module.f.mjs is byte-identical across the bump, so MAINT-11 stays PARTIAL and #1819 stays open. Still open and unchanged by any of this: phases 34 and 36, blocked on a person at a real client with real documents."
-last_updated: "2026-09-10T22:05:00.000-07:00"
+stopped_at: "Milestone v7 is CLOSED, 2026-09-10, by /gsd-autonomous -> audit -> complete. It owned ONE phase, 43, and that phase took functionalscript 0.49.0 in a single line with an EMPTY SOURCE DIFF - only package.json and package-lock.json changed. All four Phase-42 acceptance criteria met and re-derived by the audit on the merged tree: tsc 0; all 30 served dialect schemas byte-identical, sha 6062f5b85f01160b both sides; proof-leaf set 3388 -> 3388 with comm -23 empty and no assertion count moved across 123 files; npm test 3457/3457, test:integration 13/13, test:ui 46/46, cov 100.00/100.00/100.00. Archived to .planning/milestones/v7-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md; ledger and retrospective updated; tagged milestone/v7. TWO COVERED, NONE PARTIAL, NONE MISSING - the first milestone here with no PARTIAL verdict, and the first whose audit ran BEFORE the close rather than to ratify it. The milestone was SIZED BY A PROBE: 0.49.0 was installed in a throwaway worktree before a requirement was written, which turned a changelog reading of 140-files-changed into one phase instead of four. The probe deliberately skipped test:ui and cov and the phase ran both. STILL OPEN AND UNCHANGED BY ANY RELEASE: phases 34 and 36, blocked since v4 on a person at a real client with real documents; and MAINT-11's fjs web half, carried PARTIAL from v6 because fjs/web/module.f.mjs is byte-identical across the bump and functionalscript#1819 is still open. Neither upstream fix this project landed (#1899, #1900) is in any published release - both merged after 0.49.0 was cut. No milestone is open and none is defined."
+last_updated: "2026-09-10T22:30:00.000-07:00"
 last_activity: 2026-09-10
 progress:
   total_phases: 1
@@ -44,8 +44,8 @@ file: it is what a stale document says whether or not it is true.**)*
 
 ## Session
 
-Status: complete — milestone v7's only phase (43) is executed; 0.49.0 is installed
-Stopped at: Phase 43 executed 2026-09-10. `package.json` declares ^0.49.0, 0.49.0 is installed, and the source diff is EMPTY. All four acceptance criteria met: tsc 0; 30 schemas byte-identical (6062f5b85f01160b); leaf set 3388 -> 3388 with `comm -23` empty and no assertion count moved; npm test 3457/3457, integration 13/13, ui 46/46, cov 100/100/100. Report at .planning/reports/fjs-0.49.0-migration.md. Both upstream notes survive the bump and now record the re-read. Phases 34 and 36 remain open, blocked on a person at a real client.
+Status: complete — milestone v7 is CLOSED and archived; no milestone is open
+Stopped at: Milestone v7 closed 2026-09-10. Its one phase (43) took functionalscript 0.49.0 in a single line with an empty source diff; all four acceptance criteria met and re-derived by the audit on the merged tree. Archived to .planning/milestones/, ledger and retrospective updated, tagged milestone/v7. Two COVERED, none PARTIAL. Still open: phases 34 and 36 (a person at a real client), and MAINT-11's fjs web half carried PARTIAL from v6. No next milestone is defined.
 Progress: [██████████] 100%
 Last activity: 2026-09-10
 
@@ -116,28 +116,23 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: 43 — Take FunctionalScript 0.49.0. **COMPLETE 2026-09-10.** 0 plans; none were written.
+Phase: none in flight — milestone v7 closed 2026-09-10; no milestone is open
 Plan: —
-Status: Milestone v7's only phase is executed. The milestone is ready to close.
-Last activity: 2026-09-10 — Phase 43 executed
+Status: Between milestones. Two open phases (34, 36) carry forward, blocked on a person at a
+  real client with real documents — not on a decision, a release, or any work that can be done
+  here.
+Last activity: 2026-09-10 — Milestone v7 closed and archived
 
-**What is true about the tree right now.** `package.json` declares `^0.49.0` and 0.49.0 is
-installed. `npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0, coverage
-100.00/100.00/100.00 across 122 files — **measured on this tree with 0.49.0 in place**, not
-carried over from the probe.
+**Not "nothing is in flight".** This file records that as its most dangerous sentence, because
+it is what a stale document says whether or not it is true. What is accurate: no phase is being
+executed, `functionalscript@0.49.0` is installed against `^0.49.0` declared, and the tree is
+green at `npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0, coverage
+100.00/100.00/100.00 across 122 files — measured on the closing tree. What is *owed* is in
+`MILESTONES.md` under each milestone's "Known gaps at close".
 
-**The source diff is empty.** Only `package.json` and `package-lock.json` changed. Nothing
-under `fjs/`, `demo/`, `ui-tests/` or any `*.test.js` was touched, and the two `fjs/todo/`
-notes that changed gained paragraphs recording the re-read — they lost nothing.
-
-**The probe did not become the verification, and that was the point of separating them.** It
-established `tsc`, `npm test`, `test:integration` and schema identity before the milestone was
-written; it deliberately left `test:ui` and `npm run cov` to the phase, and the phase ran both.
-A probe that quietly counts as the proof is a proof that stopped watching.
-
-**Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created
-at v6's close and neither existed during v1–v5; a short ledger is not evidence of a short
-history.
+**Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created at
+v6's close and carry v6 and v7 only; **a short ledger is not evidence of a short history** —
+v1–v5 are recorded in place, in ROADMAP.md and in this file's "Earlier milestones" section.
 
 ## Shipped outside the ledger — the accountant demo, 2026-08-21
 
