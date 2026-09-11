@@ -3,7 +3,81 @@
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
 > **Starts at v6.** v1–v5 have no retrospective section and none is being written from a git
-> log months later — see the same note in `MILESTONES.md` for why.
+> log months later — see the same note in `MILESTONES.md` for why. Newest first.
+
+---
+
+## Milestone: v7 — The Drop-In
+
+**Shipped:** 2026-09-10 (opened the same day)
+**Phases:** 1 (43) · **Plans:** 0 · **PRs:** 3 (#161, #162, #163)
+
+### What Was Built
+
+- `functionalscript` 0.49.0 taken. One line in `package.json`; **zero source lines changed.**
+- `.planning/reports/fjs-0.49.0-migration.md` — the consumer's side of a release that cost
+  nothing, with a §9 that reproduces every number in it from two tarballs.
+
+### What Worked
+
+- **Sizing the milestone by performing the migration.** A throwaway worktree, an `npm install`
+  and ten minutes produced *evidence* where planning would have produced an *estimate*. The
+  changelog said "140 upstream files changed", which reads like four phases; the probe said
+  zero sites reached, which is one. **This is strictly cheaper than the planning it replaces,
+  and it is deletable by construction.**
+- **Keeping the probe and the proof separate.** The probe skipped `test:ui` and `npm run cov`
+  on purpose, and both were written into the acceptance criteria as the phase's to run. Naming
+  what a shortcut did *not* check is what stops it from silently becoming the check.
+- **Running the byte-identity criterion on an empty source diff.** It is the check that looks
+  most skippable here and is not: served schemas are a function of the dependency, not of our
+  source.
+- **Naming the requirement by version rather than "the latest"** — and then re-checking
+  `npm view functionalscript version` at execution time rather than trusting the note from
+  hours earlier.
+- **Writing the two "do not delete this" notes into the requirement, the roadmap and
+  `STATE.md` by path.** One of them *looks* stale — its own status line says FIXED — and "take
+  the new version" is exactly the task during which it would have been tidied away.
+
+### What Was Inefficient
+
+- **The same stale-figure defect was planted twice in one day, in prose written to warn about
+  it.** v6's close corrected three hardcoded counts and explained the mechanism; opening v7
+  made three more stale within hours (PR #162), and executing Phase 43 made the *fix* stale
+  within an hour. The third rewrite carries no load-bearing figure at all. **The lesson is not
+  "be careful" — it is that a number beside the command that computes it is the second
+  statement, and the second statement is the one that diverges.**
+- **`gsd-sdk query state.milestone-switch` re-armed the `STATE.md` stomp**, leaving the
+  `## Session` block on v6 while rewriting the header for v7. Caught by diffing its output —
+  which is now the standing rule for any `gsd-*` write to that file.
+
+### Patterns Established
+
+- **Probe before scoping.** For any dependency migration: install it in a throwaway worktree,
+  run the suite, then write the milestone to what was measured. Record what the probe did *not*
+  run.
+- **`fixed` ≠ `released`.** A gap filed upstream can be merged and still absent from every
+  published version. Retire a note when the fix is *installed here*, verified against the
+  artifact, never when the PR merges.
+- **Prefer a derive command with no number beside it** to a number with a derive command beside
+  it.
+
+### Key Lessons
+
+1. **Measure the migration before scoping the milestone.** Ten minutes of probe beats an hour
+   of reading a changelog, and the output is evidence rather than an estimate.
+2. **A shortcut is safe exactly as long as what it skipped is written down.** The probe was
+   trustworthy because its two gaps were named in the acceptance criteria.
+3. **Check the thing that is a function of the dependency, not of your diff.** An empty source
+   diff says nothing about what your application serves.
+4. **`merged` is not `released`,** and a consumer tracking the first deletes its notes too
+   early.
+5. **Correcting a stale number by writing a fresher number schedules the next correction.**
+
+### Cost Observations
+
+- Not instrumented; nothing is reconstructed here rather than guessed.
+- Measurable: 3 PRs in one day, of which one executed the milestone and one fixed figures the
+  previous day's work had made stale.
 
 ---
 
@@ -104,12 +178,14 @@
 | Milestone | Phases | Plans | Key change |
 |-----------|--------|-------|------------|
 | v6 | 4 owned | 0 | First milestone archived to `milestones/`; first with a retrospective; direct-to-PR execution with the audit run after the fact |
+| v7 | 1 | 0 | **First milestone scoped from a probe rather than a changelog**, and the first whose audit ran BEFORE the close rather than to ratify it |
 
 ### Cumulative Quality
 
 | Milestone | Suite | Coverage | Dependencies added |
 |-----------|-------|----------|--------------------|
 | v6 | 3457 proofs · 13 integration · 46 UI | 100.00 / 100.00 / 100.00 across 122 files (thresholds raised 90 → 100) | 1, approved by both owners: `@cantoo/pdf-lib` as a **devDependency**. The shipped package's `dependencies` are unchanged |
+| v7 | 3457 proofs · 13 integration · 46 UI — **leaf set 3388 → 3388, none lost** | 100.00 / 100.00 / 100.00, unchanged | **0** |
 
 ### Top Lessons (Verified Across Milestones)
 

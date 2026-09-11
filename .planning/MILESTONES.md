@@ -2,7 +2,7 @@
 
 Entries newest first.
 
-> **This ledger is born at v6 and v1–v5 predate it.** Do not read the single entry below as
+> **This ledger is born at v6 and v1–v5 predate it.** Do not read the entries below as
 > evidence that v6 was the first milestone — it is the first one *archived this way*. The
 > earlier five are recorded in `.planning/ROADMAP.md` (phases 1–38, milestone headings in
 > place), in `.planning/STATE.md`'s "Earlier milestones" section, in
@@ -10,6 +10,67 @@ Entries newest first.
 > Retro-filling them was considered and rejected: a milestone entry written months late from
 > a git log is a reconstruction presented as a record, which is the failure this project
 > spends most of its planning discipline avoiding.
+
+---
+
+## v7 The Drop-In (Shipped: 2026-09-10)
+
+**Delivered:** `functionalscript` 0.49.0 taken in one line, with every acceptance criterion met
+and an empty source diff — and the consumer-side report that says so with evidence.
+
+**Phases completed:** 43 (1 phase, 0 plans). Opened and closed the same day v6 closed.
+
+**Key accomplishments:**
+
+- **Sized the milestone by performing the migration.** Before a requirement was written, 0.49.0
+  was installed in a throwaway git worktree and the repository run against it unchanged.
+  Everything passed, so the milestone was scoped to one phase instead of the four a
+  changelog-driven reading of "140 upstream files changed" would have produced. **The probe cost
+  ten minutes and is strictly cheaper than the planning it replaces** — and unlike planning, its
+  output is evidence.
+- **Kept the probe and the proof separate.** It deliberately skipped `test:ui` and `npm run cov`,
+  both written into the acceptance criteria as the phase's to run. A probe that quietly becomes
+  the verification is a proof that stopped watching.
+- **Ran the byte-identity check on a migration with an empty source diff** — the check that
+  looks most skippable and is not: the served schemas are built from upstream's `rtti`
+  combinators, so they are a function of the dependency, not of our source. All 30 identical,
+  sha `6062f5b85f01160b`.
+- **Protected two upstream notes from being tidied away**, and taught each to record the re-read
+  rather than merely survive it. `fixed` and `released` are different states.
+- **Declined every new capability, on the rule v6 established** — admitted only if it *deletes*
+  something here. None of 0.49.0's does.
+
+**Stats:**
+- 8 files changed: `package.json`, `package-lock.json`, 2 `fjs/todo/` notes (additions only),
+  4 planning files, plus the new report
+- **0 source lines changed** under `fjs/`, `demo/`, `ui-tests/` or any `*.test.js`
+- 1 phase, 0 plans, 3 pull requests (#161 opened the milestone, #162 fixed three figures, #163 executed it)
+- Same day, open to close
+- Suite at close: `npm test` **3457/3457**, `test:integration` **13/13**, `test:ui` **46/46**,
+  `cov` **100.00/100.00/100.00**, `tsc` **0**, proof leaves **3388 → 3388**
+
+**Git range:** `d0cdd22` (v7 opened) → `133f25a` (PR #163)
+
+### Known gaps at close
+
+- **MAINT-11 stays PARTIAL, carried from v6.** `fjs/web/module.f.mjs` is byte-identical across
+  the bump, so the 413 ceiling stands, `demo/serve.sh` still runs `python3`, and
+  [`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819)
+  is still open.
+- **Neither upstream fix this project landed is in any published release.** `#1899` merged
+  2026-09-08 and `#1900` on 2026-09-10, both after 0.49.0 was cut on 2026-09-02. Verified
+  against the tarball, not inferred from dates.
+- **Phases 34 and 36 remain open**, as they have since v4.
+
+### A documentation sharpness, recorded rather than fixed
+
+`AGENTS.md`'s own `grep -rn 'try {' fjs --include='*.f.js'` recipe **counts its own citation**
+in `fjs/refuses/module.f.js:64`, returning 2 where the invariant is 1. The docstring there says
+"still returns exactly one CODE hit", so it anticipated the confusion — but a reader running the
+grep cold will pause, as this milestone's audit did.
+
+**What's next:** undecided. The oldest open question is still whether the accountant-facing demo
+becomes a requirement category of its own — open since `v4-MILESTONE-AUDIT.md` F-01.
 
 ---
 

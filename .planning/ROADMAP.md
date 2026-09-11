@@ -1,6 +1,6 @@
 # Roadmap: Finance
 
-**Milestone:** **v7 — The Drop-In**, opened 2026-09-10 (Phase 43). v6 SHIPPED 2026-09-10. *(This line read `v1` until 2026-09-10, five milestones stale — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
+**Milestone:** **v7 — The Drop-In, SHIPPED 2026-09-10** (Phase 43); v6 shipped the same day. No milestone is open. *(This line read `v1` until 2026-09-10, five milestones stale — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
 **Granularity:** fine. **Do not quote a phase count from this line — three have been wrong here.** Derive it: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md` (33 entries today: 1-30 plus the inserted 12.1, plus the gap-closure Phases 31 and 32). See "Granularity Note" below.
 **Coverage:** **120** requirements in REQUIREMENTS.md — 95 v1 plus 25 v2 — of which 8 are MAINT. This line read **93** until 2026-08-17. Derive it: `grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md`; `planning-truth-gate.test.js` compares the checkboxes against the traceability tables on every `npm test`.
 **Count note:** these two lines were themselves stale until 2026-08-07 — they said "15 phases" and
@@ -24,9 +24,9 @@ grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          
 | **v4** — verified with the taxpayer present | 34-36 | ⏸ opened 2026-08-19; **34 and 36 still open**, carried through v5 and v6 |
 | **v5** — a current engine and a filable return | 35, 38 | ✅ 38 shipped 2026-08-27; 35 shipped 2026-09-08 |
 | **v6** — a current engine, *actually* current | 39-42 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v6-ROADMAP.md) |
-| **v7** — the drop-in | 43 | ✅ phase complete 2026-09-10; milestone closing |
+| **v7** — the drop-in | 43 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v7-ROADMAP.md) |
 
-**Only v6 is archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36**, blocked since v4 on a person at a real client with real documents. Everything else is complete, Phase 43 included. Derive rather than trust:
+**Only v6 and v7 are archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36**, blocked since v4 on a person at a real client with real documents. Everything else is complete, Phase 43 included. Derive rather than trust:
 
 ```sh
 grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 2 open — 34 and 36
@@ -1784,6 +1784,16 @@ clients and backward compatibility buys nothing.
 
 ## Milestone v7: The Drop-In
 
+**✅ SHIPPED 2026-09-10**, the same day it opened and the same day v6 closed. Archived to [`milestones/v7-ROADMAP.md`](./milestones/v7-ROADMAP.md), with its requirements index at [`milestones/v7-REQUIREMENTS.md`](./milestones/v7-REQUIREMENTS.md) and the audit at [`milestones/v7-MILESTONE-AUDIT.md`](./milestones/v7-MILESTONE-AUDIT.md) — **two COVERED, none PARTIAL, none MISSING**, the first milestone here with no PARTIAL verdict.
+
+One phase (43). `functionalscript` 0.49.0 taken in one line with an **empty source diff**, all four Phase-42 acceptance criteria met, and the consumer-side report written.
+
+**Collapsed, not removed** — every line below is still in this file, so the `grep` recipes at the top keep counting what they count.
+
+<details>
+<summary>✅ v7 — the milestone section as it was written (Phase 43) — SHIPPED 2026-09-10</summary>
+
+
 **Opened 2026-09-10, the same day v6 closed.** One phase, two requirements, and the reason
 it is that small is that the migration was **measured before this section was written** —
 not estimated, not scoped from the changelog, but performed in a throwaway worktree off
@@ -1855,3 +1865,5 @@ write, and this milestone does not write it either.
 
 **Phases 34 and 36 are not in v7**, exactly as they were not in v6. They are blocked on a
 person at a real client with real documents, and no release changes that.
+
+</details>

@@ -30,13 +30,20 @@ a new report is a new program, not new engine code.
 
 ## Current State
 
-**Shipped: v6 — A Current Engine, Actually Current (2026-09-10).** Phases 39, 40, 41 and 42,
+**Shipped: v7 — The Drop-In (2026-09-10).** One phase (43): `functionalscript` 0.49.0 taken in
+a single line with an **empty source diff**, all four acceptance criteria met, and the
+consumer-side report written. **Two requirements COVERED, none PARTIAL** — the first milestone
+here with no PARTIAL verdict, and the first whose audit ran *before* the close rather than to
+ratify it. Archive: [`milestones/v7-ROADMAP.md`](./milestones/v7-ROADMAP.md).
+
+**Shipped before it, the same day: v6 — A Current Engine, Actually Current (2026-09-10).** Phases 39, 40, 41 and 42,
 executed `42 → 39 → 40 → 41`. Six requirements COVERED and MAINT-11 PARTIAL, blocked upstream.
 Full record: [`MILESTONES.md`](./MILESTONES.md) · archive:
 [`milestones/v6-ROADMAP.md`](./milestones/v6-ROADMAP.md) · audit:
 [`milestones/v6-MILESTONE-AUDIT.md`](./milestones/v6-MILESTONE-AUDIT.md).
 
-**Where the code stands.** `functionalscript@0.48.0`; 123 `.f.js` modules under `fjs/`;
+**Where the code stands.** `functionalscript@0.49.0`, which is the latest published version;
+123 `.f.js` modules under `fjs/`;
 `npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0 errors, and coverage
 **100.00 / 100.00 / 100.00 across all 122 measured files** at thresholds that fail the build.
 **Every requirement in `REQUIREMENTS.md` is checked — 136 of 136 at the time of writing, and the count is the part to derive rather than trust.** This sentence has now carried a stale number twice in one day: "all 134" survived v7 opening by hours, and "134 of 136" survived Phase 43 executing by about an hour. It is phrased without a load-bearing figure the third time.
@@ -82,45 +89,24 @@ same day, so "still carried forward" is true of two phases now, not three.
 
 </details>
 
-## Current Milestone: v7 The Drop-In
+## Next Milestone Goals
 
-**Goal:** Take `functionalscript` 0.49.0, and write the consumer's side of a release that
-reaches this code at zero sites.
+**Not decided, and for the first time in three milestones there is no dependency candidate
+waiting.** `functionalscript@0.49.0` is installed and is the latest published version.
 
-**Target features:**
-- **MAINT-15** — `functionalscript` 0.49.0 taken. `^0.48.0` does not admit it, so this is an
-  explicit bump. Named by version, never as "the latest": MAINT-09 says "take 0.47.0" and
-  0.47.0 was superseded four days later, and the ID was deliberately not re-pointed.
-- **MAINT-16** — a consumer-side migration report, in the shape of `fjs-0.48.0-migration.md`.
-  For a drop-in release the report **is** the deliverable: the absence of breakage is
-  invisible upstream unless somebody downstream measures it and says so.
+The open question is the oldest one: **whether the accountant-facing demo becomes a requirement
+category of its own.** Browser hand entry, generated forms, the client-side store, the
+`ui-tests` package, the measured palette and demo mode coined no requirement IDs, so there is
+nothing to retrofit and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and it is
+a scope question rather than a bookkeeping one — the owner's call, not an agent's.
 
-**Why it is one phase, and why that is a measurement rather than an estimate.** Before this
-section was written, 0.49.0 was installed in a throwaway worktree off `fe16839` and the
-repository was run against it **with zero code edits**: `tsc` 0, `npm test` 3457/3457,
-`test:integration` 13/13 including the SEC path-leak proof, and all 30 served dialect schemas
-byte-identical (sha `6062f5b85f01160b` both sides). 140 upstream files changed; 13 of the 60
-paths this repository imports changed, none moved or was removed.
+**Phases 34 and 36 are not candidates.** They are not blocked on a decision or a release; they
+are blocked on a person at a real client with real documents.
 
-Contrast v6: 0.48.0 moved `rtti` across 140 import sites and turned `option` from a function
-into a tag at 459 call sites. **A milestone sized to the fear rather than to the measurement
-would have been four phases.**
-
-**Key context — three things this milestone deliberately does not do, each measured:**
-- `fjs/todo/upstream-evo-list-raw-typeerror.md` **survives**. `functionalscript#1899` merged
-  2026-09-08, six days after 0.49.0 was cut, and is not in the tarball. Deleting the note
-  during the bump would delete a live record.
-- **MAINT-11 stays PARTIAL.** `fjs/web/module.f.mjs` is byte-identical across the bump; the
-  413 ceiling stands and `#1819` is still open.
-- **No capability-adoption phase.** 0.49.0's additions delete nothing here — `allOk`, `both`
-  and `And` are used at zero sites, and `errorMessage` is forbidden by this repository's own
-  SEC convention. v6 refused to admit a capability on "it is new" rather than "it removes
-  something", and so does this.
-
-**Deferred, and still the older question.** Whether the accountant-facing demo becomes a
-requirement category of its own — browser hand entry, generated forms, the client-side store,
-the `ui-tests` package, the measured palette. It coined no IDs, so there is nothing to
-retrofit and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and not in v7.
+**When the next `functionalscript` publishes**, `AGENTS.md`'s re-read rule fires and two notes
+come up for re-reading by name: `fjs/todo/upstream-evo-list-raw-typeerror.md` and
+`fjs/todo/upstream-web-vec-size-limit.md`. Both survived 0.49.0 and each now records that
+re-read, so the next reader can see what was checked rather than guess.
 
 ## Requirements
 
@@ -663,7 +649,11 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-10 — milestone v7 opened (`/gsd-new-milestone`): take
+*Last updated: 2026-09-10 after the v7 milestone closed (`/gsd-autonomous`). Phase 43 executed
+and the milestone archived; Current State now reads 0.49.0; the requirement count is phrased
+with no load-bearing figure, after going stale twice in one day.*
+
+*Previously updated: 2026-09-10 — milestone v7 opened (`/gsd-new-milestone`): take
 FunctionalScript 0.49.0, plus the consumer-side report. Sized from a throwaway-worktree probe
 rather than from the changelog: 0.49.0 is a drop-in, and the three things it does NOT fix are
 recorded above so nobody tidies them away during the bump.*
