@@ -88,5 +88,7 @@ the same shape as the missing-CHANGELOG observation in
 
 ## Filed
 
-Not yet. To be taken upstream under the standing authority in AGENTS.md, alongside the README
-observation above.
+Taken upstream on 2026-09-10 under the standing authority in AGENTS.md §7, as
+[`functionalscript#1984`](https://github.com/functionalscript/functionalscript/issues/1984),
+carrying the reproduction, the one-word ask, the `buildRevision` alternative, and the
+not-in-the-package README observation.

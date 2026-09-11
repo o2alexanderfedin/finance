@@ -13,10 +13,17 @@ more?" — the answer is only trustworthy if it also says where the answer is no
 
 ## Bottom line
 
-**`fjs/` itself is already effect-correct and needs no change.** The one place that hand-rolls
-what effects exist to express is `demo/lib/store.js`, the browser's IndexedDB store — and doing
-so has cost it **three real defects**, one of which writes wrong data into a content-addressed
-store.
+**`demo/lib/store.js` is where it matters** — the browser's IndexedDB store hand-rolls what
+effects exist to express, and doing so cost **three real defects**, one of which wrote wrong data
+into a content-addressed store. All three are fixed below.
+
+**`fjs/` has three smaller candidates, and this paragraph originally said it had none.** The
+first draft's bottom line read *"`fjs/` itself is already effect-correct and needs no change"* —
+written on the strength of a purity sweep, which answers *is `fjs/` pure?* and not *does it
+hand-roll what a combinator provides?* A delegated sweep answered the second question and found
+three. **The claim was record-ahead-of-verification, caught before this branch merged and
+corrected rather than quietly reworded.** The strongest of the three is verified by
+patch-and-measure, including a mutation watched to redden.
 
 The three are not independent. They are the same root cause seen three times: **the browser
 reimplements store operations instead of running the shipped ones.**
@@ -232,6 +239,102 @@ effect-host shape (`IndexedDbOp` + `Cas<IndexedDbOp>` + `asyncRun`) as the struc
 and note that it is also what would let the browser store be proven under the virtual
 interpreter instead of being untestable wiring. Doing the architecture first would mean fixing
 wrong stored data behind a larger change.
+
+---
+
+## Inside `fjs/` — three candidates, none urgent, one clearly worth doing
+
+Found by a delegated sweep and re-checked here against the installed 0.49.0. **Each was applied
+to an out-of-tree copy and re-measured**, not argued from a reading.
+
+### F1 — four sites wrap a fallible producer in a `step` so `pureOk` can re-lift it, which is the exact glue upstream deleted
+
+`foldStep(items, init, f)` takes `items` as an **`Effect`**. Upstream's own docstring
+(`fjs/effects/module.f.mjs:613-619`) names the shape this replaced:
+
+> *"`fjs/cas/cli` wrapped the whole fold in a `step` whose only job was to unwrap `list()` so
+> `pure` could wrap it again. **A producer that can fail now feeds the fold directly.**"*
+
+Four sites here still write the old shape, and their producers are already fallible effects
+(`cas.list()`, `evo.list()`, `evo.head()`):
+
+| Site | Current |
+|---|---|
+| `fjs/server/module.f.js:159-162` | `step(cas.list(), hashes => foldStep(pureOk(hashes), …))` |
+| `fjs/server/finance_documents_list/module.f.js:227-228` | `step(evo.list(archived), subjects => foldStep(pureOk(subjects), …))` |
+| …`:232-233` | `step(evo.head(subject), heads => foldStep(pureOk(heads), …))` |
+| `fjs/server/fjs_run/snapshot/module.f.js:223-224` | `step(cas.list(), hashes => foldStep(pureOk(hashes), …))` |
+
+**Measured:** −12 lines, one nesting level gone at each site, `tsc` clean, `npm test`
+**3457/3457** unchanged — and the rewritten path was mutated (`acc` → `acc.slice(0, 0)`) to
+confirm it is exercised rather than merely unnoticed; the suite went red, then was reverted.
+
+**What it buys beyond lines:** the `step`/`pureOk` pair is a joint. Anything inserted between
+them separates the producer's failure from the fold. Collapsed, `cas.list()`'s failure reaching
+the handler is structural instead of maintained.
+
+**A near-identical line that must NOT be changed:** `snapshot/module.f.js:291` reads
+`state => foldStep(pureOk([...state.activeSubjects, ...state.archivedSubjects]), …)`. That
+`pureOk` lifts a **computed array**, not an effect's payload — the case upstream's docstring
+calls unaffected. Applying F1 mechanically would break it.
+
+### F2 — the two stored guest programs hand-write the fold, in four copies, because the frozen ABI has none
+
+`guestCtx` exposes eight members — four commands plus `step`, `pure`, `centsFromString`,
+`centsToString` — and no fold. So `fjs/report/payer` and `fjs/report/tax_return` each hand-roll
+a cursor (`subjects[0]`, `subjects.slice(1)`, recurse), **and each exists twice**: once as
+source text and once as a typed twin that must stay line-for-line identical.
+
+The sweep widened the ABI with `foldStep` and rewrote the payer program in both copies: −18
+lines, `tsc` clean, `3457/3457` including the integration test that runs the literal source
+bytes through a real separate `fjs_run` process.
+
+**Not recommended now, and the reason is data rather than code.** The source text is
+**content-addressed**. Editing it changes `programHash`, so any run record already stored in a
+live CAS stops resolving and PROV-09's byte-for-byte rerun compares against a program that no
+longer exists — the very hazard `fjs/guest/module.f.js:155-159` cites for keeping `pure`'s
+pre-0.46 spelling. The suite stays green only because no test hard-codes a program hash. It also
+widens an ABI whose own comment says *"Adding a member is cheap today and expensive once
+programs exist"* — and programs now exist.
+
+*(One thing it does **not** buy, checked so nobody re-derives it wrong: `_walkLoop`'s
+stack-depth guarantee is irrelevant here. Every iteration issues `ctx.evoHead`, a `Do` node, so
+control returns to `interpret`'s loop each time and recursion depth stays ~2.)*
+
+### F3 — three nested `step`s where the inner continuation closes over the outer's parameter
+
+`fjs/server/fjs_run/snapshot/module.f.js:279-288`. `historyStep`'s docstring names exactly this:
+*"the alternative — nesting so the inner continuation closes over the outer one's parameter — is
+what `fjs/AGENTS.md` §3.4 rules out."* The repo already uses `historyStep` three times, so this
+is house style. **Measured:** −5 lines, two nesting levels, suite unchanged. **Ranked last
+honestly:** no failure becomes undroppable; the nested form already propagates correctly, and
+`history`'s tuple is newest-first so the destructure reads in reverse execution order.
+
+### Rejected inside `fjs/`, with reasons
+
+The tax engine, all ~30 document validators, `fjs/exact`, `fjs/types` — **zero** effects imports
+under those trees; they are `Result`-returning pure validators with no commands to sequence, and
+AGENTS.md's rule is a disjunction where `Result` is the correct arm. `finance_schema`,
+`finance_tax_params` and `response` return `pureOk(okResult(…))` correctly — `toolResultStep`
+picks between the two arms of a *fallible effect's* Result, and these are pure lookups with no
+effect to fail. `write_validation`'s five `return undefined` guards are a **third** value
+(*"declines to judge"*), which a two-armed error channel cannot express. `fjs_run`'s
+`RunOutcome`-on-the-success-channel is required by PROV-03: a failed run must still write a run
+record, so the failure has to survive into a branch that performs writes. And `attempt` cannot
+become `catchStep` — it catches a synchronous `throw` from untrusted guest code, and nothing in
+`fjs/effects` intercepts a `throw`.
+
+### Two stale claims the sweep turned up, worth a later pass
+
+- **`AGENTS.md:218`** says *"`fjs/exec/module.f.js` catches in shipped production code."* It does
+  not — `fjs/exec` has no `try`, and AGENTS.md:119-120 itself records that 0.46.0 retired it.
+- **`fjs/exec/module.f.js:37-41`** says `fjs/tax/table`, `fjs/tax/deduction`, `fjs/schedule/a`
+  and `fjs/server/fjs_run/snapshot` "each catch an `assert` throw". They all go through
+  `refuses(...)`, in proof sections only.
+
+Both are left for a separate change rather than folded in here, because this branch is already
+carrying a fix and two corrections and they belong to the `try`-rule documentation, not to
+effects.
 
 ---
 

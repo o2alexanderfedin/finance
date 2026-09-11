@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v7
 milestone_name: The Drop-In
-status: complete
-stopped_at: "Milestone v7 is CLOSED, 2026-09-10, by /gsd-autonomous -> audit -> complete. It owned ONE phase, 43, and that phase took functionalscript 0.49.0 in a single line with an EMPTY SOURCE DIFF - only package.json and package-lock.json changed. All four Phase-42 acceptance criteria met and re-derived by the audit on the merged tree: tsc 0; all 30 served dialect schemas byte-identical, sha 6062f5b85f01160b both sides; proof-leaf set 3388 -> 3388 with comm -23 empty and no assertion count moved across 123 files; npm test 3457/3457, test:integration 13/13, test:ui 46/46, cov 100.00/100.00/100.00. Archived to .planning/milestones/v7-{ROADMAP,REQUIREMENTS,MILESTONE-AUDIT}.md; ledger and retrospective updated; tagged milestone/v7. TWO COVERED, NONE PARTIAL, NONE MISSING - the first milestone here with no PARTIAL verdict, and the first whose audit ran BEFORE the close rather than to ratify it. The milestone was SIZED BY A PROBE: 0.49.0 was installed in a throwaway worktree before a requirement was written, which turned a changelog reading of 140-files-changed into one phase instead of four. The probe deliberately skipped test:ui and cov and the phase ran both. STILL OPEN AND UNCHANGED BY ANY RELEASE: phases 34 and 36, blocked since v4 on a person at a real client with real documents; and MAINT-11's fjs web half, carried PARTIAL from v6 because fjs/web/module.f.mjs is byte-identical across the bump and functionalscript#1819 is still open. Neither upstream fix this project landed (#1899, #1900) is in any published release - both merged after 0.49.0 was cut. No milestone is open and none is defined."
-last_updated: "2026-09-10T22:30:00.000-07:00"
+status: completed
+stopped_at: context exhaustion at 95% (2026-09-11)
+last_updated: "2026-09-11T06:00:20.881Z"
 last_activity: 2026-09-10
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 0
-  completed_plans: 0
-  percent: 100
+  total_phases: 44
+  completed_phases: 41
+  total_plans: 88
+  completed_plans: 88
+  percent: 93
 ---
 
 # Project State
@@ -45,7 +45,7 @@ file: it is what a stale document says whether or not it is true.**)*
 ## Session
 
 Status: complete — milestone v7 is CLOSED and archived; no milestone is open
-Stopped at: Milestone v7 closed 2026-09-10. Its one phase (43) took functionalscript 0.49.0 in a single line with an empty source diff; all four acceptance criteria met and re-derived by the audit on the merged tree. Archived to .planning/milestones/, ledger and retrospective updated, tagged milestone/v7. Two COVERED, none PARTIAL. Still open: phases 34 and 36 (a person at a real client), and MAINT-11's fjs web half carried PARTIAL from v6. No next milestone is defined.
+Stopped at: context exhaustion at 95% (2026-09-11)
 Progress: [██████████] 100%
 Last activity: 2026-09-10
 
@@ -810,7 +810,7 @@ server and asking it instead of grepping. Green does not mean verified.
 
 ## Session Continuity
 
-Last session: 2026-08-14
+Last session: 2026-09-11T06:00:20.844Z
 Stopped at: **Phase 18 planned, zero plans executed.** 4 plans across 3 waves, plan-checked
 twice, 3 blockers fixed. Phase 19 is complete and MERGED to `develop` (PR #66), as are the
 Phase 18 criteria corrections (PR #67).
