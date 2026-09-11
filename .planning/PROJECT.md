@@ -39,7 +39,7 @@ Full record: [`MILESTONES.md`](./MILESTONES.md) · archive:
 **Where the code stands.** `functionalscript@0.48.0`; 123 `.f.js` modules under `fjs/`;
 `npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0 errors, and coverage
 **100.00 / 100.00 / 100.00 across all 122 measured files** at thresholds that fail the build.
-All 134 requirements in `REQUIREMENTS.md` are checked.
+**134 of the 136** requirements in `REQUIREMENTS.md` are checked; the two outstanding are v7's own, MAINT-15 and MAINT-16. *(This read "all 134 … are checked" for the few hours between v6's close and v7's opening, which added them.)*
 
 **What is open, and it is the same two things it has been since v4.** Phases 34 and 36 — a
 second implementation run over the owner's own documents, and a model (rather than a script)
@@ -126,17 +126,23 @@ retrofit and something to decide. Open since `v4-MILESTONE-AUDIT.md` F-01, and n
 
 ### Validated
 
-**All 134 requirements in `REQUIREMENTS.md` are complete, across six milestones.** This
-section read "(None yet — ship to validate)" until 2026-09-10, which was written before v1
-shipped and was false from v1's close onward — four milestones of drift in the field that
-records whether anything has been validated at all.
+**134 of the 136 requirements in `REQUIREMENTS.md` are complete, across six milestones.**
+The two outstanding are milestone v7's own — MAINT-15 (take `functionalscript` 0.49.0) and
+MAINT-16 (the consumer-side report) — and they are Pending because v7 is open, not because
+anything stalled.
 
-It is not restated as a list here, because a second copy of 134 checkboxes is a second thing to
+This section read "(None yet — ship to validate)" until 2026-09-10, which was written before
+v1 shipped and was false from v1's close onward — four milestones of drift in the field that
+records whether anything has been validated at all. **Its replacement then said "all 134" and
+was stale within hours**, because v7 opened the same day and added two IDs. That is the same
+defect one size smaller, and it is why the figure below is derived rather than transcribed.
+
+It is not restated as a list here, because a second copy of the checkboxes is a second thing to
 keep true. Derive it:
 
 ```sh
-grep -cE '^- \[x\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # 134 complete
-grep -cE '^- \[ \] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # 0 outstanding
+grep -cE '^- \[x\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # complete
+grep -cE '^- \[ \] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # outstanding — v7's two
 ```
 
 `planning-truth-gate.test.js` compares those checkboxes against the traceability tables on
