@@ -1706,7 +1706,7 @@ for why a phase without an ID is preferable to an ID invented to give it one.
 
 Four phases owned — 39, 40, 41, 42, executed `42 → 39 → 40 → 41`. Six requirements COVERED and MAINT-11 PARTIAL, blocked upstream on [`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819).
 
-**The section below is collapsed, not removed.** Every line of it is still in this file, so the `grep` recipes at the top of this document still count what they always counted — 42 phase checkboxes, 40 complete, 2 open.
+**The section below is collapsed, not removed.** Every line of it is still in this file, so the `grep` recipes at the top of this document count exactly what they counted before it was collapsed. **At v6's close, 2026-09-10, that was 42 checkboxes / 40 complete / 2 open — and it stayed 42/40/2 across the collapse, which is the claim this paragraph exists to make.** It is 43/40/3 today: milestone v7 added Phase 43 hours later, on the same day. The figure is dated rather than updated because the invariant being asserted is about the collapse, not about the current total — and an undated count here is a sentence the reader disproves with the very `grep` it names.
 
 <details>
 <summary>✅ v6 — the milestone section as it was written (Phases 39-42) — SHIPPED 2026-09-10</summary>
