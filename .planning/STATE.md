@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v7
 milestone_name: The Drop-In
-status: completed
-stopped_at: context exhaustion at 95% (2026-09-11)
+status: complete
+stopped_at: "Milestone v7 is CLOSED and archived (2026-09-10); no milestone is open and none is defined. Its one phase, 43, took functionalscript 0.49.0 in a single line with an EMPTY SOURCE DIFF - all four Phase-42 criteria met and re-derived by the audit on the merged tree: tsc 0, all 30 served schemas byte-identical (6062f5b85f01160b), leaf set 3388 -> 3388, npm test 3457/3457, integration 13/13, ui 47/47, cov 100/100/100. Archived to .planning/milestones/v7-*, tagged milestone/v7. Two COVERED, NONE PARTIAL - the first milestone here with no PARTIAL verdict and the first whose audit ran BEFORE the close. AFTERWARDS, outside any milestone: an effects-opportunity analysis (.planning/reports/effects-opportunity-analysis.md) found and fixed three defects in demo/lib/store.js - the browser wrote generation stuck at 1 from the second amendment, readAll dropped rows silently, and JSON.parse entered a typed map unvalidated - with a regression test watched to redden; corrected AGENTS.md's carve-out (a stale count and a missing third reason) and three gate headers citing a precedent 0.49.0 retired; and filed functionalscript#1984 to export computeGeneration. THE PROGRESS BLOCK BELOW IS PROJECT-WIDE, NOT MILESTONE-SCOPED: 41 of 44 roadmap rows complete (Phase 14 is the 44th, marked [->] moved, and is neither complete nor open), 88 of 88 plans. Milestone v7 itself was 1 phase, 1 complete. STILL OPEN: phases 34 and 36, blocked since v4 on a person at a real client; MAINT-11's fjs web half, PARTIAL from v6, blocked on functionalscript#1819."
 last_updated: "2026-09-11T06:00:20.881Z"
 last_activity: 2026-09-10
 progress:
@@ -45,14 +45,23 @@ file: it is what a stale document says whether or not it is true.**)*
 ## Session
 
 Status: complete — milestone v7 is CLOSED and archived; no milestone is open
-Stopped at: context exhaustion at 95% (2026-09-11)
-Progress: [██████████] 100%
+Stopped at: Milestone v7 closed and archived 2026-09-10; no milestone is open. Afterwards, outside any milestone: the effects-opportunity analysis, three defects fixed in demo/lib/store.js with a regression test watched to redden, AGENTS.md and three gate headers corrected, and functionalscript#1984 filed. Open: phases 34 and 36, and MAINT-11's fjs web half.
+Progress: [█████████░] 93% — **project-wide**, 41 of 44 roadmap rows. Milestone v7 itself was 1 of 1.
 Last activity: 2026-09-10
 
-*(0% is 0 of milestone v7's single phase. The previous text here explained that v6's 100% was
-4 of the 4 phases it OWNED, not 4 of 7 — the `7` counted the three carried forward from v4,
-which the ROADMAP's own v6 section says it "does not touch". That reading stands and v7
-inherits it: 34 and 36 are still open and still belong to no milestone that claims them.*
+*(93% is **project-wide**: 41 of the 44 rows in ROADMAP.md's ledger. The 44th is Phase 14,
+marked `- [→]` (moved to v3 and reframed), which is neither complete nor open — which is why
+`grep -cE '^- \[[ x]\]'` answers 43 and the unique-ID recipe answers 44. Both are right about
+different questions. Milestone v7 itself was **1 phase, 1 complete**.*
+
+*This line and the four above it went through the fifth recurrence of this file's documented
+corruption on 2026-09-11, and the first that was COMMITTED. A GSD hook rewrote the frontmatter
+and the body's `Stopped at:` between two commits, replacing a detailed close record with
+"context exhaustion at 95%" and `complete` with `completed`; a `git add -A` swept it in
+unnoticed. **The hook's progress numbers were right and the milestone-scoped `1/1/100%` they
+replaced was the deviation** — the ledger this field reads is project-wide, as this file's own
+"Earlier milestones" section says. What it destroyed was the `stopped_at` prose. Restored here,
+with the quantity NAMED so the milestone-versus-project ambiguity stops recurring.*
 
 *These four lines are the ones `buildStateFrontmatter` rebuilds the header from — the FIRST
 `Status:` / `Stopped at:` / `Progress:` / `Last activity:` in the body. **They went stale
