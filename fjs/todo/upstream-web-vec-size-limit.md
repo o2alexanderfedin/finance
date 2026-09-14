@@ -27,7 +27,7 @@ MAINT-11 adopts capabilities that *delete* code here, and `fjs web` would have d
 invocation of anything outside `functionalscript` — `python3 -m http.server` in `demo/serve.sh`.
 
 **Eleven files the demo loads are over the ceiling.** The largest is
-`fjs/form1040/core/module.f.js` at **995159 bytes — 7.6x** the limit; `fjs/schedule/1`,
+`fjs/form1040/core/module.f.js`, the largest — **995159 bytes, 7.6x the limit, measured 2026-08-31**, and past 1022000 bytes by 2026-09-14, so this multiple is a dated observation and not a current fact (derive it with the recipe at the end of this note); `fjs/schedule/1`,
 `fjs/return/scope` and `fjs/tax/params` are each over 340 KB. These are not assets that could be
 trimmed: they are the engine the page imports, and the demo runs the same modules the proofs do.
 
@@ -119,3 +119,26 @@ This paragraph exists because the sentence above it — *"the next version after
 first one worth re-reading this note against"* — was a promise, and a promise nobody records
 keeping is indistinguishable from one nobody kept. 0.49.0 was that version; the note was
 re-read; the answer was no. The **next** release is now the one worth re-reading it against.
+
+
+## The figures here are dated, and one of them has already drifted
+
+**The count has held and the magnitude has not.** Eleven modules exceeded the ceiling on
+2026-08-31 and eleven exceed it today — but `fjs/form1040/core/module.f.js` has grown from
+995,159 bytes to over 1,022,000, so `7.6x` is now `7.8x`. That is the ordinary direction of
+travel: the engine only gets bigger, so the gap this note describes only widens.
+
+**Derive rather than quote**, over the demo's own import closure:
+
+```sh
+node -e "import('functionalscript/fjs/types/bit_vec/module.f.mjs').then(m=>{
+  const c=Number(m.maxLengthBytes); const fs=require('fs'),p=require('path')
+  const walk=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(p.join(d,e.name)):[p.join(d,e.name)])
+  walk('fjs').filter(f=>f.endsWith('.f.js')).map(f=>[fs.statSync(f).size,f])
+    .filter(([s])=>s>c).sort((a,b)=>b[0]-a[0])
+    .forEach(([s,f])=>console.log((s/c).toFixed(1)+'x', s, f))})"
+```
+
+That walks `fjs/**.f.js` rather than the exact closure, so it reports **twelve** — the extra is
+`fjs/server/fjs_run/module.f.js`, which the browser never imports. The eleven the demo actually
+loads are the rest.
