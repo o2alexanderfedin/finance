@@ -76,7 +76,15 @@ echo
 #
 # `fjs web` answers **413** for any file larger than one `Vec` — 131072 bytes —
 # and ELEVEN files this demo loads are over that, `fjs/form1040/core/module.f.js`
-# at 995159 bytes being 7.6x the ceiling. The swap was made, and the UI suite
+# being the largest. Do not quote a multiple from this comment: it said "7.6x,
+# 995159 bytes" as measured on 2026-08-31 and the file has since grown past
+# 1022000 bytes. Derive it instead — the count and the worst offender are what
+# matter, and only the count has held:
+#
+#   node -e "import('functionalscript/fjs/types/bit_vec/module.f.mjs').then(m=>{ … })"
+#
+# (the full recipe is in fjs/todo/upstream-web-vec-size-limit.md).
+# The swap was made, and the UI suite
 # caught it: 44 of 46 tests failed with an empty `#dialect` and an empty `#step`,
 # because the engine modules the page imports never arrived. Recorded in
 # `fjs/todo/upstream-web-vec-size-limit.md`.
