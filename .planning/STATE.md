@@ -819,10 +819,34 @@ server and asking it instead of grepping. Green does not mean verified.
 
 ## Session Continuity
 
-Last session: 2026-09-11T06:00:20.844Z
-Stopped at: **Phase 18 planned, zero plans executed.** 4 plans across 3 waves, plan-checked
-twice, 3 blockers fixed. Phase 19 is complete and MERGED to `develop` (PR #66), as are the
-Phase 18 criteria corrections (PR #67).
+Last session: 2026-09-15
+Stopped at: **Resume, 2026-09-15. Nothing in flight; no milestone open.** Verified from
+measurement rather than from this file: `npm test` exit 0, **3457/3457**, `duration_ms 10505`;
+`main` == `develop` == `origin/*` == `mine/*` at `408f4b0`, identical trees; no open PRs in
+either finance remote. Three one-shot handoff artifacts were consumed and deleted —
+`HANDOFF.json` and `.continue-here.md` (both written 2026-08-19 at `9ccdfcc`, describing v3
+closed / v4 blocked, **three milestones stale** after v5, v6 and v7 shipped) and
+`HANDOFF-pr-review.json` (`28a5101`, 2026-08-26, a queue snapshot of functionalscript PRs
+#1709–#1724 when the live queue is #2047–#2068). A FOURTH was found and deleted with them on 2026-09-16:
+`.planning/.continue-here-pr-review.md` (`28a5101`, 2026-08-26), which the resume above missed —
+and missing it mattered, because it was the one file that **cited** the other three, asserting
+they were "untouched and still current". It was the same class of artifact: `status: paused`,
+tracking functionalscript PRs #1709–#1724 while the live queue is #2073–#2078. All four are
+recoverable from git history at their last commits, and nothing unique died with them: Phase 35's `f1040.pdf` AcroForm homework is
+carried in seven other planning files, and the PR-loop method lives in the review markers on
+GitHub plus the standing subagent brief.
+
+**The `PLAN`-without-`SUMMARY` detector fires on Phase 18 and is wrong.** Its four
+`18-0N-PLAN.md` files have no per-plan summaries because the phase carries one phase-level
+`18-SUMMARY.md`, and its ROADMAP row is `- [x]`. The detector pairs names, not phases; do not
+read those four hits as unfinished work.
+
+*(The paragraph this replaced described "Phase 18 planned, zero plans executed" and Phase 19
+merging to `develop` via PR #66 — accurate in mid-August and carried unread ever since, under a
+`Last session:` stamp of 2026-09-11 that made it look current. **A stale line under a fresh
+timestamp is the same defect this file names twice above**, once for its own Current Position
+block and once for the four canonical lines near the top. This block is the third site, and it
+was never on anyone's list.)*
 
 > **This block was corrupted for the FOURTH time on 2026-08-14, the third time by an SDK
 > write.** It arrived reading `status: verifying`, `stopped_at: context exhaustion at 75%`,
