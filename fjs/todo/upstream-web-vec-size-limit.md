@@ -142,3 +142,49 @@ node -e "import('functionalscript/fjs/types/bit_vec/module.f.mjs').then(m=>{
 That walks `fjs/**.f.js` rather than the exact closure, so it reports **twelve** — the extra is
 `fjs/server/fjs_run/module.f.js`, which the browser never imports. The eleven the demo actually
 loads are the rest.
+
+
+## What this actually waits on — the chain, re-checked on upstream `main` 2026-09-16
+
+**This note is not waiting on `fjs/web`.** Read against `functionalscript` `main` at `a735da3`,
+the dependency path is three deep and every link is a design rather than an implementation:
+
+```
+functionalscript#1819  (fjs web answers 413 above one Vec)
+  └── fjs/effects/node/todo/streaming-http-bodies.md          open   ← our #1900 landed here
+        └── fjs/web/todo/stat-then-read.md                    open
+              └── the file-handle effect it specifies          does not exist
+```
+
+Both intermediate designs state the edge in their own words, so this is a summary and not our
+inference:
+
+- **streaming-http-bodies**: *"the response side is buildable from what is in the tree today,
+  except for the one part of it that serves a **named** file: reading a body in chunks resolves
+  that name once per chunk, which is a race the current whole-file read does not have, so
+  `fjs/web` waits on the handle effect **stat-then-read** designs."*
+- **stat-then-read**: *"**It blocks streaming-http-bodies** … a replaced entry can be spliced
+  into a response that is clean, correctly sized, and **made of two files**. The handle effect
+  below is what binds every chunk of one response to one inode."*
+
+**Why that matters for what we do here: there is nothing to implement.** The response side needs
+a type change (`ServerResponse` gains an `O` parameter and a `release` field), a new file-handle
+effect, a pump in each of the two runners, the chunk loop moved out of `fjs/cas`, and a settled
+answer on destroying the socket rather than ending the response when a body fails after the
+headers are out. Arriving with a fork built on a foundation that is still being designed would
+hand the maintainer a branch he would rewrite. `functionalscript#1649` is the shape that worked
+instead: the open question was handed back as a spec obligation, and he merged it in that form.
+
+**Our contribution already did its work.** The design cites this repository's incident as the
+justification for the priority, near enough verbatim: *"The cap is low enough to have cost an
+adoption… Every small file answered `200`, so loading the page as a smoke test passed; what
+caught it was a UI suite, where 44 of 46 cases failed on empty elements."* That is MAINT-13's
+whole point — a gap taken upstream becomes a specification instead of a local workaround.
+
+**The trigger is the next `functionalscript` release, and `AGENTS.md`'s re-read rule is what
+fires on it.** At that point the check is two greps: does a handle effect exist, and does
+`ServerResponse.body` take a `List`. If both, MAINT-11 closes with the one line already written
+in `demo/serve.sh`'s comment.
+
+Posted as a comment on `#1819` the same day, so the chain is visible in the issue rather than
+only in these files.
