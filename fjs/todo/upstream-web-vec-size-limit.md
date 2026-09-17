@@ -188,3 +188,69 @@ in `demo/serve.sh`'s comment.
 
 Posted as a comment on `#1819` the same day, so the chain is visible in the issue rather than
 only in these files.
+
+
+## 2026-09-16: `readWhole` landed upstream, and it changes the answer above
+
+**The section immediately above says there is nothing to implement. That is no longer true**,
+and the reason is an operation that did not exist when it was written.
+
+`ReadWhole` was added to `main` on **2026-09-14** (`11e3533f`) — two days after that section was
+written, and **it is not in the published 0.49.0 we run** (`grep readWhole` over the installed
+package returns 0):
+
+```ts
+// fjs/effects/node/types.ts:243, and in the Fs union at :247, so in NodeOp
+export type ReadWhole = readonly['readWhole', (path: string) => IoResult<readonly Vec[]>]
+```
+
+It answers **a list of `Vec`s** — each chunk within the cap, the list itself uncapped — from
+**one `open`**. It is implemented in **both** runners (`effects/node/module.mjs` walks the
+descriptor's own cursor 128 KiB at a time; `effects/node/virtual/module.f.mjs` mirrors it down to
+the shared `ERR_NOT_A_FILE` code), and it is already consumed by **seven** `fjs/git` modules, so
+it is a proven primitive rather than a fresh sketch.
+
+**It dissolves the blocker this note recorded.** `stat-then-read.md` blocks the streaming design
+because a chunk loop over a *name* re-resolves that name per chunk, so a replaced file can be
+spliced into one response. `readWhole`'s own docstring answers exactly that:
+
+> *"The chunks are one open's, which is why this is not a fold over `readBytes`. That operation
+> resolves the path per call, so reading a file in windows can straddle two files."*
+
+and `fjs/git/store/module.f.mjs:41` states the property plainly: *"`readWhole` opens the path
+once and reads it to the end, so the chunks it answers are one file's."* The race is solved by an
+**operation**, not by the file-handle effect the design assumed was the only route.
+
+**The streaming design does not know this.** `streaming-http-bodies.md` has **zero** mentions of
+`readWhole`. Per upstream's own DESIGN §3 — *"When a discrepancy is found between an issue's
+design and reality … correct the design document and surface the problem rather than silently
+working around it"* — correcting that document is the first contribution to make, and §3 also
+prefers the design change and its implementation to be **separate pull requests**.
+
+**What still genuinely blocks a large response**, and it is now one thing rather than a chain:
+
+```ts
+// fjs/effects/node/types.ts:265 — the body is ONE Vec
+export type ServerResponse = {
+    readonly status: number
+    readonly headers: Headers
+    readonly body: Vec
+}
+```
+
+So `readWhole` can *read* a 1 MB file today and `ServerResponse` still cannot *carry* it. That is
+a type change with a narrow blast radius — **29 references across 8 files**, and `fjs/web` is the
+only consumer outside the effects layer.
+
+**Also worth flagging: `fjs/web`'s current guard contradicts DESIGN §6.**
+`readBounded` (`fjs/web/module.f.mjs:461`) does
+`BigInt(size) > maxLengthBytes ? pureError(tooLarge(size)) : readFile(path)` — a precomputed size
+predicting whether something fits, which §6 forbids by name: *"Never precompute or estimate an
+encoding/decoding size to predict whether it will fit a limit. Attempt the real decode/encode and
+branch on its result instead."* `readWhole` is what makes obeying it possible.
+
+**And the cap itself is correct and must stay**, which is worth recording because the obvious
+"fix" is to raise it. `maxLength = 0x100000n` (`fjs/types/bigint/module.f.mjs:203`) is not a Node
+limit — measured, Node handles `1n << (maxLength * 16n)` without complaint. The comments at `:196`
+and `:205` say why the number is what it is: **Bun** throws. The weakest runtime sets the cap, so
+chunking is the only honest route.
