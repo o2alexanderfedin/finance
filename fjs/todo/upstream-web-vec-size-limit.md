@@ -254,3 +254,30 @@ branch on its result instead."* `readWhole` is what makes obeying it possible.
 limit — measured, Node handles `1n << (maxLength * 16n)` without complaint. The comments at `:196`
 and `:205` say why the number is what it is: **Bun** throws. The weakest runtime sets the cap, so
 chunking is the only honest route.
+
+
+## 2026-09-17: the chunk loop left `fjs/cas`, which ticks the first box of that chain
+
+**One reusable chunk reader now exists upstream where two hand-written loops used to sit.**
+`readChunks` (`fjs/effects/node/module.f.mjs:408`) reads a file through a chunk source the caller
+supplies, optionally bounded by a byte count, advancing by what each read actually returned rather
+than by `chunkBytes`. Both `fjs/cas` loops — `read` and `streamFile` — call it and the
+hand-written ones are gone. Merged 2026-09-17 as
+[`functionalscript#2079`](https://github.com/functionalscript/functionalscript/pull/2079)
+(`8e241993`).
+
+It also settles the question `fjs/cas/todo/66o-read-streamfile-dedup.md` had left open for `tsc`:
+**no cast is needed**, because the `List<ReadBytes, …>` a source produces widens into `read`'s
+pinned `List<FileCasOperation, …>` by ordinary `Effect` widening. That note is deleted upstream
+and its issue is retired.
+
+**The ceiling has not moved.** `ServerResponse.body` is still one `Vec`
+(`fjs/effects/node/types.ts:305`), `readBounded` still answers 413 above `maxLengthBytes`
+(`fjs/web/module.f.mjs:461`), `demo/serve.sh` still runs `python3 -m http.server`, and
+**MAINT-11's `fjs web` half stays PARTIAL**. Five tasks remain on the streaming design; three are
+Stage 1, and one of those is still blocked on the file-handle effect `stat-then-read` specifies.
+
+**And none of it is installable.** `0.49.0` is what runs here, and it shipped 2026-09-02 — two
+weeks before this merge. The trigger for re-reading this note is unchanged: the next release, per
+AGENTS.md, checked with the same two greps — does a handle effect exist, and does
+`ServerResponse.body` take a `List`.
