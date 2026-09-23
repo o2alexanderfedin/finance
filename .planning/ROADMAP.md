@@ -1885,3 +1885,31 @@ write, and this milestone does not write it either.
 person at a real client with real documents, and no release changes that.
 
 </details>
+
+
+---
+
+<details>
+<summary>✅ v8 — The Narrower Trap — SHIPPED 2026-09-22</summary>
+
+Archived: [`milestones/v8-ROADMAP.md`](./milestones/v8-ROADMAP.md)
+
+- [x] **Phase 44: Take FunctionalScript 0.50.0** — MAINT-17, MAINT-18. `^0.49.0` does not admit
+      0.50.0, so an explicit bump. **The source diff is not empty, unlike 0.49.0's:** `parse`
+      stopped sorting string keys and one proof of 3,457 reddened — the one written to pin that
+      asymmetry. Split into two leaves, one per direction, both watched to fail. `tsc` 0; 30
+      schemas byte-identical (`f2f79e40a957e7a6`); 3458/0 · 13/13 · 47/47 · 100/100/100. Report:
+      `.planning/reports/fjs-0.50.0-migration.md`. PR #173.
+
+- [x] **Phase 45: Publish the guest vocabulary** — MCP-10. `fjs_run`'s description now names the
+      entry-point spelling and all ten `ctx.` members, derived from `taxGuestCtx` so the published
+      list cannot drift from the context a guest is handed. The integration leaf that pinned the
+      gap is inverted rather than deleted. This is Phase 36's code half; Phase 36 stays open for
+      the half that needs a person. PR #174.
+
+**MAINT-11 stays PARTIAL.** `ServerResponse.body` is still one `Vec` and there is still no
+file-handle effect, so `fjs web` still answers 413 above the cap and `demo/serve.sh` stays on
+`python3 -m http.server`. `readChunks` landed in this release but is the chunk reader, not the
+response type.
+
+</details>

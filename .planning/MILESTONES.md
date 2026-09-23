@@ -152,8 +152,33 @@ Upstream in the same window: `functionalscript#1899` (merged 2026-09-08) closed 
 interpreter divergence; `#1900` (merged 2026-09-10) landed the streaming-HTTP-bodies design in
 upstream's own `todo/`. Neither is in a published release — 0.49.0 shipped before both merges.
 
-**What's next:** undecided. The live candidate is FunctionalScript 0.49.0; the open question
-older than it is whether the accountant-facing demo becomes a requirement category of its own.
+**What's next:** the open question older than any release is whether the accountant-facing demo
+becomes a requirement category of its own.
 Both are the owner's call.
 
 ---
+
+
+---
+
+## v8 — The Narrower Trap · 2026-09-22
+
+Archived: [`v8-ROADMAP.md`](./milestones/v8-ROADMAP.md) · [`v8-REQUIREMENTS.md`](./milestones/v8-REQUIREMENTS.md)
+
+A release made the JSON round trip *more* faithful and reddened the proof that pinned the old
+behavior. `parse` stopped sorting string keys; the rule the code carries survived, and the set of
+inputs that trip it got smaller — which is what the milestone is named for.
+
+| PR | What shipped |
+|---|---|
+| #173 | `functionalscript` 0.50.0, the `parse` proof split in two, and a note deleted because the release carried its fix |
+| #174 | The guest vocabulary published on the MCP surface — Phase 36's code half |
+
+Upstream in the same window: [`#2079`](https://github.com/functionalscript/functionalscript/pull/2079)
+(merged 2026-09-17) replaced two duplicated chunk loops with one `readChunks`;
+[`#2203`](https://github.com/functionalscript/functionalscript/pull/2203) corrects the streaming
+design, which was written before `ReadWhole` existed and recorded `fjs/web` as blocked when it is
+now a choice.
+
+**Still open:** MAINT-11's `fjs web` half (PARTIAL since v6), and Phases 34 and 36 — blocked on a
+person at a real client, not on a release.

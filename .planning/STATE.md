@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v7
-milestone_name: The Drop-In
+milestone: v8
+milestone_name: The Narrower Trap
 status: complete
-stopped_at: "Milestone v7 is CLOSED and archived (2026-09-10); no milestone is open and none is defined. Its one phase, 43, took functionalscript 0.49.0 in a single line with an EMPTY SOURCE DIFF - all four Phase-42 criteria met and re-derived by the audit on the merged tree: tsc 0, all 30 served schemas byte-identical (6062f5b85f01160b), leaf set 3388 -> 3388, npm test 3457/3457, integration 13/13, ui 47/47, cov 100/100/100. Archived to .planning/milestones/v7-*, tagged milestone/v7. Two COVERED, NONE PARTIAL - the first milestone here with no PARTIAL verdict and the first whose audit ran BEFORE the close. AFTERWARDS, outside any milestone: an effects-opportunity analysis (.planning/reports/effects-opportunity-analysis.md) found and fixed three defects in demo/lib/store.js - the browser wrote generation stuck at 1 from the second amendment, readAll dropped rows silently, and JSON.parse entered a typed map unvalidated - with a regression test watched to redden; corrected AGENTS.md's carve-out (a stale count and a missing third reason) and three gate headers citing a precedent 0.49.0 retired; and filed functionalscript#1984 to export computeGeneration. THE PROGRESS BLOCK BELOW IS PROJECT-WIDE, NOT MILESTONE-SCOPED: 41 of 44 roadmap rows complete (Phase 14 is the 44th, marked [->] moved, and is neither complete nor open), 88 of 88 plans. Milestone v7 itself was 1 phase, 1 complete. STILL OPEN: phases 34 and 36, blocked since v4 on a person at a real client; MAINT-11's fjs web half, PARTIAL from v6, blocked on functionalscript#1819."
-last_updated: "2026-09-11T06:00:20.881Z"
-last_activity: 2026-09-10
+stopped_at: "Milestone v8 (The Narrower Trap) is CLOSED and archived 2026-09-22, two phases, both complete. Phase 44 took functionalscript 0.50.0: unlike 0.49.0 the source diff is NOT empty - parse stopped sorting string keys and now answers ECMAScript property order (integer-like first, ascending, then source order), which reddened the one proof written to pin that asymmetry. It is split into two leaves, one per direction, both watched to fail. All of Phase 42 criteria met: tsc 0, 30 served schemas byte-identical f2f79e40a957e7a6, integration 13/13, ui 47/47, cov 100/100/100. Report .planning/reports/fjs-0.50.0-migration.md. fjs/todo/upstream-evo-list-raw-typeerror.md DELETED - 0.50.0 carries functionalscript#1899, verified by running that note own reproduction, which answers memory key not found: 0. Phase 45 closed MCP-10: fjs_run description now publishes the guest entry-point spelling and all ten ctx. members, derived from taxGuestCtx so the list cannot drift; the integration leaf that pinned the gap is inverted rather than deleted. That is Phase 36 CODE half - Phase 36 stays open for the half needing a person. PRs #173, #174. Upstream in the same window: #2079 merged (one readChunks for both fjs/cas loops) and #2203 opened, correcting the streaming design that was written before ReadWhole existed. THE PROGRESS BLOCK BELOW IS PROJECT-WIDE, NOT MILESTONE-SCOPED, and its figures are derived by the two greps in .planning/milestones/v8-REQUIREMENTS.md rather than carried forward. STILL OPEN: phases 34 and 36, blocked since v4 and v5 on a person at a real client; MAINT-11 fjs web half, PARTIAL from v6, blocked on ServerResponse.body being one Vec (functionalscript#1819)."
+last_updated: "2026-09-23T04:20:00.000Z"
+last_activity: 2026-09-22
 progress:
-  total_phases: 44
-  completed_phases: 41
+  total_phases: 46
+  completed_phases: 43
   total_plans: 88
   completed_plans: 88
   percent: 93
