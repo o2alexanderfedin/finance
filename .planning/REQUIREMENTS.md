@@ -2459,3 +2459,65 @@ re-read rather than merely surviving it: `fjs/todo/upstream-evo-list-raw-typeerr
 does not carry `#1899` — verified by `grep` over the tarball, not inferred from dates) and
 `fjs/todo/upstream-web-vec-size-limit.md` (`fjs/web/module.f.mjs` byte-identical across the
 bump, so **MAINT-11 stays PARTIAL** and `#1819` stays open).
+
+---
+
+## v8 — The Narrower Trap
+
+- [x] **MAINT-17** *(T3)*: **Take `functionalscript` 0.50.0.** `^0.49.0` does not admit 0.50.0 —
+      a caret on a `0.x` pins the minor — so this is an explicit bump, exactly as MAINT-09,
+      MAINT-14 and MAINT-15 were, and **named by version rather than as "the latest"**, for the
+      reason MAINT-15 states and does not need restating.
+
+      **Acceptance is Phase 42's, unchanged.** `package.json` names the version explicitly and
+      `tsc` is 0; all 30 served dialect schemas are byte-identical across the bump; the full
+      battery is green. Criterion 2 decides, because the served schemas are built from upstream's
+      `rtti` combinators and are therefore a function of the dependency rather than of our source.
+
+      **Unlike 0.49.0, the source diff is not empty.** `parse` stopped sorting string keys — it
+      now answers ECMAScript's own property order — and one proof in `fjs/json/module.f.js`
+      existed to pin the old behavior. That proof reddening is the requirement being met, not a
+      failure to migrate: it is split in two, one leaf per direction, and the module's docstring
+      records that its rule survived while the reason for it narrowed.
+
+- [x] **MAINT-18** *(T3)*: **A consumer-side migration report for 0.50.0**, in the shape of
+      `fjs-0.48.0-migration.md` and `fjs-0.49.0-migration.md`, with a section that reproduces
+      every number in it from the installed package.
+
+- [x] **MCP-10** *(T2)*: **The MCP surface must name the vocabulary a stored program is written
+      in.** An agent holding only the surface — every tool name, description and input schema,
+      every served dialect schema, the parameter set — could not author a program `fjs_run` would
+      run, because `ctx.form1040Report` and its nine siblings appeared nowhere in it. The only way
+      to learn a name was to guess wrong and read the refusal.
+
+      **This is the half of Phase 36's gap that never needed a person at a client.** The other
+      half — a wrong guess exiting the server process — closed in `5c7f324`.
+
+      **The published list must be derived from the context a guest is actually handed**, not
+      re-listed beside it, so a member added to the frozen ABI reaches the surface by itself. The
+      integration leaf that pinned the gap is inverted rather than deleted, so the surface losing
+      the vocabulary again is a test failure.
+
+### v8 Traceability
+
+| REQ-ID | Tier | Phase | Milestone | Status |
+|--------|------|-------|-----------|--------|
+| MAINT-17 | T3 | 44. Take FunctionalScript 0.50.0 | v8 | Complete |
+| MAINT-18 | T3 | 44. Take FunctionalScript 0.50.0 | v8 | Complete |
+| MCP-10 | T2 | 45. Publish the guest vocabulary | v8 | Complete |
+
+**Executed 2026-09-22.** `package.json` declares `^0.50.0` and 0.50.0 is installed; `tsc` **0**;
+all 30 served dialect schemas **byte-identical** (`f2f79e40a957e7a6` both sides); `npm test`
+**3460/3460**, `test:integration` **13/13**, `test:ui` **47/47**, `npm run cov`
+**100.00/100.00/100.00**. The report is
+[`.planning/reports/fjs-0.50.0-migration.md`](./reports/fjs-0.50.0-migration.md).
+
+**One note was deleted and one survived, and both were re-read rather than assumed.**
+`fjs/todo/upstream-evo-list-raw-typeerror.md` is gone — 0.50.0 carries `#1899`, verified by
+running that note's own reproduction, which now answers `memory key not found: 0`.
+`fjs/todo/upstream-web-vec-size-limit.md` stays: `ServerResponse.body` is still one `Vec` and
+there is still no file-handle effect, so **MAINT-11 stays PARTIAL** and `#1819` stays open.
+
+**Phases 34 and 36 are still not in a milestone.** Phase 36's code half closed here as MCP-10;
+what remains of both is blocked on a person at a real client with real documents, which no
+release changes.
