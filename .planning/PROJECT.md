@@ -103,10 +103,12 @@ a scope question rather than a bookkeeping one — the owner's call, not an agen
 **Phases 34 and 36 are not candidates.** They are not blocked on a decision or a release; they
 are blocked on a person at a real client with real documents.
 
-**When the next `functionalscript` publishes**, `AGENTS.md`'s re-read rule fires and two notes
-come up for re-reading by name: `fjs/todo/upstream-evo-list-raw-typeerror.md` and
-`fjs/todo/upstream-web-vec-size-limit.md`. Both survived 0.49.0 and each now records that
-re-read, so the next reader can see what was checked rather than guess.
+**0.50.0 published on 2026-09-18 and the re-read rule fired.** Of the two notes it named,
+`fjs/todo/upstream-evo-list-raw-typeerror.md` is **gone**: the release carries the fix it was
+waiting for, so it was deleted rather than annotated, which is what its own closing rule asked
+for. `fjs/todo/upstream-web-vec-size-limit.md` **stays** — both checks it prescribes still answer
+no, so the `fjs web` ceiling stands and MAINT-11 stays PARTIAL. The next release is the next
+time this fires, and one note is left to re-read.
 
 ## Requirements
 

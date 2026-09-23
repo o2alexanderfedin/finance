@@ -281,3 +281,34 @@ Stage 1, and one of those is still blocked on the file-handle effect `stat-then-
 weeks before this merge. The trigger for re-reading this note is unchanged: the next release, per
 AGENTS.md, checked with the same two greps — does a handle effect exist, and does
 `ServerResponse.body` take a `List`.
+
+
+## 0.50.0 was taken, and this note survived it — both checks re-run
+
+**`functionalscript@0.50.0` shipped 2026-09-18 and the ceiling did not move.** The trigger this
+note set for itself is the next release, and the check it prescribed is two greps over the
+installed package. Both answer no:
+
+```sh
+grep -n -A5 'ServerResponse = {' node_modules/functionalscript/fjs/effects/node/types.d.ts
+#   readonly body: Vec;              ← still one Vec, not a List
+grep -nE "'(open|fstat|close)'" node_modules/functionalscript/fjs/effects/node/types.d.ts
+#   (no output)                      ← no file-handle effect
+```
+
+So `fjs/web` still answers `413` above `maxLengthBytes`, `demo/serve.sh` stays on `python3 -m
+http.server`, **MAINT-11's `fjs web` half stays PARTIAL**, and `functionalscript#1819` stays open.
+
+`readChunks` landed in this release — the section above records it — but it is the chunk *reader*,
+and what blocks a large response is the response *type*. Reading was never the part that could
+not be done; carrying is.
+
+**The sibling note is gone.** `upstream-evo-list-raw-typeerror.md` was deleted in the same change:
+0.50.0 carries `functionalscript#1899`, so the virtual interpreter now refuses a never-allocated
+slot with the project's own sentence, verified by that note's own reproduction:
+
+```
+memory key not found: 0
+```
+
+This note is now the only one waiting on a release. The next one after 0.50.0 is when to re-read it.

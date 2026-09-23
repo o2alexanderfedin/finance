@@ -24,13 +24,20 @@
  * `fjs/todo/upstream-json-parse-split.md`, was retired and deleted in
  * `c1441e1` once 0.43.1 shipped the total parser its own text asked for.
  *
- * **`parse` returns its keys sorted, `stringify` writes them in source
- * order.** So `stringify(unwrap(parse(text)))` canonicalizes rather than
- * reproducing `text`, and in a content-addressed store that is the difference
- * between two hashes. Hash the bytes that were written; never hash a
- * re-serialization of a parsed value and expect the original address. Both
- * halves are pinned by proofs below, because the asymmetry is invisible at
- * the call site.
+ * **A parsed value does not necessarily re-serialize to the text it came
+ * from.** `stringify` writes source order; `parse` returns ECMAScript's own
+ * property order — integer-like keys first, ascending, then the rest in
+ * source order. A text whose keys are all non-numeric therefore round-trips
+ * faithfully, and one that mixes in `"2"` or `"10"` comes back reordered. In
+ * a content-addressed store that difference is two addresses: hash the bytes
+ * that were written, never a re-serialization of the parsed value. Both
+ * shapes are pinned by proofs below, because which one a given text is is
+ * invisible at the call site.
+ *
+ * (Through 0.49.0 `parse` sorted *every* key, so no text with two unordered
+ * keys round-tripped. 0.50.0 narrowed that to the integer-like ones, which is
+ * what ECMAScript specifies. The rule above did not change with it — only the
+ * set of inputs that trip it, which got smaller and therefore easier to miss.)
  *
  * @module
  */
@@ -58,13 +65,19 @@ export const proof = {
     stringifyKeepsSourceOrder: () => {
         assertEq(stringify({ b: 1, a: 2 }), '{"b":1,"a":2}')
     },
-    // …but `parse` returns its keys SORTED, so a text round trip normalizes
-    // rather than preserving. Pinned because of what it means downstream: a
-    // record read back and re-serialized does not necessarily reproduce the
-    // bytes it was stored as, so a CAS hash must be taken over the text that
-    // was actually written, never over a re-serialization of the parsed value.
-    parseSortsKeysSoRoundTripCanonicalizes: () => {
-        assertEq(stringify(unwrap(parse('{"b":1,"a":2}'))), '{"a":2,"b":1}')
+    // `parse` leaves ordinary keys where it found them, so a text of nothing
+    // but non-numeric keys survives a round trip byte for byte.
+    parseKeepsOrdinaryKeysInSourceOrder: () => {
+        assertEq(stringify(unwrap(parse('{"b":1,"a":2}'))), '{"b":1,"a":2}')
+    },
+    // …but an integer-like key is hoisted to the front, ascending, because
+    // that is ECMAScript's property order and `parse` builds ordinary objects.
+    // Pinned because of what it means downstream: a record read back and
+    // re-serialized does not necessarily reproduce the bytes it was stored as,
+    // so a CAS address must be taken over the text that was actually written,
+    // never over a re-serialization of the parsed value.
+    parseHoistsIntegerLikeKeysSoRoundTripCanCanonicalize: () => {
+        assertEq(stringify(unwrap(parse('{"b":1,"2":2,"1":3}'))), '{"1":3,"2":2,"b":1}')
     },
     // The round trip is nonetheless stable after the first pass: parsing an
     // already-canonical text and re-serializing reproduces it exactly.
