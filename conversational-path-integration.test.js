@@ -659,17 +659,26 @@ test(
                 }
             })
 
-            await t.test('the gap: nothing the surface says names the vocabulary a stored program must be written in', async () => {
+            await t.test('the surface names the whole vocabulary a stored program must be written in', async () => {
                 // The whole captured surface — every tool name, description
                 // and input schema, every served dialect schema, the tax
                 // parameter set, and the one refusal that volunteers a list —
                 // searched for the six names §"guestVocabularyTheAgentMustKnow"
                 // states an agent must know to author the program the next
                 // subtest runs.
+                //
+                // **This leaf used to assert the opposite**, and it was right
+                // to: through 2026-09-22 the surface named none of the six, so
+                // a stored program could only be authored by someone who had
+                // read this repository. `fjs_run`'s description now publishes
+                // the context a guest is handed, derived from `taxGuestCtx`
+                // itself, so the search that found nothing must now find
+                // everything. The list it searches for is still hand-typed —
+                // that is what makes this the independent side.
                 assert.ok(capturedSurface.length > 0, 'the surface capture must precede this search')
-                const found = guestVocabularyTheAgentMustKnow.filter(name => capturedSurface.includes(name))
-                assert.deepEqual(found, [],
-                    'the MCP surface names part of the guest vocabulary after all — re-read the report before trusting its verdict')
+                const missing = guestVocabularyTheAgentMustKnow.filter(name => !capturedSurface.includes(name))
+                assert.deepEqual(missing, [],
+                    'the MCP surface stopped naming part of the guest vocabulary — an agent holding only the surface can no longer author a program')
 
                 // The control: the search is capable of finding something.
                 // Without it, a capture that silently became empty, or a
@@ -679,15 +688,15 @@ test(
                         `the search must be able to find ${present}, or its emptiness proves nothing`)
                 }
 
-                // And the ONE fragment that IS reachable, stated so the
-                // finding is not overclaimed: `fjs/exec`'s refusal prints the
-                // four permitted command names. It is reachable only by
-                // running a program that violates the policy, and four
-                // read-only commands are not enough to author a 1040 — but it
-                // is not nothing, and a report that pretended otherwise would
-                // be wrong in the direction that matters.
-                assert.equal(capturedSurface.includes('evoRevision'), false,
-                    'even the four op names are absent from the STATIC surface; they surface only in a refusal')
+                // The four dispatched command names are part of it now, and
+                // on the STATIC surface rather than only in a refusal a guest
+                // had to provoke. Asserted positively so that publishing the
+                // ABI while quietly dropping the commands from it would fail
+                // here rather than read as a pass.
+                for (const command of ['casRead', 'evoList', 'evoHead', 'evoRevision']) {
+                    assert.ok(capturedSurface.includes(`ctx.${command}`),
+                        `${command} must be named on the static surface, not only inside a refusal`)
+                }
             })
 
             await t.test('the program text is supplied out of band, and everything after it is the surface again', async () => {

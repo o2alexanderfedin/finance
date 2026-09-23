@@ -1126,6 +1126,22 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 
 > **2026-09-09 — the crash half of that gap is FIXED**, on branch `fix/guest-throw-kills-the-server`, commit `5c7f324`. A wrong guess now returns `isError: true` with `fjs_run failed: guest program threw: TypeError: ctx.computeForm1040 is not a function (run record: …)`, writes the `status: 'error'` run record, and leaves the session answering; `fjs/server/fjs_run` wraps the guest call in `fjs/refuses`' `attempt`, which stays the single `try` under `fjs/`. **The vocabulary half is NOT fixed** — `ctx.form1040Report` and its five siblings are still named by no tool description, no served schema and no refusal, so the status above stands except for its last clause. The status line is annotated rather than rewritten; the report's §5.2 carries the full account, and the harness leaf that pinned the crash is now the regression test for its absence.
 
+> **2026-09-22 — the vocabulary half is FIXED too, so nothing in this phase now waits on code.**
+> `fjs_run`'s tool description publishes the context a stored program is handed:
+> the entry-point spelling and all ten `ctx.` members, derived from `taxGuestCtx`
+> itself rather than re-listed, so a member added to the frozen ABI reaches the
+> surface on its own. An agent holding only the MCP surface can now author a
+> program that runs. The integration leaf that pinned the gap is inverted rather
+> than deleted — it now fails if the surface stops naming the vocabulary — and
+> two proofs guard the halves that could drift: `abiNamesAreTheContextsOwnKeys`
+> (published list against the real context, both directions) and
+> `publishedEntryPointSpellingMatchesThisProgramsOwn` (published spelling against
+> `taxReturnReportSource`'s own first line). All three were watched to fail:
+> omitting the names from the description reddened the integration leaf alone,
+> and dropping `form1040Report` from the published list reddened the proof alone.
+> **What is still owed is only the half that needs a person** — a model choosing
+> the calls, and boxes read off a real scan.
+
 ### Phase 37: FunctionalScript 0.46.1
 **Requirements**: MAINT-06 (intent) · **Tier**: T3 · **Status**: complete 2026-08-19 · record: `.planning/reports/fjs-0.46.1-migration.md`
 
