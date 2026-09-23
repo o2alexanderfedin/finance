@@ -171,7 +171,7 @@
  */
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { interpret } from '../../exec/module.f.js'
-import { taxGuestCtx } from '../../guest/tax/module.f.js'
+import { taxGuestCtx, taxGuestEntryPoint } from '../../guest/tax/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
@@ -2322,6 +2322,17 @@ const dispatchedDialects = [
 const expectedDispatchedDialectCount = 29
 
 export const proof = {
+    // `fjs_run`'s tool description publishes an entry-point spelling so an
+    // agent can author a program from the MCP surface alone. This is the
+    // program that surface is describing, so its first line is the thing the
+    // published spelling has to match. Pinned here rather than beside the
+    // constant, because `fjs/guest/tax` cannot import this module back
+    // without a cycle.
+    publishedEntryPointSpellingMatchesThisProgramsOwn: () => {
+        const opening = taxGuestEntryPoint.replace(' ...', '')
+        assert(taxReturnReportSource.startsWith(opening),
+            `the stored program opens with ${taxReturnReportSource.slice(0, opening.length)}, not ${opening}`)
+    },
     // The phase's central number check, and the reason this module exists:
     // a program written against nothing but `ctx` computes a REAL 1040 from
     // stored documents.

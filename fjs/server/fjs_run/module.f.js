@@ -136,7 +136,7 @@ import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
 import { guestCtx } from '../../guest/module.f.js'
-import { taxGuestCtx } from '../../guest/tax/module.f.js'
+import { taxGuestCtx, taxGuestAbiNames, taxGuestEntryPoint } from '../../guest/tax/module.f.js'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../../guest/materialize/module.f.js'
 import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
 import { dialect, validate as validateRun } from '../../run/module.f.js'
@@ -634,7 +634,11 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
     'Runs a stored report program (by CAS hash) against pinned inputs and returns ' +
     'the result and run-record hashes. Requires taxYear (the tax year whose parameter ' +
     'set was in effect for this run). Supply subject and parents together to pin ' +
-    'the snapshot the program\'s evoHead reads; omit both for an ordinary unpinned run.',
+    'the snapshot the program\'s evoHead reads; omit both for an ordinary unpinned run. ' +
+    'The program is a FunctionalScript module written as `' + taxGuestEntryPoint + '`, ' +
+    'returning ctx.pure(value) or a chain of ctx.step(command, next). Its ctx carries ' +
+    'exactly: ' + taxGuestAbiNames.join(', ') + '. Only the four ctx.cas*/ctx.evo* ' +
+    'members dispatch a command; the rest are ordinary functions and values.',
     fjsRunInputSchema,
     /** @type {(args: Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, ToolsCallResult, never>} */
     (args => {

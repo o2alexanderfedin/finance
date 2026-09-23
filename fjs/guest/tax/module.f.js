@@ -107,6 +107,36 @@ export const taxGuestCtx = (/** @type {TaxParamSet} */ taxParams) => ({
 /** @typedef {ReturnType<typeof taxGuestCtx>} TaxGuestCtx */
 
 /**
+ * The names a stored tax program's author has to know, spelled as they are
+ * written — `ctx.form1040Report`, not `form1040Report`.
+ *
+ * This list exists to be **published**. `fjs_run`'s tool description prints
+ * it, which is what lets an agent holding nothing but the MCP surface author
+ * a program that runs; before it, the vocabulary was named by no tool
+ * description, no served schema and no refusal, and a wrong guess was the
+ * only way to learn one (Phase 36, `.planning/reports/phase-36-conversational-path.md`).
+ *
+ * Built from {@link guestCtx}'s own keys rather than re-listed, so a member
+ * added to the frozen ABI reaches the published surface by itself. The two
+ * this module adds are the only spelled-out entries, and
+ * {@link proof.abiNamesAreTheContextsOwnKeys} checks the whole list against a
+ * real `taxGuestCtx`, so neither half can drift from what a guest is handed.
+ * @type {readonly string[]}
+ */
+export const taxGuestAbiNames = [...Object.keys(guestCtx), 'taxParams', 'form1040Report']
+    .map(name => `ctx.${name}`)
+
+/**
+ * The entry point the executor calls, as a stored program must spell it.
+ * `fjs/report/tax_return`'s own source text opens with exactly this line.
+ * That module pins the two together (its
+ * `publishedEntryPointSpellingMatchesThisProgramsOwn`), because the check has
+ * to live on the side that already imports this one — the reverse would be a
+ * cycle.
+ */
+export const taxGuestEntryPoint = 'export const report = ctx => args => ...'
+
+/**
  * The entry point a stored **tax** report program exports — `fjs/guest`'s
  * own `Report<T>`, with `TaxGuestCtx` in place of `GuestCtx` and nothing
  * else changed. The effect parameter is still `CasOp`: the four frozen
@@ -222,6 +252,17 @@ export const proof = {
         assert(Object.is(ctx.centsFromString, guestCtx.centsFromString), 'centsFromString must be the frozen ABI\'s own helper')
         assert(Object.is(ctx.centsToString, guestCtx.centsToString), 'centsToString must be the frozen ABI\'s own helper')
         assertEq(typeof ctx.form1040Report, 'function')
+    },
+    // `taxGuestAbiNames` is what `fjs_run` publishes, so it has to name the
+    // context a guest is ACTUALLY handed — not a list that once did. Checked
+    // against a real `taxGuestCtx`, both directions: same members, same order,
+    // each prefixed exactly once. A member added to `guestCtx` and forgotten
+    // here cannot pass, and neither can a name published for something a
+    // guest cannot reach.
+    abiNamesAreTheContextsOwnKeys: () => {
+        const ctx = taxGuestCtx(assertNotNullish(taxParams2025, 'TY2025 parameters'))
+        assertEq(taxGuestAbiNames.join(' '), Object.keys(ctx).map(name => `ctx.${name}`).join(' '))
+        assertEq(taxGuestAbiNames.length, 10)
     },
     // Success Criterion 2's runtime half, mirroring `fjs/guest`'s own
     // `combinatorsAreNeverOperations` for the two members this module adds:
