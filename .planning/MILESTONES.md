@@ -13,6 +13,35 @@ Entries newest first.
 
 ---
 
+## v8 — The Narrower Trap · 2026-09-22
+
+*(Appended below v6 and v7 by PR #175 and moved here 2026-09-25. "Entries newest
+first" is the rule three lines from the top of this file, and this is the entry that
+broke it — a ledger that is ordered by rule and unordered in fact is read by date, which
+made v7 look like the most recent thing that had happened.)*
+
+Archived: [`v8-ROADMAP.md`](./milestones/v8-ROADMAP.md) · [`v8-REQUIREMENTS.md`](./milestones/v8-REQUIREMENTS.md)
+
+A release made the JSON round trip *more* faithful and reddened the proof that pinned the old
+behavior. `parse` stopped sorting string keys; the rule the code carries survived, and the set of
+inputs that trip it got smaller — which is what the milestone is named for.
+
+| PR | What shipped |
+|---|---|
+| #173 | `functionalscript` 0.50.0, the `parse` proof split in two, and a note deleted because the release carried its fix |
+| #174 | The guest vocabulary published on the MCP surface — Phase 36's code half |
+
+Upstream in the same window: [`#2079`](https://github.com/functionalscript/functionalscript/pull/2079)
+(merged 2026-09-17) replaced two duplicated chunk loops with one `readChunks`;
+[`#2203`](https://github.com/functionalscript/functionalscript/pull/2203) corrects the streaming
+design, which was written before `ReadWhole` existed and recorded `fjs/web` as blocked when it is
+now a choice.
+
+**Still open:** MAINT-11's `fjs web` half (PARTIAL since v6), and Phases 34 and 36 — blocked on a
+person at a real client, not on a release.
+
+---
+
 ## v7 The Drop-In (Shipped: 2026-09-10)
 
 **Delivered:** `functionalscript` 0.49.0 taken in one line, with every acceptance criterion met
@@ -155,30 +184,3 @@ upstream's own `todo/`. Neither is in a published release — 0.49.0 shipped bef
 **What's next:** the open question older than any release is whether the accountant-facing demo
 becomes a requirement category of its own.
 Both are the owner's call.
-
----
-
-
----
-
-## v8 — The Narrower Trap · 2026-09-22
-
-Archived: [`v8-ROADMAP.md`](./milestones/v8-ROADMAP.md) · [`v8-REQUIREMENTS.md`](./milestones/v8-REQUIREMENTS.md)
-
-A release made the JSON round trip *more* faithful and reddened the proof that pinned the old
-behavior. `parse` stopped sorting string keys; the rule the code carries survived, and the set of
-inputs that trip it got smaller — which is what the milestone is named for.
-
-| PR | What shipped |
-|---|---|
-| #173 | `functionalscript` 0.50.0, the `parse` proof split in two, and a note deleted because the release carried its fix |
-| #174 | The guest vocabulary published on the MCP surface — Phase 36's code half |
-
-Upstream in the same window: [`#2079`](https://github.com/functionalscript/functionalscript/pull/2079)
-(merged 2026-09-17) replaced two duplicated chunk loops with one `readChunks`;
-[`#2203`](https://github.com/functionalscript/functionalscript/pull/2203) corrects the streaming
-design, which was written before `ReadWhole` existed and recorded `fjs/web` as blocked when it is
-now a choice.
-
-**Still open:** MAINT-11's `fjs web` half (PARTIAL since v6), and Phases 34 and 36 — blocked on a
-person at a real client, not on a release.

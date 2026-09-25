@@ -4,7 +4,7 @@ milestone: v8
 milestone_name: The Narrower Trap
 status: complete
 stopped_at: "Milestone v8 (The Narrower Trap) is CLOSED and archived 2026-09-22, two phases, both complete. Phase 44 took functionalscript 0.50.0: unlike 0.49.0 the source diff is NOT empty - parse stopped sorting string keys and now answers ECMAScript property order (integer-like first, ascending, then source order), which reddened the one proof written to pin that asymmetry. It is split into two leaves, one per direction, both watched to fail. All of Phase 42 criteria met: tsc 0, 30 served schemas byte-identical f2f79e40a957e7a6, integration 13/13, ui 47/47, cov 100/100/100. Report .planning/reports/fjs-0.50.0-migration.md. fjs/todo/upstream-evo-list-raw-typeerror.md DELETED - 0.50.0 carries functionalscript#1899, verified by running that note own reproduction, which answers memory key not found: 0. Phase 45 closed MCP-10: fjs_run description now publishes the guest entry-point spelling and all ten ctx. members, derived from taxGuestCtx so the list cannot drift; the integration leaf that pinned the gap is inverted rather than deleted. That is Phase 36 CODE half - Phase 36 stays open for the half needing a person. PRs #173, #174. Upstream in the same window: #2079 merged (one readChunks for both fjs/cas loops) and #2203 opened, correcting the streaming design that was written before ReadWhole existed. THE PROGRESS BLOCK BELOW IS PROJECT-WIDE, NOT MILESTONE-SCOPED, and its figures are derived by the two greps in .planning/milestones/v8-REQUIREMENTS.md rather than carried forward. STILL OPEN: phases 34 and 36, blocked since v4 and v5 on a person at a real client; MAINT-11 fjs web half, PARTIAL from v6, blocked on ServerResponse.body being one Vec (functionalscript#1819)."
-last_updated: "2026-09-23T04:20:00.000Z"
+last_updated: "2026-09-25T08:37:39.000Z"
 last_activity: 2026-09-22
 progress:
   total_phases: 46
@@ -44,15 +44,27 @@ file: it is what a stale document says whether or not it is true.**)*
 
 ## Session
 
-Status: complete — milestone v7 is CLOSED and archived; no milestone is open
-Stopped at: Milestone v7 closed and archived 2026-09-10; no milestone is open. Afterwards, outside any milestone: the effects-opportunity analysis, three defects fixed in demo/lib/store.js with a regression test watched to redden, AGENTS.md and three gate headers corrected, and functionalscript#1984 filed. Open: phases 34 and 36, and MAINT-11's fjs web half.
-Progress: [█████████░] 93% — **project-wide**, 41 of 44 roadmap rows. Milestone v7 itself was 1 of 1.
-Last activity: 2026-09-10
+Status: complete — milestone v8 is CLOSED and archived; no milestone is open
+Stopped at: Milestone v8 (The Narrower Trap) closed and archived 2026-09-22, two phases both complete. Phase 44 took functionalscript 0.50.0; Phase 45 published the guest vocabulary on the MCP surface, which is Phase 36's code half. PRs #173 and #174 shipped the work; #175 wrote the record. The detail is in MILESTONES.md's v8 entry and in .planning/reports/fjs-0.50.0-migration.md - not in the frontmatter above, which is the copy this line overwrites. Open: phases 34 and 36, and MAINT-11's fjs web half.
+Progress: [█████████░] 93% — **project-wide**, 43 of 46 roadmap rows. Milestone v8 itself was 2 of 2.
+Last activity: 2026-09-22
 
-*(93% is **project-wide**: 41 of the 44 rows in ROADMAP.md's ledger. The 44th is Phase 14,
-marked `- [→]` (moved to v3 and reframed), which is neither complete nor open — which is why
-`grep -cE '^- \[[ x]\]'` answers 43 and the unique-ID recipe answers 44. Both are right about
-different questions. Milestone v7 itself was **1 phase, 1 complete**.*
+*(That percentage is **project-wide**, and the fraction beside it counts ROADMAP.md's ledger
+rows rather than the milestone's phases. One row — Phase 14, marked `- [→]` (moved to v3 and
+reframed) — is neither complete nor open, which is why `grep -cE '^- \[[ x]\]'` and the
+unique-ID recipe answer different numbers; both are right about different questions. **Those
+two numbers are not restated here**, because a figure sitting beside the command that computes
+it is the second statement of one fact, and the second statement is the one that drifts — the
+lesson PRs #162 and #165 paid for twice in two days. Milestone v8 itself was 2 phases, 2
+complete.*
+
+*The SIXTH recurrence is the one this section is being written out of, and it is the first
+one a test can see. PR #175 archived v8 in the frontmatter and left all four lines above
+reading v7, dated 2026-09-10, against a ledger two phases further on — an armed stomp, not a
+typo: the next `gsd-*` write would have copied v7 back up over the v8 record. `planning-truth-gate`
+was **24/24** for it, because nothing in that gate compared this body's milestone narrative to
+the header it is the source of. It does now, and the leaf was watched to fail on this exact
+content before the content was corrected.*
 
 *This line and the four above it went through the fifth recurrence of this file's documented
 corruption on 2026-09-11, and the first that was COMMITTED. A GSD hook rewrote the frontmatter
@@ -125,23 +137,27 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: none in flight — milestone v7 closed 2026-09-10; no milestone is open
+Phase: none in flight — milestone v8 closed 2026-09-22; no milestone is open
 Plan: —
 Status: Between milestones. Two open phases (34, 36) carry forward, blocked on a person at a
   real client with real documents — not on a decision, a release, or any work that can be done
   here.
-Last activity: 2026-09-10 — Milestone v7 closed and archived
+Last activity: 2026-09-22 — Milestone v8 closed and archived
 
 **Not "nothing is in flight".** This file records that as its most dangerous sentence, because
 it is what a stale document says whether or not it is true. What is accurate: no phase is being
-executed, `functionalscript@0.49.0` is installed against `^0.49.0` declared, and the tree is
-green at `npm test` 3457/3457, `test:integration` 13/13, `test:ui` 46/46, `tsc` 0, coverage
-100.00/100.00/100.00 across 122 files — measured on the closing tree. What is *owed* is in
+executed, and `functionalscript@0.50.0` is installed against `^0.50.0` declared. **The suite
+figures are deliberately not restated here**: this paragraph carried v7's, four days after v8
+moved them, directly above this file's own "Test metrics — MEASURE, do not read" section. The
+closing measurements are in `MILESTONES.md`'s v8 entry and in
+`.planning/reports/fjs-0.50.0-migration.md`; run the commands for today's. What is *owed* is in
 `MILESTONES.md` under each milestone's "Known gaps at close".
 
-**Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created at
-v6's close and carry v6 and v7 only; **a short ledger is not evidence of a short history** —
-v1–v5 are recorded in place, in ROADMAP.md and in this file's "Earlier milestones" section.
+**Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created
+at v6's close. MILESTONES.md carries v6, v7 and v8; **RETROSPECTIVE.md stops at v7** — v8 has
+no retrospective section, which is a gap in the record rather than a shorter history. And
+**a short ledger is not evidence of a short history** at all — v1–v5 are recorded in place, in
+ROADMAP.md and in this file's "Earlier milestones" section.
 
 ## Shipped outside the ledger — the accountant demo, 2026-08-21
 
@@ -819,9 +835,14 @@ server and asking it instead of grepping. Green does not mean verified.
 
 ## Session Continuity
 
-Last session: 2026-09-15
-Stopped at: **Resume, 2026-09-15. Nothing in flight; no milestone open.** Verified from
-measurement rather than from this file: `npm test` exit 0, **3457/3457**, `duration_ms 10505`;
+Last session: 2026-09-22 — milestone v8 closed and archived
+Stopped at: **Milestone v8 (The Narrower Trap) closed and archived 2026-09-22.** Two phases,
+both complete; PRs #173, #174 and #175. No milestone is open and no phase is in flight — and
+the copy of that statement which matters is the `## Session` block at the top of this file,
+because that is the one `gsd-sdk` reads back into the header.
+
+**The session before it, 2026-09-15**, is kept because the artifacts it consumed are
+recorded nowhere else. It was verified from measurement rather than from this file: `npm test` exit 0, **3457/3457**, `duration_ms 10505`;
 `main` == `develop` == `origin/*` == `mine/*` at `408f4b0`, identical trees; no open PRs in
 either finance remote. Three one-shot handoff artifacts were consumed and deleted —
 `HANDOFF.json` and `.continue-here.md` (both written 2026-08-19 at `9ccdfcc`, describing v3
