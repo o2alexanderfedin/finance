@@ -405,6 +405,209 @@ test('negative control: an explanation after the body status is not a disagreeme
     assert.equal(stated[1], 'passed')
 })
 
+// ── STATE.md's body is the header's SOURCE, not its echo ───────────────────
+//
+// `.planning/STATE.md` names its milestone twice: once in frontmatter, and
+// once in four lines of prose under `## Session`. The frontmatter is the copy
+// a reader believes; the body is the copy that WINS. `gsd-sdk`'s
+// `buildStateFrontmatter` rebuilds the header out of the body, taking the
+// FIRST `Status:`, `Stopped at:`, `Progress:` and `Last activity:` line it can
+// find. So a body still narrating the previous milestone does not merely read
+// wrong -- the next `gsd-*` write copies it up over the header, and the newer
+// record is gone.
+//
+// STATE.md documents that mechanism at length and records five recurrences of
+// it. **The sixth arrived with PR #175**, which wrote v8 into the frontmatter
+// and left all four body lines reading v7 -- and this suite was **24/24** for
+// it, because every other leaf here reads STATE.md only for the
+// modeled/refused/tripwire figures and never for what its prose says happened.
+//
+// Reading the body *exactly as the tool does* is what makes this watch the
+// hazard instead of a paraphrase of it. The other half of the documented
+// failure is a `Status:`-shaped line INSERTED above the canonical four -- and
+// that inserted line is then the one this check reads, so it has to agree with
+// the header too. One predicate, both directions.
+//
+// Not a MAINT requirement, like the rest of this file.
+
+const statePath = join(planningDir, 'STATE.md')
+
+/**
+ * The four body lines `buildStateFrontmatter` reads, in the order it reads
+ * them. Anchored and case-sensitive, because the tool's own match is: a
+ * `**Status:**` in bold is a phase report's form and is deliberately NOT one
+ * of these.
+ */
+const stateBodyPatterns = [
+    ['Status', /^Status: *(.+)$/m],
+    ['Stopped at', /^Stopped at: *(.+)$/m],
+    ['Progress', /^Progress: *(.+)$/m],
+    ['Last activity', /^Last activity: *(.+)$/m],
+]
+
+/** The header fields those four lines are the source of. */
+const stateHeaderPatterns = [
+    ['milestone', /^milestone: *(\S+)/m],
+    ['status', /^status: *(\S+)/m],
+    ['last_activity', /^last_activity: *"?(\d{4}-\d{2}-\d{2})/m],
+    ['completed_phases', /^ +completed_phases: *(\d+)/m],
+    ['total_phases', /^ +total_phases: *(\d+)/m],
+    ['percent', /^ +percent: *(\d+)/m],
+]
+
+/** `v8` out of `Milestone v8 (The Narrower Trap) is CLOSED`; `null` if none. */
+const milestoneTokenIn = text => (/\bv[0-9]+\b/.exec(text) ?? [null])[0]
+
+/**
+ * Every way STATE.md's body and its own frontmatter disagree about which
+ * milestone happened, when, and how far the ledger got.
+ *
+ * Takes the text rather than reading the file, so the controls below can drive
+ * the same predicate over a synthetic pair. A missing field is a complaint and
+ * never a silent pass: an absent body line is precisely the state in which the
+ * tool rebuilds the header from nothing.
+ */
+const stateNarrativeDisagreements = text => {
+    const end = text.indexOf('\n---', 3)
+    if (!text.startsWith('---') || end === -1) {
+        return ['STATE.md has no frontmatter block -- there is no header to compare the body against']
+    }
+    const front = text.slice(0, end)
+    const body = text.slice(end)
+    const problems = []
+    const header = {}
+    for (const [name, pattern] of stateHeaderPatterns) {
+        const match = pattern.exec(front)
+        if (match === null) { problems.push(`frontmatter states no \`${name}\``) } else { header[name] = match[1] }
+    }
+    const first = {}
+    for (const [name, pattern] of stateBodyPatterns) {
+        const match = pattern.exec(body)
+        if (match === null) {
+            problems.push(`the body has no \`${name}:\` line, so a \`gsd-*\` write rebuilds that header field from nothing`)
+        } else { first[name] = match[1].trim() }
+    }
+    if (problems.length !== 0) { return problems }
+
+    // The date is the sharpest of the four: one token on each side, and the
+    // field that walked BACKWARDS during the first recurrence.
+    const bodyDate = (/\d{4}-\d{2}-\d{2}/.exec(first['Last activity']) ?? [null])[0]
+    if (bodyDate !== header['last_activity']) {
+        problems.push(
+            `body \`Last activity:\` is ${bodyDate ?? 'undated'}, frontmatter \`last_activity\` is ${header['last_activity']}`)
+    }
+
+    // Both narrative lines name the milestone, and both are copied upward.
+    for (const name of ['Status', 'Stopped at']) {
+        const token = milestoneTokenIn(first[name])
+        if (token !== header['milestone']) {
+            problems.push(
+                `body \`${name}:\` names ${token ?? 'no milestone'}, frontmatter \`milestone\` is ${header['milestone']}`)
+        }
+    }
+
+    // The status word alone, because the body line carries an explanation
+    // after it and routinely should. This is the field the fifth stomp
+    // flipped from `complete` to `completed`.
+    const statusWord = (/^([A-Za-z_]+)/.exec(first['Status']) ?? [null, null])[1]
+    if (statusWord !== header['status']) {
+        problems.push(`body \`Status:\` opens with "${statusWord ?? ''}", frontmatter \`status\` is "${header['status']}"`)
+    }
+
+    // The ledger figures. `N of M` and the percentage are separate claims and
+    // have gone stale separately -- `41 of 44` survived under a percentage
+    // that was still right, because 41/44 and 43/46 round to the same whole
+    // number. A leaf reading only the percentage would have passed on it.
+    const fraction = /(\d+) of (\d+)/.exec(first['Progress'])
+    if (fraction === null) {
+        problems.push('body `Progress:` states no `N of M`, so nothing pins it to the frontmatter ledger')
+    } else if (
+        Number(fraction[1]) !== Number(header['completed_phases'])
+        || Number(fraction[2]) !== Number(header['total_phases'])) {
+        problems.push(
+            `body \`Progress:\` says ${fraction[1]} of ${fraction[2]}, frontmatter says `
+            + `${header['completed_phases']} of ${header['total_phases']}`)
+    }
+    const percent = /(\d+(?:\.\d+)?)%/.exec(first['Progress'])
+    if (percent === null) {
+        problems.push('body `Progress:` states no percentage')
+    } else if (Number(percent[1]) !== Number(header['percent'])) {
+        problems.push(`body \`Progress:\` says ${percent[1]}%, frontmatter \`percent\` is ${header['percent']}`)
+    }
+    return problems
+}
+
+test('STATE.md\'s body agrees with the frontmatter it is the source of', () => {
+    const problems = stateNarrativeDisagreements(readFileSync(statePath, 'utf8'))
+    assert.deepEqual(problems, [],
+        'STATE.md\'s first-of-kind body lines are what `buildStateFrontmatter` rebuilds the header FROM, '
+        + `so the next \`gsd-*\` write would stamp these over it: ${problems.join('; ')}`)
+})
+
+test('positive control: a body narrating the previous milestone IS detected', () => {
+    // PR #175's shape, reduced: a v8 header over a v7 narrative. Written
+    // literally rather than by concatenation -- unlike the citation controls,
+    // nothing scans this file for `Status:`-shaped lines, and the fixture is
+    // only readable if it looks like what it imitates.
+    const stale = [
+        '---',
+        'milestone: v8',
+        'status: complete',
+        'last_activity: 2026-09-22',
+        'progress:',
+        '  total_phases: 46',
+        '  completed_phases: 43',
+        '  percent: 93',
+        '---',
+        '',
+        '## Session',
+        '',
+        'Status: complete -- milestone v7 is CLOSED and archived; no milestone is open',
+        'Stopped at: Milestone v7 closed and archived 2026-09-10.',
+        'Progress: 93% -- project-wide, 41 of 44 roadmap rows.',
+        'Last activity: 2026-09-10',
+        '',
+    ].join('\n')
+    assert.deepEqual(stateNarrativeDisagreements(stale), [
+        'body `Last activity:` is 2026-09-10, frontmatter `last_activity` is 2026-09-22',
+        'body `Status:` names v7, frontmatter `milestone` is v8',
+        'body `Stopped at:` names v7, frontmatter `milestone` is v8',
+        'body `Progress:` says 41 of 44, frontmatter says 43 of 46',
+    ])
+})
+
+test('positive control: a missing body line is a complaint, not a pass', () => {
+    // The state in which the tool rebuilds a header field from nothing.
+    const headerOnly = ['---', 'milestone: v8', 'status: complete', 'last_activity: 2026-09-22',
+        'progress:', '  total_phases: 46', '  completed_phases: 43', '  percent: 93', '---', '', '## Session', ''].join('\n')
+    assert.equal(stateNarrativeDisagreements(headerOnly).length, 4)
+})
+
+test('negative control: an agreeing body passes, explanations and all', () => {
+    // The body lines carry prose after the value on purpose -- a check that
+    // demanded bare values would fail on a healthy file.
+    const agreeing = [
+        '---',
+        'milestone: v8',
+        'status: complete',
+        'last_activity: 2026-09-22',
+        'progress:',
+        '  total_phases: 46',
+        '  completed_phases: 43',
+        '  percent: 93',
+        '---',
+        '',
+        '## Session',
+        '',
+        'Status: complete -- milestone v8 is CLOSED and archived; no milestone is open',
+        'Stopped at: Milestone v8 closed and archived 2026-09-22; two phases, both complete.',
+        'Progress: [#########.] 93% -- project-wide, 43 of 46 roadmap rows. Milestone v8 was 2 of 2.',
+        'Last activity: 2026-09-22 -- milestone v8 closed and archived',
+        '',
+    ].join('\n')
+    assert.deepEqual(stateNarrativeDisagreements(agreeing), [])
+})
+
 test('every requirement is traced somewhere, and every traced ID has a body', () => {
     const { body, traced } = parseRequirements()
     assert.ok(body.size > 0, 'no requirements parsed -- the body pattern has drifted')

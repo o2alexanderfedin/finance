@@ -1,15 +1,15 @@
 # Roadmap: Finance
 
-**Milestone:** **v7 — The Drop-In, SHIPPED 2026-09-10** (Phase 43); v6 shipped the same day. No milestone is open. *(This line read `v1` until 2026-09-10, five milestones stale — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
-**Granularity:** fine. **Do not quote a phase count from this line — three have been wrong here.** Derive it: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md` (33 entries today: 1-30 plus the inserted 12.1, plus the gap-closure Phases 31 and 32). See "Granularity Note" below.
-**Coverage:** **120** requirements in REQUIREMENTS.md — 95 v1 plus 25 v2 — of which 8 are MAINT. This line read **93** until 2026-08-17. Derive it: `grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md`; `planning-truth-gate.test.js` compares the checkboxes against the traceability tables on every `npm test`.
+**Milestone:** **v8 — The Narrower Trap, SHIPPED 2026-09-22** (Phases 44 and 45). No milestone is open. *(This line read `v1` until 2026-09-10, five milestones stale, and then `v7` until 2026-09-25, one milestone stale and three days after v8 closed — the same drift the two "Count note" lines below warn about, in the one field nothing derives.)* See `## Milestones` below; archives live in `.planning/milestones/`.
+**Granularity:** fine. **Do not quote a phase count from this line — four have been wrong here.** Derive it: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md`. *(The parenthetical here read "33 entries today: 1-30 plus the inserted 12.1, plus the gap-closure Phases 31 and 32" until 2026-09-25 — true at v2's close and twelve phases behind by then. What has been added since is in the `## Milestones` table below.)* See "Granularity Note" below.
+**Coverage:** derived, not written here: `grep -cE '^- \[[ x]\] \*\*[A-Z]+(-[A-Z]+)*-[0-9]+' .planning/REQUIREMENTS.md`; `planning-truth-gate.test.js` compares the checkboxes against the traceability tables on every `npm test`. *(This line said **93** until 2026-08-17 and **120** until 2026-09-25, with a v1/v2 split and a MAINT count that had drifted alongside it; the figure is not restated a third time. The command also gained `(-[A-Z]+)*`, and that part is not cosmetic — `[A-Z]+-[0-9]+` cannot parse `FORM-KEY-01`, so the recipe a reader was told to trust over the prose was itself two requirements short. Same hyphenated-prefix blindness `planning-truth-gate.test.js` records against its own `bodyPattern`.)*
 **Count note:** these two lines were themselves stale until 2026-08-07 — they said "15 phases" and
 "85 v1 requirements" after Phase 12 was split into 12 and 12.1, which is exactly the drift this note
 warns about. Older totals of 79 and 83 also survive further down this file and in the coverage table;
 they predate TEST-01..04 and the MAINT set. MAINT-03 owns reconciling those.
 **Recompute rather than trust any prose in this file, including this line:**
 ```
-grep -oE '\*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | sort -u | wc -l   # requirements
+grep -oE '\*\*[A-Z]+(-[A-Z]+)*-[0-9]+\*\*' .planning/REQUIREMENTS.md | sort -u | wc -l   # requirements
 grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          # phases
 ```
 **Created:** 2026-08-03
@@ -25,13 +25,19 @@ grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          
 | **v5** — a current engine and a filable return | 35, 38 | ✅ 38 shipped 2026-08-27; 35 shipped 2026-09-08 |
 | **v6** — a current engine, *actually* current | 39-42 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v6-ROADMAP.md) |
 | **v7** — the drop-in | 43 | ✅ **SHIPPED 2026-09-10** · [archive](./milestones/v7-ROADMAP.md) |
+| **v8** — the narrower trap | 44, 45 | ✅ **SHIPPED 2026-09-22** · [archive](./milestones/v8-ROADMAP.md) |
 
-**Only v6 and v7 are archived to `milestones/`.** v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36**, blocked since v4 on a person at a real client with real documents. Everything else is complete, Phase 43 included. Derive rather than trust:
+**v6, v7 and v8 are archived to `milestones/`**; v8 has a roadmap and a requirements archive there but no audit. v1-v5 are recorded in place, in the sections below and in `.planning/MILESTONES.md` — retro-filling them from a git log would be a reconstruction presented as a record. **The open phases are 34 and 36**, blocked since v4 on a person at a real client with real documents. Everything else is complete, Phases 43, 44 and 45 included. Derive rather than trust:
 
 ```sh
-grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 2 open — 34 and 36
-grep -cE '^- \[x\] \*\*Phase ' .planning/ROADMAP.md   # 40 complete
+grep -cE '^- \[ \] \*\*Phase ' .planning/ROADMAP.md   # 34 and 36
+grep -cE '^- \[x\] \*\*Phase ' .planning/ROADMAP.md
 ```
+
+**The completed count is no longer written beside the grep that answers it.** It said `40` while
+the grep answered `43` — the drift PRs #162 and #165 each fixed once and #165 then had to fix in
+its own correction. The open-phase annotation keeps its two phase NUMBERS, because those are what
+the count alone does not tell you; it names them instead of restating them.
 
 ## Overview
 
