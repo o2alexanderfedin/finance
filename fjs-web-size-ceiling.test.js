@@ -88,23 +88,73 @@ const freePort = () => new Promise((resolve, reject) => {
 })
 
 /**
- * One request, with keep-alive off.
+ * How long one request may take before it is called a failure.
+ *
+ * The large module is about a megabyte over the loopback interface, which takes
+ * about a second here, so thirty is far more room than a working server needs
+ * and still a bound. The leaves below are given a longer limit than this, on
+ * purpose: whichever clock runs out first writes the failure message, and this
+ * one knows the path and carries the server's own output.
+ */
+const requestTimeoutMs = 30_000
+
+/** The same bound for the start-up probe, short because a refusal is instant. */
+const probeTimeoutMs = 2_000
+
+/** How long the server gets to come up before the hook gives up. */
+const startupTimeoutMs = 20_000
+
+/**
+ * One request, with keep-alive off and a deadline.
  *
  * `agent: false` gives every call its own socket and closes it when the
  * response ends. A pooled socket would outlive the last assertion and hold the
  * process open, which reads as a hang rather than as a pass.
+ *
+ * THE DEADLINE IS NOT A CONVENIENCE. An error on the socket settles this
+ * promise, but a server that accepts the connection and then stops writing
+ * produces no error at all: the response never ends, the promise stays pending,
+ * and the open handles keep the test process alive. `node --test` sets no
+ * timeout of its own, so without the timer below that case gives no failing
+ * test and no output — the run sits there until something outside it loses
+ * patience. A half-sent body is the exact shape of breakage this file exists to
+ * notice, since `fjs web` answers from a lazy list of chunks, so the one failure
+ * mode most worth reporting was the one that could not be reported.
+ *
+ * `req.destroy(error)` is what turns it into a report: it emits `'error'` with
+ * that error, so the handler below is the single place a failure leaves here.
  */
-const fetchPath = (port, path) => new Promise((resolve, reject) => {
+const fetchPath = (port, path, timeoutMs) => new Promise((resolve, reject) => {
+    let timer = null
+    // Clearing matters as much as setting: a live timer is an open handle, and
+    // one left behind would hold the process for `timeoutMs` after the last
+    // assertion passed.
+    const fail = e => {
+        clearTimeout(timer)
+        reject(e)
+    }
     const req = httpRequest({ host: '127.0.0.1', port, path, method: 'GET', agent: false }, res => {
         const chunks = []
         res.on('data', chunk => chunks.push(chunk))
-        res.on('end', () => resolve({
-            status: res.statusCode,
-            headers: res.headers,
-            body: Buffer.concat(chunks),
-        }))
+        // Destroying the request mid-body makes the response emit too. Without
+        // this listener that would be an unhandled `'error'`, which ends the
+        // whole process instead of failing one leaf.
+        res.on('error', fail)
+        res.on('end', () => {
+            clearTimeout(timer)
+            resolve({
+                status: res.statusCode,
+                headers: res.headers,
+                body: Buffer.concat(chunks),
+            })
+        })
     })
-    req.on('error', reject)
+    req.on('error', fail)
+    timer = setTimeout(
+        () => req.destroy(new Error(
+            `no complete response for ${path} within ${timeoutMs} ms — the connection was `
+            + `accepted and the body never ended\n${served.said}`)),
+        timeoutMs)
     req.end()
 })
 
@@ -118,18 +168,25 @@ const served = { port: 0, child: null, said: '' }
  * the server refusing the port or the root and exiting with a message — is one
  * this loop reports, because a dead child makes every attempt fail and the
  * server's own words are in `served.said`.
+ *
+ * The budget is wall-clock, the way the other spawning suites here count it,
+ * and not a number of attempts: with a per-request deadline a count would
+ * multiply by it, so a server that stalled on every probe would keep the hook
+ * for a hundred times `probeTimeoutMs` instead of the twenty seconds promised.
  */
 const awaitServer = async port => {
+    const deadline = Date.now() + startupTimeoutMs
     let last = null
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+    while (Date.now() < deadline) {
         try {
-            return await fetchPath(port, `/${smallFile}`)
+            return await fetchPath(port, `/${smallFile}`, probeTimeoutMs)
         } catch (e) {
             last = e
             await new Promise(resolve => setTimeout(resolve, 100))
         }
     }
-    throw new Error(`fjs web never answered on port ${port}: ${last}\n${served.said}`)
+    throw new Error(
+        `fjs web never answered on port ${port} within ${startupTimeoutMs} ms: ${last}\n${served.said}`)
 }
 
 before(async () => {
@@ -146,13 +203,19 @@ before(async () => {
     served.child.stderr.on('data', chunk => { served.said += chunk })
     const first = await awaitServer(served.port)
     assert.equal(first.status, 200, `fjs web did not serve ${smallFile}: ${served.said}`)
-})
+    // An outer bound on the hook as well as on each request inside it, so this
+    // hook cannot become the unbounded wait again by a later edit.
+}, { timeout: 60_000 })
 
 after(() => {
     served.child.kill('SIGTERM')
 })
 
-test('MAINT-11: `fjs web` serves a file above the old `Vec` ceiling, every byte of it', async () => {
+test('MAINT-11: `fjs web` serves a file above the old `Vec` ceiling, every byte of it', {
+    // Longer than `requestTimeoutMs`, so the request's own deadline is what
+    // reports a stall; this one only catches a wait nothing else bounds.
+    timeout: 60_000,
+}, async () => {
     const onDisk = readFileSync(join(repoRoot, largeModule))
     const size = statSync(join(repoRoot, largeModule)).size
     assert.equal(onDisk.length, size)
@@ -160,7 +223,7 @@ test('MAINT-11: `fjs web` serves a file above the old `Vec` ceiling, every byte 
         `${largeModule} is ${size} bytes, which is not above the ${oldCeilingBytes}-byte ceiling this `
         + 'leaf exists to clear — name a file that is, or the leaf has stopped testing anything')
 
-    const got = await fetchPath(served.port, `/${largeModule}`)
+    const got = await fetchPath(served.port, `/${largeModule}`, requestTimeoutMs)
     // Through 0.51.0 this was `413`, with the size in the body: "file is
     // 1022499 bytes; this server cannot answer with more than 131072".
     assert.equal(got.status, 200,
@@ -173,7 +236,9 @@ test('MAINT-11: `fjs web` serves a file above the old `Vec` ceiling, every byte 
         `${largeModule} arrived at the right length and with different bytes`)
 })
 
-test('MAINT-11 control: a file under the old ceiling is served whole too', async () => {
+test('MAINT-11 control: a file under the old ceiling is served whole too', {
+    timeout: 60_000,
+}, async () => {
     // AGENTS.md's rule that a gate needs a control. Without this leaf, the one
     // above reads as "this server works"; with it, it reads as "this server
     // works ABOVE A SIZE", which is the claim being made.
@@ -181,7 +246,7 @@ test('MAINT-11 control: a file under the old ceiling is served whole too', async
     assert.ok(onDisk.length < oldCeilingBytes,
         `${smallFile} is ${onDisk.length} bytes and is supposed to be the SMALL case`)
 
-    const got = await fetchPath(served.port, `/${smallFile}`)
+    const got = await fetchPath(served.port, `/${smallFile}`, requestTimeoutMs)
     assert.equal(got.status, 200)
     assert.equal(got.body.length, onDisk.length)
     assert.equal(Buffer.compare(got.body, onDisk), 0)
