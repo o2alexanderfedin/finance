@@ -71,27 +71,41 @@ echo "  ← / →  move between steps"
 echo "  stop   Ctrl-C"
 echo
 
-# STILL `python3 -m http.server`, and MAINT-11 wanted this line to be
-# `fjs web` (2026-08-31). It cannot be, yet.
+# STILL `python3 -m http.server`, and MAINT-11 has wanted this line to be
+# `fjs web` since 2026-08-31. The reason changed on 2026-10-02; the answer did
+# not.
 #
-# `fjs web` answers **413** for any file larger than one `Vec` — 131072 bytes —
-# and ELEVEN files this demo loads are over that, `fjs/form1040/core/module.f.js`
-# being the largest. Do not quote a multiple from this comment: it said "7.6x,
-# 995159 bytes" as measured on 2026-08-31 and the file has since grown past
-# 1022000 bytes. Derive it instead — the count and the worst offender are what
-# matter, and only the count has held:
+# **The size ceiling that used to block it is gone.** `fjs web` answered `413`
+# to any file over one `Vec` — 131072 bytes — and eleven of the files this page
+# imports are over that. `functionalscript@0.52.0` made the response body a lazy
+# list of chunks, so `fjs web` now serves `fjs/form1040/core/module.f.js` whole,
+# all 1022499 bytes of it, byte for byte. `fjs-web-size-ceiling.test.js` is that
+# measurement, kept as a test.
 #
-#   node -e "import('functionalscript/fjs/types/bit_vec/module.f.mjs').then(m=>{ … })"
+# **What blocks the swap now is speed, and it is not close.** Measured on
+# 2026-10-02 against 0.53.0, same file, same disk, same machine:
 #
-# (the full recipe is in fjs/todo/upstream-web-vec-size-limit.md).
-# The swap was made, and the UI suite
-# caught it: 44 of 46 tests failed with an empty `#dialect` and an empty `#step`,
-# because the engine modules the page imports never arrived. Recorded in
-# `fjs/todo/upstream-web-vec-size-limit.md`.
+#     fjs web                   565 ms   (1.73 MB/s)
+#     python3 -m http.server      1 ms
 #
-# So this is the one place something outside `functionalscript` is still
-# executed, and it is not an oversight — it is the open gap named above. When
-# `fjs web` can stream a file larger than a `Vec`, this becomes:
+# The page imports about 3.2 MB of engine, so a cold load is 4.4 s against
+# `fjs web` and 0.17 s against python3. A reload costs the same 4.4 s again,
+# because `fjs web` sends no `Last-Modified` and no `ETag`, so nothing can be
+# revalidated — python3 sends one and answers `304`, which is why its reload is
+# 37 ms. The swap was made and the UI suite failed **7 of 47** cases, every one
+# of them a `page.reload()` that ran past the 30-second budget.
+#
+# The cost is not the file read. Reading those bytes takes under a millisecond;
+# turning them into `Vec` chunks takes 195 ms and turning those chunks back into
+# bytes for the socket takes 322 ms, which is the 517 ms the response takes. A
+# `Vec` is a bigint that carries its length, so a 131072-byte chunk is a
+# million-bit integer and every byte crosses that boundary twice per response.
+# Lifting the ceiling removed the limit on how big one of those may be; it did
+# not change the cost per byte.
+#
+# Recorded in `fjs/todo/upstream-web-vec-throughput.md`, which replaced the
+# ceiling note. When `fjs web` can serve this page at a speed a person would
+# accept, this becomes:
 #
 #     exec "$repo/node_modules/.bin/fjs" web "$site" "$port"
 #

@@ -92,7 +92,14 @@ same day, so "still carried forward" is true of two phases now, not three.
 ## Next Milestone Goals
 
 **Not decided, and for the first time in three milestones there is no dependency candidate
-waiting.** `functionalscript@0.49.0` is installed and is the latest published version.
+waiting.** **Do not read a version out of this line.** It said `0.49.0` from 2026-09-10 until
+2026-10-02, through two releases this repository took, because a version number written beside
+prose nobody is editing is a fact with no owner. Derive it:
+
+```sh
+node -p "require('./node_modules/functionalscript/package.json').version"
+node -p "require('./package-lock.json').packages['node_modules/functionalscript'].version"
+```
 
 The open question is the oldest one: **whether the accountant-facing demo becomes a requirement
 category of its own.** Browser hand entry, generated forms, the client-side store, the
@@ -109,6 +116,20 @@ waiting for, so it was deleted rather than annotated, which is what its own clos
 for. `fjs/todo/upstream-web-vec-size-limit.md` **stays** — both checks it prescribes still answer
 no, so the `fjs web` ceiling stands and MAINT-11 stays PARTIAL. The next release is the next
 time this fires, and one note is left to re-read.
+
+**0.53.0 published on 2026-09-30 and the re-read rule fired again — the note is gone and the
+adoption is still blocked.** `fjs web`'s `413` above 131,072 bytes was lifted in **0.52.0**:
+the server now answers the engine's largest module whole, all 1,022,499 bytes of it, verified
+byte for byte over a socket. So `fjs/todo/upstream-web-vec-size-limit.md` is **deleted**, per
+the convention its own closing rule stated, and `functionalscript#1819` is closed.
+
+**MAINT-11 stays PARTIAL anyway, on a newly measured blocker.** `fjs web` serves at 1.7 MB/s
+where `python3 -m http.server` answers the same file in 1 ms, and it sends no `Last-Modified`
+or `ETag`, so a reload re-downloads the whole engine. The showcase page loads in 4.4 s against
+it and 0.17 s against python3; the swap was made and reverted again, with the UI suite failing
+7 of 47 cases on `page.reload()` timeouts. Recorded in
+`fjs/todo/upstream-web-vec-throughput.md`, which replaced the ceiling note, and measured in
+`.planning/reports/fjs-0.53.0-migration.md`.
 
 ## Requirements
 
@@ -138,8 +159,11 @@ every `npm test`, so the two cannot disagree silently.
 **One is complete with a live caveat.** MAINT-11 is ticked on the strength of `toolResultStep`,
 `memoryRun` and `path.escapes`; its `fjs web` item is blocked upstream and `demo/serve.sh` still
 runs `python3`. The tick is accurate to what the requirement delivered and the gap is recorded
-in `fjs/todo/upstream-web-vec-size-limit.md` — but a reader who stops at the checkbox gets the
-wrong picture, which is why it is named here.
+in `fjs/todo/upstream-web-vec-throughput.md` — but a reader who stops at the checkbox gets the
+wrong picture, which is why it is named here. *(That pointer named
+`upstream-web-vec-size-limit.md` until 2026-10-02, when the size ceiling was fixed upstream and
+the note was deleted. The caveat survived the fix because the blocker changed rather than
+closed — which is the one case where a pointer to a gap outlives the gap it was written for.)*
 
 **The Active list below is v1's, kept as written.** It was never rewritten as requirements
 landed; `REQUIREMENTS.md` is the live ledger and this is the origin document.

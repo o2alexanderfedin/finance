@@ -796,8 +796,14 @@ export const proof = {
              * handlers over the still-threaded memory state, isolating this
              * batch's own stdout (each call starts from a fresh `stdout`)
              * while carrying every other field of `state` (crucially
-             * `memoryValues`/`memoryNext`, so the session and cache slots
-             * persist across batches) forward.
+             * `memory`, so the session and cache slots persist across
+             * batches) forward.
+             *
+             * That field was `memoryValues`/`memoryNext` until
+             * `functionalscript@0.51.0` folded both into one `memory`. The
+             * spread is why nothing here had to change, and why nothing
+             * complained — a docstring naming a field that no longer exists
+             * reads as an instruction to look for it.
              * @type {(state: State, messages: readonly unknown[]) => readonly [State, readonly Unknown[]]}
              */
             const runBatch = (state, messages) => {

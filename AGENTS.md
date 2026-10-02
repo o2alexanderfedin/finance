@@ -34,6 +34,11 @@
       `form1040-pdf-gate.test.js` is pinned by `@cantoo/pdf-lib` alone — and, independently, by
       the `Vec` ceiling: `readFile` cannot exceed **131,072** bytes and `forms/f1040-2025.pdf` is
       **220,237**, the same ceiling as `functionalscript#1819` reached from the reading side.
+
+      **`#1819` closed in `functionalscript@0.52.0` and this `readFile` ceiling did not move** —
+      verified 2026-10-02, `fjs/effects/node/module.mjs` still refuses a file above
+      `maxLengthBytes`. The issue was about a *response* body, and only the response changed.
+      Written down because the obvious inference from "that issue is closed" is the wrong one.
 - The files can be used as normal ESM files.
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
