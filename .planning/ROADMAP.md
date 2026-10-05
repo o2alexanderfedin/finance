@@ -1904,7 +1904,7 @@ Archived: [`milestones/v8-ROADMAP.md`](./milestones/v8-ROADMAP.md)
       0.50.0, so an explicit bump. **The source diff is not empty, unlike 0.49.0's:** `parse`
       stopped sorting string keys and one proof of 3,457 reddened — the one written to pin that
       asymmetry. Split into two leaves, one per direction, both watched to fail. `tsc` 0; 30
-      schemas byte-identical (`f2f79e40a957e7a6`); 3458/0 · 13/13 · 47/47 · 100/100/100. Report:
+      schemas byte-identical (`6062f5b85f01160b`); 3458/0 · 13/13 · 47/47 · 100/100/100. Report:
       `.planning/reports/fjs-0.50.0-migration.md`. PR #173.
 
 - [x] **Phase 45: Publish the guest vocabulary** — MCP-10. `fjs_run`'s description now names the
