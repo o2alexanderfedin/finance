@@ -13,7 +13,7 @@ repository's requirement document is one cumulative file whose IDs are cited fro
 
 | ID | Tier | Statement | Verdict | Where it is proven |
 |---|---|---|---|---|
-| **MAINT-17** | T3 | Take `functionalscript` 0.50.0. `^0.49.0` does not admit it, so an explicit bump | ✅ **COVERED** | `package.json` declares `^0.50.0`, 0.50.0 installed, `tsc` **0**. 30 schemas byte-identical (`f2f79e40a957e7a6`); `npm test` 3458/3458 at the bump, `test:integration` 13/13, `test:ui` 47/47, `cov` 100/100/100. Phase 44, PR #173 |
+| **MAINT-17** | T3 | Take `functionalscript` 0.50.0. `^0.49.0` does not admit it, so an explicit bump | ✅ **COVERED** | `package.json` declares `^0.50.0`, 0.50.0 installed, `tsc` **0**. 30 schemas byte-identical (`6062f5b85f01160b`); `npm test` 3458/3458 at the bump, `test:integration` 13/13, `test:ui` 47/47, `cov` 100/100/100. Phase 44, PR #173 |
 | **MAINT-18** | T3 | A consumer-side migration report for 0.50.0 | ✅ **COVERED** | `.planning/reports/fjs-0.50.0-migration.md`, with §7 reproducing every number from the installed package. Phase 44, PR #173 |
 | **MCP-10** | T2 | The MCP surface names the vocabulary a stored program is written in | ✅ **COVERED** | `fjs_run`'s description publishes the entry-point spelling and all ten `ctx.` members, derived from `taxGuestCtx`. The integration leaf that pinned the gap is inverted; `abiNamesAreTheContextsOwnKeys` and `publishedEntryPointSpellingMatchesThisProgramsOwn` guard the halves that could drift. `npm test` 3460/3460. Phase 45, PR #174 |
 
