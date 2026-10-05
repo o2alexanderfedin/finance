@@ -1901,6 +1901,32 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       `functionalscript#1819`. `path.escapes` and `memoryRun` are
       **deliberately not adopted**: neither has a hand-rolled equivalent here to delete, which is
       this requirement's own criterion for adoption.
+
+      **Outcome, 2026-10-02: the ceiling is gone and the item is still open, on a different
+      blocker.** `functionalscript@0.52.0` made the response body a lazy list of chunks, so
+      `fjs web` serves `fjs/form1040/core/module.f.js` whole — 1,022,499 bytes, byte-identical
+      over a socket, verified on every version between (413 at 0.50.0 and 0.51.0, 200 at 0.52.0
+      and 0.53.0). `functionalscript#1819` is closed and
+      `fjs/todo/upstream-web-vec-size-limit.md` is **deleted** per its own closing rule; the
+      reproduction lives on as `fjs-web-size-ceiling.test.js` so that deleting the note did not
+      stop the measurement being made.
+
+      **What blocks the swap now is speed.** `fjs web` answers that file at **1.73 MB/s** where
+      `python3 -m http.server` answers it in **1 ms**, and it sends no `Last-Modified` or
+      `ETag`, so a reload re-downloads the whole engine rather than revalidating it. The page
+      imports about 3.2 MB, so a cold load is 4.4 s against `fjs web` and 0.17 s against
+      python3. The swap was made and reverted for the second time, and the UI suite caught it
+      for the second time: **7 of 47** cases failed, every one a `page.reload()` past the
+      30-second budget, and the run took 4.0 minutes against python3's 17.4 seconds. The cost
+      is not the file read — reading those bytes is sub-millisecond, while turning them into
+      `Vec` chunks is 195 ms and turning the chunks back into bytes for the socket is 322 ms,
+      which is the whole response. Recorded in `fjs/todo/upstream-web-vec-throughput.md` and
+      measured in [`.planning/reports/fjs-0.53.0-migration.md`](./reports/fjs-0.53.0-migration.md).
+
+      **So MAINT-11 stays PARTIAL, and the reason in its table rows is now one version old.**
+      The rows say *blocked upstream*, which is still true; what changed is which upstream
+      thing. A reader who takes `131072` from the paragraph above and checks it against 0.53.0
+      will find it fixed and conclude this item is done. It is not.
 - [x] **MAINT-12** *(T3)*: **A consumer-side migration report for 0.47.0**, in the shape of
       `.planning/reports/fjs-0.46.1-migration.md`. Sergey asked for the 0.46 one explicitly
       in `todo/update-fjs-0.46.0` (PR #96): *"an extensive, structured report on the migration
@@ -2521,3 +2547,39 @@ there is still no file-handle effect, so **MAINT-11 stays PARTIAL** and `#1819` 
 **Phases 34 and 36 are still not in a milestone.** Phase 36's code half closed here as MCP-10;
 what remains of both is blocked on a person at a real client with real documents, which no
 release changes.
+
+---
+
+## Shipped outside the ledger — `functionalscript` 0.53.0, 2026-10-02
+
+**No milestone was open and no new requirement ID was coined**, which is deliberate: this is a
+dependency bump plus one attempt at an item that was already written down. Recording it here
+rather than coining the next `MAINT-` number keeps the ledger a record of decisions rather than
+of commits.
+
+*(The first draft of that sentence named the number it was declining to coin, and
+`planning-truth-gate.test.js` failed on it — "IDs cited with no requirement behind them".
+Worth recording, because the gate was doing precisely its job on prose that was trying to be
+careful: in this file an ID in a sentence is a citation, whatever the sentence says about it.)*
+
+`package.json` declares `^0.53.0` and 0.53.0 is installed; `tsc` **0** (and **0** again measured
+from outside the parent checkout, which is the only form AGENTS.md trusts in a nested worktree);
+all 30 served dialect schemas **byte-identical**, sha `6062f5b85f01160b` both sides; the
+proof-leaf set is **3391 → 3391** with `comm -23` empty and no file's assertion count moved (123
+files, 11,578 assertions); `npm test` **3466/3466** — 3464 before the bump, plus the two leaves
+of the new test; `test:integration` **13/13**; `test:ui` **47/47** in 17.7 s; `npm run cov`
+**100.00/100.00/100.00**. The report is
+[`.planning/reports/fjs-0.53.0-migration.md`](./reports/fjs-0.53.0-migration.md).
+
+**MAINT-11 was attempted and stays PARTIAL.** Its paragraphs above carry the measurement. The
+one-line summary: the ceiling it was blocked on is genuinely gone, and `fjs web` is too slow to
+serve this page.
+
+**The 0.50.0 report's schema digest does not reproduce, and the reason is a redirection.**
+`f2f79e40a957e7a6` is the sha256 of the dump **with the harness's `stderr` merged into the
+stream** — `2>&1 |` rather than `>` — so it hashes the line `dialects: 30` as well as the
+schemas. `6062f5b85f01160b` is the schemas alone, and it is what 0.48.0, 0.49.0, 0.50.0 and
+0.53.0 all answer. That report's explanation — *"the served surface grew between the two
+milestones"* — is wrong: re-running the harness against the tree at the 0.50.0 bump commit
+itself answers `6062f5b85f01160b`. The historical citations are left where they are; this is
+the correction.

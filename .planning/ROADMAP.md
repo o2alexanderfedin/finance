@@ -1161,7 +1161,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: DOC-25 · **Tier**: T3 · **Status**: complete — milestone v6, 2026-08-31. Option 1 (the write boundary), not the note's preferred Option 2; the reason is in `fjs/todo/no-dialect-validation-on-the-write-path.md` under "How it was closed".
 
 ### Phase 41: New Capabilities and the Migration Report
-**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: complete except MAINT-11's `fjs web` item, blocked upstream — milestone v6, 2026-08-31. The report is `fjs-0.48.0-migration.md`, not `-0.47.0-`: v6 superseded 0.47.0 before this phase ran, and 0.47.0's own unreported migration is folded in as §5.1. `fjs web` cannot serve a file over 131072 bytes and eleven of the demo's do; see `fjs/todo/upstream-web-vec-size-limit.md`, filed upstream as `functionalscript#1819`.
+**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: complete except MAINT-11's `fjs web` item, blocked upstream — milestone v6, 2026-08-31. The report is `fjs-0.48.0-migration.md`, not `-0.47.0-`: v6 superseded 0.47.0 before this phase ran, and 0.47.0's own unreported migration is folded in as §5.1. `fjs web` could not serve a file over 131072 bytes and eleven of the demo's exceed that; filed upstream as `functionalscript#1819`, **fixed in fjs 0.52.0 and verified here on 2026-10-02**. The item is still open: `fjs web` serves at 1.73 MB/s where python3 answers the same file in 1 ms, so the page takes 4.4 s to load against 0.17 s and the UI suite fails 7 of 47 on reload timeouts. See `fjs/todo/upstream-web-vec-throughput.md`, which replaced the ceiling note.
 
 ### Phase 42: Take FunctionalScript 0.48.0
 **Requirements**: MAINT-14 · **Tier**: T3 · **Status**: complete — milestone v6, shipped in PR #144 (merge `80b5e1e`)
@@ -1232,7 +1232,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 38. Take FunctionalScript 0.47.0 | v5 | 0/0 — no plans written | Complete (MAINT-09); superseded four days later by 0.48.0 in Phase 42 | 2026-08-27 · PR #139 |
 | 39. Retire the Protocol-Version Gap | **v6** | 0/0 — no plans written | Complete (MAINT-10); three dangling citations removed, and the proof that could not have failed replaced by one that watches the negotiation | 2026-08-31 · PR #145 |
 | 40. Validation on the Write Path | **v6** | 0/0 — no plans written | Complete (DOC-25); `cas_add` now refuses content that declares a finance dialect and does not satisfy it | 2026-08-31 · PR #146 |
-| 41. New Capabilities and the Migration Report | **v6** | 0/0 — no plans written | Complete (MAINT-11 partial / MAINT-12 / MAINT-13); the `fjs web` half of MAINT-11 is blocked upstream on a 131072-byte ceiling, filed in `fjs/todo/` | 2026-08-31 · PR #147 |
+| 41. New Capabilities and the Migration Report | **v6** | 0/0 — no plans written | Complete (MAINT-11 partial / MAINT-12 / MAINT-13); the `fjs web` half of MAINT-11 is still blocked upstream — the 131072-byte ceiling was fixed in fjs 0.52.0 and the blocker is now throughput, 1.73 MB/s against python3's 1 ms, re-measured 2026-10-02 and recorded in `fjs/todo/` | 2026-08-31 · PR #147 |
 | 42. Take FunctionalScript 0.48.0 | **v6** | 0/0 — no plans written | Complete; 140 rtti sites and 459 `option` calls rewritten, all 30 served schemas byte-identical | 2026-08-31 · PR #144 |
 | 43. Take FunctionalScript 0.49.0 | **v7** | 0/0 — no plans written | Complete (MAINT-15, MAINT-16); zero source lines changed, all 30 schemas byte-identical, 3388 proof leaves in and out | 2026-09-10 |
 
@@ -1919,3 +1919,19 @@ file-handle effect, so `fjs web` still answers 413 above the cap and `demo/serve
 response type.
 
 </details>
+
+---
+
+## Outside the ledger — `functionalscript` 0.53.0, 2026-10-02
+
+**No phase row.** No milestone was open, nothing in this ledger moved, and the work was a
+dependency bump plus one attempt at an item Phase 41 had already written down. The record is
+`.planning/REQUIREMENTS.md`'s "Shipped outside the ledger" section and
+`.planning/reports/fjs-0.53.0-migration.md`.
+
+**MAINT-11's `fjs web` half no longer waits on what it used to wait on.** The 131072-byte
+ceiling, which held it from milestone v6 through v8, was lifted in fjs **0.52.0**, and
+`fjs/todo/upstream-web-vec-size-limit.md` is deleted because its own reproduction now passes.
+The item is still PARTIAL: `fjs web` is 26 times slower than `python3 -m http.server` on this
+page and 120 times slower on a reload, so the swap was made and reverted a second time. Phase
+41's row above says so, and the measurement is in `fjs/todo/upstream-web-vec-throughput.md`.

@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v8
 milestone_name: The Narrower Trap
 status: complete
-stopped_at: "Milestone v8 (The Narrower Trap) is CLOSED and archived 2026-09-22, two phases, both complete. Phase 44 took functionalscript 0.50.0: unlike 0.49.0 the source diff is NOT empty - parse stopped sorting string keys and now answers ECMAScript property order (integer-like first, ascending, then source order), which reddened the one proof written to pin that asymmetry. It is split into two leaves, one per direction, both watched to fail. All of Phase 42 criteria met: tsc 0, 30 served schemas byte-identical f2f79e40a957e7a6, integration 13/13, ui 47/47, cov 100/100/100. Report .planning/reports/fjs-0.50.0-migration.md. fjs/todo/upstream-evo-list-raw-typeerror.md DELETED - 0.50.0 carries functionalscript#1899, verified by running that note own reproduction, which answers memory key not found: 0. Phase 45 closed MCP-10: fjs_run description now publishes the guest entry-point spelling and all ten ctx. members, derived from taxGuestCtx so the list cannot drift; the integration leaf that pinned the gap is inverted rather than deleted. That is Phase 36 CODE half - Phase 36 stays open for the half needing a person. PRs #173, #174. Upstream in the same window: #2079 merged (one readChunks for both fjs/cas loops) and #2203 opened, correcting the streaming design that was written before ReadWhole existed. THE PROGRESS BLOCK BELOW IS PROJECT-WIDE, NOT MILESTONE-SCOPED, and its figures are derived by the two greps in .planning/milestones/v8-REQUIREMENTS.md rather than carried forward. STILL OPEN: phases 34 and 36, blocked since v4 and v5 on a person at a real client; MAINT-11 fjs web half, PARTIAL from v6, blocked on ServerResponse.body being one Vec (functionalscript#1819)."
-last_updated: "2026-09-25T08:37:39.000Z"
-last_activity: 2026-09-22
+stopped_at: "Milestone v8 (The Narrower Trap) is CLOSED and archived 2026-09-22 and no milestone has opened since. WORK SHIPPED OUTSIDE THE LEDGER 2026-10-02: functionalscript 0.53.0 taken, and MAINT-11 fjs web half attempted and still PARTIAL. The bump is clean - tsc 0 in the worktree and 0 again measured from outside the parent checkout, 30 served schemas byte-identical sha 6062f5b85f01160b both sides, proof-leaf set 3391 to 3391 with comm -23 empty, 123 files and 11578 assertions with no count moving, integration 13/13, ui 47/47, cov 100/100/100. Nothing reddened; the one source consequence is a docstring in fjs/server that named memoryValues/memoryNext, which 0.51.0 folded into one memory field. THE fjs web CEILING IS GONE AND MAINT-11 IS STILL PARTIAL, which is the thing to read twice: functionalscript#1819 was fixed in 0.52.0 and fjs/todo/upstream-web-vec-size-limit.md is DELETED per its own closing rule, verified by running its reproduction on every version between - 413 at 0.50.0 and 0.51.0, 200 with all 1022499 bytes byte-identical at 0.52.0 and 0.53.0. What blocks the demo swap now is speed: fjs web answers that file at 1.73 MB/s where python3 -m http.server answers it in 1 ms, and it sends no Last-Modified or ETag so a reload re-downloads the whole engine. The page loads in 4.4 s against it and 0.17 s against python3; the swap was made and reverted a second time with the UI suite failing 7 of 47 on page.reload timeouts, 4.0 minutes against 17.4 seconds. Recorded in fjs/todo/upstream-web-vec-throughput.md. ALSO CORRECTED: the 0.50.0 report schema digest f2f79e40a957e7a6 does not reproduce - it is the sha256 of the dump with the harness stderr merged in, 2>&1 rather than >, and the schemas alone have answered 6062f5b85f01160b since 0.48.0. Report .planning/reports/fjs-0.53.0-migration.md. THE PROGRESS BLOCK BELOW IS PROJECT-WIDE, NOT MILESTONE-SCOPED, and no ledger row moved. STILL OPEN: phases 34 and 36, blocked since v4 and v5 on a person at a real client; MAINT-11 fjs web half, PARTIAL from v6."
+last_updated: "2026-10-02T13:40:00.000-07:00"
+last_activity: 2026-10-02
 progress:
   total_phases: 46
   completed_phases: 43
@@ -44,10 +44,10 @@ file: it is what a stale document says whether or not it is true.**)*
 
 ## Session
 
-Status: complete — milestone v8 is CLOSED and archived; no milestone is open
-Stopped at: Milestone v8 (The Narrower Trap) closed and archived 2026-09-22, two phases both complete. Phase 44 took functionalscript 0.50.0; Phase 45 published the guest vocabulary on the MCP surface, which is Phase 36's code half. PRs #173 and #174 shipped the work; #175 wrote the record. The detail is in MILESTONES.md's v8 entry and in .planning/reports/fjs-0.50.0-migration.md - not in the frontmatter above, which is the copy this line overwrites. Open: phases 34 and 36, and MAINT-11's fjs web half.
-Progress: [█████████░] 93% — **project-wide**, 43 of 46 roadmap rows. Milestone v8 itself was 2 of 2.
-Last activity: 2026-09-22
+Status: complete — milestone v8 is CLOSED and archived; no milestone is open, and the work of 2026-10-02 shipped outside the ledger
+Stopped at: Milestone v8 (The Narrower Trap) remains the last closed milestone, archived 2026-09-22. Since then, outside the ledger: functionalscript 0.53.0 taken on 2026-10-02 and MAINT-11's fjs web half attempted and left PARTIAL. The bump is clean on every gate; the attempt is not, and the reason changed — the 131072-byte ceiling was fixed upstream in 0.52.0, so fjs/todo/upstream-web-vec-size-limit.md is deleted, and what blocks the swap now is that fjs web serves this page 26 times slower than python3. The detail is in .planning/reports/fjs-0.53.0-migration.md and in fjs/todo/upstream-web-vec-throughput.md - not in the frontmatter above, which is the copy this line overwrites. Open: phases 34 and 36, and MAINT-11's fjs web half.
+Progress: [█████████░] 93% — **project-wide**, 43 of 46 roadmap rows. No ledger row moved on 2026-10-02.
+Last activity: 2026-10-02 — functionalscript 0.53.0 taken; MAINT-11 attempted and still PARTIAL
 
 *(That percentage is **project-wide**, and the fraction beside it counts ROADMAP.md's ledger
 rows rather than the milestone's phases. One row — Phase 14, marked `- [→]` (moved to v3 and
@@ -141,8 +141,9 @@ Phase: none in flight — milestone v8 closed 2026-09-22; no milestone is open
 Plan: —
 Status: Between milestones. Two open phases (34, 36) carry forward, blocked on a person at a
   real client with real documents — not on a decision, a release, or any work that can be done
-  here.
-Last activity: 2026-09-22 — Milestone v8 closed and archived
+  here. A third item, MAINT-11's `fjs web` half, is blocked on a release again — on a
+  different property of it than before, measured 2026-10-02.
+Last activity: 2026-10-02 — functionalscript 0.53.0 taken outside the ledger
 
 **Not "nothing is in flight".** This file records that as its most dangerous sentence, because
 it is what a stale document says whether or not it is true. What is accurate: no phase is being
@@ -152,6 +153,19 @@ moved them, directly above this file's own "Test metrics — MEASURE, do not rea
 closing measurements are in `MILESTONES.md`'s v8 entry and in
 `.planning/reports/fjs-0.50.0-migration.md`; run the commands for today's. What is *owed* is in
 `MILESTONES.md` under each milestone's "Known gaps at close".
+
+**One paragraph of that is now one version old, and the correction matters more than the
+version.** `functionalscript@0.53.0` was taken on 2026-10-02, outside any milestone, and the
+measurements are in `.planning/reports/fjs-0.53.0-migration.md`. The part worth reading before
+anything else: **MAINT-11's `fjs web` half is no longer blocked on the size ceiling.** That
+ceiling — `413` above 131,072 bytes, which held the item from v6 through v8 — was fixed
+upstream in **0.52.0**, verified here by running the blocking note's own reproduction on every
+version between, and `fjs/todo/upstream-web-vec-size-limit.md` is deleted. The item is still
+PARTIAL because `fjs web` serves the showcase at 1.73 MB/s against python3's 1 ms for the same
+file, with no cache validator, so the page needs 4.4 s to load and 4.4 s again to reload. The
+new record is `fjs/todo/upstream-web-vec-throughput.md`. **A reader who checks the old
+blocker and finds it fixed will conclude this item is done, and that is the mistake this
+paragraph exists to prevent.**
 
 **Read `.planning/MILESTONES.md` and `.planning/RETROSPECTIVE.md` first.** Both were created
 at v6's close. MILESTONES.md carries v6, v7 and v8; **RETROSPECTIVE.md stops at v7** — v8 has
