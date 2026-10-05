@@ -39,7 +39,7 @@ full bodies stay where the gate can read them.
 | **MAINT-11** | T3 | Adopt the 0.48.0 capabilities that **remove** code here — `toolResultStep`, `memoryRun`, `path.escapes`, `fjs web` | ⚠️ **PARTIAL — blocked upstream** | `toolResultStep` adopted at 4 sites in `fjs/server/module.f.js`; `okResult`/`errorResult` no longer appear at all. **The `fjs web` half is not done:** it answers 413 above 131072 bytes and eleven demo modules exceed it, so `demo/serve.sh:74-86` still runs `python3`. `fjs/todo/upstream-web-vec-size-limit.md` → [`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819), **still open**. Phase 41, PR #147 |
 | **MAINT-12** | T3 | A consumer-side migration report, in the shape Sergey asked for in `todo/update-fjs-0.46.0` | ✅ **COVERED** | `.planning/reports/fjs-0.48.0-migration.md`, 232 lines. Named for 0.48.0, not 0.47.0 — v6 superseded 0.47.0 before the phase ran, and 0.47.0's own unreported migration is folded in as §5.1, which carries the headline finding. Phase 41, PR #147 |
 | **MAINT-13** | T3 | An fjs gap may be taken upstream directly — standing authority granted 2026-08-27 | ✅ **COVERED** | `AGENTS.md:25`, written as an **extension** of the existing gap rule at `:24`, with the re-read rule at `:26`. Exercised three times since: `#1819`, `#1893` → `#1899` (merged), `#1900` (merged). Phase 41, PR #147 |
-| **MAINT-14** | T3 | Take `functionalscript` 0.48.0 — `rtti` relocated (140 sites), `option` stopped being a function (459 calls / 34 files) | ✅ **COVERED** | `toJsonSchema` over **all 30** served dialect schemas byte-identical across the bump (sha `f2f79e40a957e7a6`) — the criterion that decides the phase, because a 459-site `option` rewrite is exactly the shape of change that alters every served schema while looking mechanical. Phase 42, PR #144 |
+| **MAINT-14** | T3 | Take `functionalscript` 0.48.0 — `rtti` relocated (140 sites), `option` stopped being a function (459 calls / 34 files) | ✅ **COVERED** | `toJsonSchema` over **all 30** served dialect schemas byte-identical across the bump (sha `6062f5b85f01160b`) — the criterion that decides the phase, because a 459-site `option` rewrite is exactly the shape of change that alters every served schema while looking mechanical. Phase 42, PR #144 |
 
 **Count at close:** 134 requirements in `.planning/REQUIREMENTS.md`, **134 checked, 0 unchecked.**
 Derive rather than quote:
@@ -76,3 +76,13 @@ Carried forward from v4 at their original numbers. The v2 Tier-B ruling in
 `.planning/REQUIREMENTS.md` is why: a phase without an ID is preferable to an ID invented to
 give it one. 35 completed on 2026-09-08; 34 and 36 remain open, blocked on the same person at
 the same real client they have been blocked on since v4.
+
+---
+
+**Digest corrected 2026-10-04.** This record cited `f2f79e40a957e7a6` for the 30 served schemas.
+That digest was the dump with the harness's own `stderr` line `dialects: 30` merged into the
+hashed file, from running it as `> after.txt 2>&1`. The schemas themselves have answered
+`6062f5b85f01160b` since 0.48.0 and have not changed. The criterion was met either way — both
+sides of every comparison used the same redirection — so only the recorded number was wrong, and
+it is corrected above rather than annotated in place, because a wrong digest invites the next
+reader to trust it.
