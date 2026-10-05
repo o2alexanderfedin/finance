@@ -2533,7 +2533,7 @@ bump, so **MAINT-11 stays PARTIAL** and `#1819` stays open).
 | MCP-10 | T2 | 45. Publish the guest vocabulary | v8 | Complete |
 
 **Executed 2026-09-22.** `package.json` declares `^0.50.0` and 0.50.0 is installed; `tsc` **0**;
-all 30 served dialect schemas **byte-identical** (`f2f79e40a957e7a6` both sides); `npm test`
+all 30 served dialect schemas **byte-identical** (`6062f5b85f01160b` both sides); `npm test`
 **3460/3460**, `test:integration` **13/13**, `test:ui` **47/47**, `npm run cov`
 **100.00/100.00/100.00**. The report is
 [`.planning/reports/fjs-0.50.0-migration.md`](./reports/fjs-0.50.0-migration.md).

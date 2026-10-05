@@ -51,7 +51,7 @@ the proof that watches it.
 | # | Criterion | Result |
 |---|---|---|
 | 1 | `package.json` names 0.50.0 explicitly; `tsc` 0 | ✅ `^0.50.0`, 0.50.0 installed |
-| 2 | `toJsonSchema` over all 30 dialect schemas **byte-identical** | ✅ `f2f79e40a957e7a6` both sides |
+| 2 | `toJsonSchema` over all 30 dialect schemas **byte-identical** | ✅ `6062f5b85f01160b` both sides |
 | 3 | Full battery green | ✅ 3458/0 · 13/13 · 47/47 · 100/100/100 |
 
 **Criterion 2 is the one that decides**, for the reason 0.49.0's report gives and this release
@@ -59,8 +59,21 @@ does not weaken: the served schemas are built from upstream's `rtti` combinators
 function of the dependency and not of our source. A release that changes `parse` could have
 changed them. It did not, and that was run rather than assumed.
 
-**The sha differs from 0.49.0's `6062f5b85f01160b`** because the served surface grew between the
-two milestones. The criterion is that both sides of *this* comparison agree, and they do.
+**Corrected 2026-10-04: an earlier version of this line said the sha was `f2f79e40a957e7a6`,
+and explained the difference from `6062f5b85f01160b` as the served surface having grown.** Both
+halves were wrong. The schemas have answered `6062f5b85f01160b` since 0.48.0 and did not change;
+the other number came from running the dump as `> after.txt 2>&1`, which merged the harness's own
+`stderr` line `dialects: 30` into the file being hashed. Measured both ways:
+
+```sh
+node .../schema-dump.mjs > a.txt 2>&1   # 31 lines, f2f79e40a957e7a6
+node .../schema-dump.mjs > b.txt        # 30 lines, 6062f5b85f01160b
+diff b.txt a.txt                        # the only difference: "dialects: 30"
+```
+
+The criterion itself was met either way — both sides of the comparison used the same redirection,
+so they agreed. What was wrong was the recorded digest and the reason given for it, and a
+confident explanation of a number nobody re-derived is worse than no explanation.
 
 ## 5. The two notes the re-read rule named
 
@@ -112,7 +125,7 @@ npm i functionalscript@0.50.0
 npx tsc --noEmit                                     # §4 criterion 1
 
 node .planning/reports/fjs-0.48.0-migration-harness/schema-dump.mjs > after.txt
-diff before.txt after.txt                            # §4 criterion 2; sha f2f79e40a957e7a6
+diff before.txt after.txt                            # §4 criterion 2; sha 6062f5b85f01160b
 
 npm test && npm run test:integration && npm run test:ui && npm run cov   # §4 criterion 3
 
